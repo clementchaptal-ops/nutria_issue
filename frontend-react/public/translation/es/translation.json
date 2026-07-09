@@ -1,0 +1,160 @@
+{
+  "app_title": "NUTRIA - Finalizar el informe",
+  "loading": "Conexión segura con LabWare en curso...",
+  "error": {
+    "no_id": "No se encontró ningún ID de ticket en la URL.",
+    "not_found": "No se puede encontrar este billete previo",
+    "validation": "Error al validar el ticket"
+  },
+  "form": {
+    "title_label": "Título del número:",
+    "title_placeholder": "Ej: Error al crear un nuevo lote",
+    "type_label": "Tipo de problema:",
+    "desc_label": "Descripción detallada:",
+    "desc_placeholder": "Describe paso a paso lo que estabas haciendo justo antes del incidente...",
+    "submit": "Enviar al soporte técnico"
+  },
+  "issues": {
+    "SLOW": "Lentitud de la aplicación (LENTA)",
+    "CRASH": "Apagado por falla o falla (CRASH)",
+    "ILLOGICAL": "Comportamiento ilógico / Error de visualización (ILOGICO)",
+    "OTHER": "Otro problema (OTRO)"
+  },
+  "context": {
+    "title": "Entorno capturado",
+    "user": "Usuario:",
+    "project": "Proyecto :",
+    "batch": "Lote:",
+    "analysis": "Análisis :",
+    "customer": "Cliente :",
+    "none": "Ninguno",
+    "logs_ok": "Diagnósticos y registros de red incluidos automáticamente."
+  },
+  "success": {
+    "title": "¡Informe enviado exitosamente!",
+    "subtitle": "Su ticket ha sido enviado al soporte técnico.",
+    "close": "Ahora puedes cerrar esta ventana."
+  },
+  "dashboard": {
+    "loading": "Cargando datos del panel...",
+    "title": "Panel de Entradas",
+    "visible": "visibles",
+    "empty_state": "No se encontraron entradas coincidentes",
+    "create_button": "Crear un boleto previo",
+    "search": {
+      "placeholder": "Buscar...",
+      "all_columns": "Todas las columnas",
+      "id": "IDENTIFICACIÓN",
+      "title": "Título",
+      "status": "Estado",
+      "issue_type": "Tipo de problema",
+      "username": "Nombre de usuario",
+      "fullname": "Nombre completo",
+      "location": "Ubicación",
+      "date": "Fecha"
+    },
+    "filters": {
+      "show": "Espectáculo:",
+      "preticket": "PREBOLETO",
+      "resolved": "RESUELTO",
+      "closed": "CERRADO"
+    },
+    "table": {
+      "id": "IDENTIFICACIÓN",
+      "title": "Título",
+      "status": "Estado",
+      "type": "Tipo",
+      "username": "Nombre de usuario",
+      "fullname": "Nombre completo",
+      "location": "Ubicación",
+      "date": "Fecha"
+    }
+  },
+  "login": {
+    "subtitle": "INFORME DE EDICIÓN DE NUTRIA",
+    "choose_profile": "Se detectaron múltiples perfiles LIMS. Por favor elige uno:",
+    "back": "Atrás",
+    "instructions": "Inicie sesión con su cuenta de Mérieux NutriSciences para acceder a la plataforma.",
+    "error": {
+      "auth_denied": "Autenticación denegada",
+      "server_fail": "No se puede conectar con el servidor Nutria.",
+      "google_fail": "La autenticación de Google falló."
+    }
+  },
+  "common": {
+    "na": "N / A",
+    "unknown": "Desconocido",
+    "select": "Seleccionar",
+    "no": "No",
+    "yes": "Sí",
+    "loading": "Cargando datos del billete..."
+  },
+  "ticket": {
+    "not_found": "Boleto no encontrado o acceso denegado.",
+    "download_error": "No se pudo descargar el archivo. Verifique si el backend se está ejecutando.",
+    "success_msg_create": "Boleto creado exitosamente!",
+    "success_msg_update": "Boleto actualizado exitosamente!",
+    "confirm_cancel": "¿Estás seguro de que quieres cancelar este billete? Esta acción no se puede deshacer.",
+    "cancel_success": "Boleto cancelado exitosamente.",
+    "confirm_resolve": "¿Está seguro de que desea resolver este ticket?",
+    "confirm_close": "¿Está seguro de que desea cerrar este ticket?",
+    "resolve_success": "Ticket resuelto exitosamente.",
+    "close_success": "Ticket cerrado exitosamente.",
+    "current_status": "Estado actual:",
+    "resolve": "Resolver",
+    "close": "Cerca",
+    "edit": "Editar",
+    "cancel": "Cancelar billete",
+    "main_info_title_create": "Crear nuevo billete",
+    "main_info_title_update": "Finalización del ticket",
+    "title": "Título del problema",
+    "ssp_ticket": "Enlace de ticket SSP (opcional)",
+    "issue_type": "Tipo de problema",
+    "criticity": "Criticidad",
+    "frequency": "Frecuencia",
+    "blocking_issue": "¿Problema de bloqueo?",
+    "description": "Descripción",
+    "attachments": "Adjuntos",
+    "auto_collected": "Archivos de contexto recopilados automáticamente:",
+    "download_workdir": "Directorio de trabajo",
+    "download_logs": "Registros del sistema",
+    "submit_create": "Crear billete",
+    "submit_update": "Enviar y actualizar ticket"
+  },
+  "sidebar": {
+    "user_title": "Información del usuario",
+    "user": {
+      "username": "Nombre de usuario:",
+      "fullname": "Nombre completo:",
+      "role": "Role:",
+      "lab": "Laboratorio:",
+      "location": "Ubicación:",
+      "email": "Correo electrónico:",
+      "created_on": "Creado el:"
+    },
+    "context_title": "Contexto LIMS",
+    "context": {
+      "project": "Proyecto actual",
+      "batch": "Lote actual",
+      "sample": "Muestra actual",
+      "analysis": "Análisis actual",
+      "variation": "Variación del análisis",
+      "customer": "Cliente actual"
+    },
+    "network_title": "Red e infraestructura",
+    "network": {
+      "citrix": "Sesión Citrix:",
+      "ip": "Dirección IP:",
+      "workstation": "Puesto de trabajo:",
+      "pc": "PC actual:",
+      "show_ipconfig": "Mostrar registros de configuración de IP",
+      "show_ping": "Mostrar resultados de Ping 8.8.8.8"
+    }
+  },
+  "layout": {
+    "default_user": "Usuario",
+    "go_to_dashboard": "Ir al panel",
+    "dashboard_btn": "Panel",
+    "logout_btn": "Cerrar sesión"
+  }
+}

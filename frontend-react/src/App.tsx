@@ -1,34 +1,41 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import MainLayout from './layouts/MainLayout'
+import TicketForm from './pages/TicketForm'
+import Dashboard from './pages/Dashboard'
+import Login from './pages/Login'
+import ProtectedRoute from './components/ProtectedRoute' 
+import AuditLogs from './pages/AuditLogs'
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <BrowserRouter>
+      <Routes>
+        
+        {/* Route publique pour la connexion (sans menu ni layout global) */}
+        <Route path="/login" element={<Login />} />
+
+        {/* LE MUR DE SÉCURITÉ : TOUT CE QUI EST EN DESSOUS EST PROTÉGÉ */}
+        <Route element={<ProtectedRoute />}>
+          
+          {/* L'interface principale (MainLayout) enveloppe nos pages protégées */}
+          <Route path="/" element={<MainLayout />}>
+            
+            {/* Les pages intérieures de l'application */}
+            <Route index element={<TicketForm />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            
+            {/* 🚨 LA NOUVELLE ROUTE AUDIT EST ICI 🚨 */}
+            <Route path="audit" element={<AuditLogs />} />
+            
+            {/* Redirection de secours : si l'URL tapée n'existe pas, on renvoie à l'accueil */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+            
+          </Route>
+          
+        </Route>
+
+      </Routes>
+    </BrowserRouter>
   )
 }
 

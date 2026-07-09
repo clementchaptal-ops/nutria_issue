@@ -1,0 +1,173 @@
+{
+  "app_title": "NUTRIA - Finalize the report",
+  "loading": "Secure connection with LabWare in progress...",
+  "error": {
+    "no_id": "No ticket ID found in URL.",
+    "not_found": "Unable to find this preticket",
+    "validation": "Error validating ticket"
+  },
+  "form": {
+    "title_label": "Issue title:",
+    "title_placeholder": "Ex: Error creating a new batch",
+    "type_label": "Type of problem:",
+    "desc_label": "Detailed description:",
+    "desc_placeholder": "Describe step by step what you were doing just before the incident...",
+    "submit": "Submit to technical support"
+  },
+  "issues": {
+    "SLOW": "Application slowness (SLOW)",
+    "CRASH": "Crash/Crash Shutdown (CRASH)",
+    "ILLOGICAL": "Illogical behavior / Display bug (ILLOGICAL)",
+    "OTHER": "Another problem (OTHER)"
+  },
+  "context": {
+    "title": "Captured environment",
+    "user": "User :",
+    "project": "Project :",
+    "batch": "Batch:",
+    "analysis": "Analysis :",
+    "customer": "Customer :",
+    "none": "None",
+    "logs_ok": "Network diagnostics & logs included automatically."
+  },
+  "success": {
+    "title": "Report sent successfully!",
+    "subtitle": "Your ticket has been forwarded to technical support.",
+    "close": "You can now close this window."
+  },
+  "common": {
+    "na": "N/A",
+    "unknown": "Unknown",
+    "select": "Select",
+    "no": "No",
+    "yes": "Yes",
+    "loading": "Loading data..."
+  },
+  "layout": {
+    "default_user": "User",
+    "go_to_dashboard": "Go to Dashboard",
+    "dashboard_btn": "Dashboard",
+    "logout_btn": "Logout"
+  },
+  "login": {
+    "subtitle": "NUTRIA ISSUE REPORT",
+    "choose_profile": "Multiple LIMS profiles detected. Please choose one:",
+    "back": "Back",
+    "instructions": "Please log in with your Mérieux NutriSciences account to access the platform.",
+    "error": {
+      "auth_denied": "Authentication denied",
+      "server_fail": "Unable to connect to the Nutria server.",
+      "google_fail": "Google authentication failed."
+    }
+  },
+  "dashboard": {
+    "loading": "Loading dashboard data...",
+    "title": "Tickets Dashboard",
+    "visible": "visible(s)",
+    "empty_state": "No matching tickets found",
+    "create_button": "Create a Pre-ticket",
+    "search": {
+      "placeholder": "Search...",
+      "all_columns": "All Columns",
+      "id": "ID",
+      "title": "Title",
+      "status": "Status",
+      "issue_type": "Issue Type",
+      "username": "User Name",
+      "fullname": "Full Name",
+      "location": "Location",
+      "date": "Date"
+    },
+    "filters": {
+      "show": "Show:",
+      "preticket": "PRETICKET",
+      "resolved": "RESOLVED",
+      "closed": "CLOSED"
+    },
+    "table": {
+      "id": "ID",
+      "title": "Title",
+      "status": "Status",
+      "type": "Type",
+      "username": "Username",
+      "fullname": "Full Name",
+      "location": "Location",
+      "date": "Date"
+    }
+  },
+  "ticket": {
+    "not_found": "Ticket not found or access denied.",
+    "download_error": "Failed to download file. Please check if backend is running.",
+    "success_msg_create": "Ticket successfully created!",
+    "success_msg_update": "Ticket successfully updated!",
+    "confirm_cancel": "Are you sure you want to cancel this ticket? This action cannot be undone.",
+    "cancel_success": "Ticket successfully canceled.",
+    "confirm_resolve": "Are you sure you want to resolve this ticket?",
+    "confirm_close": "Are you sure you want to close this ticket?",
+    "resolve_success": "Ticket successfully resolved.",
+    "close_success": "Ticket successfully closed.",
+    "current_status": "Current Status:",
+    "resolve": "Resolve",
+    "close": "Close",
+    "edit": "Edit",
+    "cancel": "Cancel Ticket",
+    "main_info_title_create": "Create New Ticket",
+    "main_info_title_update": "Ticket Completion",
+    "title": "Issue Title",
+    "ssp_ticket": "SSP Ticket Link (Optional)",
+    "issue_type": "Issue Type",
+    "criticity": "Criticity",
+    "frequency": "Frequency",
+    "blocking_issue": "Blocking Issue?",
+    "description": "Description",
+    "attachments": "Attachments",
+    "auto_collected": "Auto-collected Context Files:",
+    "download_workdir": "Working Directory",
+    "download_logs": "System Logs",
+    "submit_create": "Create Ticket",
+    "submit_update": "Submit & Update Ticket",
+    "download_video": "Click here to Download the Video"
+  },
+  "sidebar": {
+    "user_title": "User Information",
+    "user": {
+      "username": "Username:",
+      "fullname": "Full Name:",
+      "role": "Role:",
+      "lab": "Lab:",
+      "location": "Location:",
+      "email": "Email:",
+      "created_on": "Created On:"
+    },
+    "context_title": "LIMS Context",
+    "context": {
+      "project": "Current Project",
+      "batch": "Current Batch",
+      "sample": "Current Sample",
+      "analysis": "Current Analysis",
+      "variation": "Analysis Variation",
+      "customer": "Current Customer"
+    },
+    "network_title": "Network & Infrastructure",
+    "network": {
+      "citrix": "Citrix Session:",
+      "ip": "IP Address:",
+      "workstation": "Workstation:",
+      "pc": "Current PC:",
+      "show_ipconfig": "Show IP Configuration logs",
+      "show_ping": "Show Ping 8.8.8.8 results"
+    }
+  },
+  "audit": {
+    "title": "🛡️ Audit Trail (Admin)",
+    "table": {
+      "date": "Date",
+      "user": "User",
+      "action": "Action",
+      "ticket_id": "Ticket ID",
+      "details": "Details",
+      "ip": "IP Address"
+    },
+    "empty": "No logs found."
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "files.exclude": {
+    "**/.gitignore": false,
+    "**/package-lock.json": true,
+    "**/tsconfig*.json": true,
+    "**/vite.config.ts": false,
+    "**/.eslintrc*": true,
+    "**/eslint.config.js": true,
+    "**/node_modules": false,
+    "**/vite-env.d.ts": true,
+  }
+}

@@ -1,0 +1,271 @@
+.container {
+    padding: 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 15px;
+  }
+  
+  .title {
+    color: var(--text-main);
+    margin: 0;
+  }
+  
+  .ticketCount {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 5px 12px;
+    border-radius: 15px;
+    font-size: 14px;
+    font-weight: bold;
+  }
+  
+  /* SEARCH BAR */
+  .searchBar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    background-color: var(--bg-container);
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+  }
+  
+  .select {
+    padding: 10px 15px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background-color: #fff;
+    font-size: 14px;
+    min-width: 150px;
+    cursor: pointer;
+  }
+  
+  .inputSearch {
+    flex: 1;
+    padding: 10px 15px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background-color: #fff;
+    font-size: 14px;
+  }
+  
+  .inputSearch:focus, .select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+  
+  /* TABLE STYLES */
+  .tableWrapper {
+    overflow-x: auto;
+    background: var(--bg-container);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 14px;
+  }
+  
+  .table th {
+    background-color: #f4f5f7;
+    color: var(--text-muted);
+    padding: 12px 15px;
+    font-weight: bold;
+    border-bottom: 2px solid var(--border-color);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  
+  .table th:hover {
+    background-color: #ebecf0;
+    color: var(--text-main);
+  }
+  
+  .table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-main);
+  }
+  
+  .tableRow {
+    transition: background-color 0.2s ease;
+    cursor: pointer;
+  }
+  
+  .tableRow:hover {
+    background-color: #fafbfc;
+  }
+  
+  .tableRow:last-child td {
+    border-bottom: none;
+  }
+  
+  /* SPECIFIC COLUMN STYLES */
+  .tdId {
+    font-weight: bold;
+    color: var(--text-muted);
+  }
+  
+  .tdTitle {
+    font-weight: 600;
+    max-width: 250px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .tdLocation {
+    font-weight: bold;
+    color: var(--text-muted);
+  }
+  
+  .tdDate {
+    white-space: nowrap;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  
+  /* BADGES */
+  .badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+  
+  .badgeDefault { background-color: #f4f5f7; color: var(--text-muted); }
+  
+  /* Types */
+  .type_CRASH { background-color: #ffebe6; color: #bf2600; }
+  .type_SLOW { background-color: #fff0b3; color: #8f6b00; }
+  .type_ILLOGICAL { background-color: #eae6ff; color: #403294; }
+  
+  /* Status */
+  .status_PRETICKET { background-color: #e6f0ff; color: var(--primary-color); }
+  .status_RESOLVED { background-color: var(--success-bg); color: var(--success-color); }
+  
+  .emptyState {
+    text-align: center;
+    padding: 50px;
+    background-color: var(--bg-container);
+    border-radius: 8px;
+    color: var(--text-muted);
+    border: 1px dashed var(--border-color);
+  }
+
+  /* Le conteneur principal qui aligne la gauche (filtres) et la droite (bouton) */
+.actionBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #ffffff;
+  padding: 16px 20px;
+  border-radius: 8px;
+  border: 1px solid #e3e6e8;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+/* Zone des filtres */
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.filterLabel {
+  font-weight: 600;
+  font-size: 14px;
+  color: #4a5568;
+}
+
+/* Style "pilule" pour les cases à cocher */
+.checkboxPill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #42526e;
+  cursor: pointer;
+  background-color: #f4f5f7;
+  padding: 6px 14px;
+  border-radius: 20px; /* Bordures très arrondies */
+  border: 1px solid #dfe1e6;
+  transition: all 0.2s ease;
+}
+
+.checkboxPill:hover {
+  background-color: #ebecf0;
+  border-color: #c1c7d0;
+}
+
+.checkboxInput {
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+}
+
+/* Nouveau style du bouton de création */
+.createBtn {
+  background-color: #0052cc; /* Bleu type Jira/Pro */
+  color: #ffffff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  margin-bottom : 50 px; 
+}
+
+.createBtn:hover {
+  background-color: #0047b3;
+}
+
+.createBtn:active {
+  transform: scale(0.98); /* Petit effet d'enfoncement au clic */
+}
+
+.criticity_DEFAULT {
+  background-color: #ebecf0;
+  color: #42526e;
+}
+
+/* Haute / Critique (Rouge) */
+.criticity_HIGH,
+.criticity_CRITICAL {
+  background-color: #ffebe6;
+  color: #bf2600;
+}
+
+/* Moyenne (Orange/Jaune) */
+.criticity_MEDIUM {
+  background-color: #fff0b3;
+  color: #ff8b00;
+}
+
+/* Basse / Mineure (Vert ou Gris selon tes préférences) */
+.criticity_LOW,
+.criticity_MINOR {
+  background-color: #e3fcef;
+  color: #006644;
+}
