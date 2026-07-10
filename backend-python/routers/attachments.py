@@ -1,27 +1,16 @@
 import os
 import uuid
 import logging
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request, BackgroundTasks
-from fastapi.responses import FileResponse
-from typing import List, Optional
+
 # Database configuration import
 from config.database import get_db_connection
 
-# Local module imports from your flat routers/ file hierarchy
-from .security import get_current_user
+# Local module imports
 from .audit import log_user_action
 
 logger = logging.getLogger(__name__)
 
-# Dedicated sub-router for handling file attachments
-# The prefix ensures we don't have to repeat "/api/issues" for every route
-router = APIRouter(
-    prefix="/api/issues",
-    tags=["Attachments"]
-)
-
-# Local storage folder (Mock S3 location)
-# Moving up one directory (..) since this file resides inside the 'routers' folder
+# Local storage folder
 UPLOAD_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "stored_attachments"))
 
 def get_oracle_attachment_type(content_type: str, filename: str) -> str:
@@ -35,17 +24,18 @@ def get_oracle_attachment_type(content_type: str, filename: str) -> str:
     else:
         return 'DOCUMENT'
 
-# The dynamic route maps directly to "/{issue_id}/attachments" due to the router prefix
-@router.post("/{issue_id}/attachments")
-def upload_attachments(
-    issue_id: int, 
-    request: Request,
-    files: List[UploadFile] = File(...),
-    current_user: dict = Depends(get_current_user)
-):
+# =====================================================================
+# ROUTES MÉTIER
+# =====================================================================
+
+def upload_attachments(issue_id, files_data, current_user, client_ip):
+    """
+    files_data doit être une liste de dictionnaires fournis par Flask (main.py) :
+    [{"filename": "...", "content_type": "...", "bytes": b"..."}]
+    """
     connection = get_db_connection()
     if not connection:
-        raise HTTPException(status_code=500, detail="Oracle Database connection error.")
+        return {"error": "Oracle Database connection error."}, 500
     
     ticket_folder = os.path.join(UPLOAD_DIR, f"ticket_{issue_id}.0")
     os.makedirs(ticket_folder, exist_ok=True)
@@ -55,35 +45,32 @@ def upload_attachments(
     cursor = connection.cursor()
     
     try:
-        for file in files:
+        for file_info in files_data:
+            filename = file_info["filename"]
+            content_type = file_info["content_type"]
+            file_bytes = file_info["bytes"]
+
             unique_prefix = uuid.uuid4().hex[:8]
-            safe_file_name = f"{unique_prefix}_{file.filename}"
+            safe_file_name = f"{unique_prefix}_{filename}"
             file_destination_path = os.path.join(ticket_folder, safe_file_name)
             
             # Store the raw original filename for the audit string
-            file_names_list.append(file.filename)
+            file_names_list.append(filename)
             
-            file.file.seek(0)
-            # Streaming the file upload block by block to preserve server memory
             with open(file_destination_path, "wb") as buffer:
-                while chunk := file.file.read(1024 * 1024):
-                    buffer.write(chunk)
+                buffer.write(file_bytes)
             
-            attach_type = get_oracle_attachment_type(file.content_type, file.filename)
+            attach_type = get_oracle_attachment_type(content_type, filename)
             
             qry = """
                 INSERT INTO c_issue_attachment (
-                    id_issue, 
-                    attachment_name, 
-                    attachment_type, 
-                    url_path
+                    id_issue, attachment_name, attachment_type, url_path
                 ) VALUES (:1, :2, :3, :4)
             """
-            
-            cursor.execute(qry, [issue_id, file.filename, attach_type, file_destination_path])
+            cursor.execute(qry, [issue_id, filename, attach_type, file_destination_path])
             
             uploaded_files_info.append({
-                "original_name": file.filename,
+                "original_name": filename,
                 "type": attach_type,
                 "saved_path": file_destination_path
             })
@@ -91,72 +78,47 @@ def upload_attachments(
         # Commit the database rows for all metadata rows added
         connection.commit()
         
-        # AUDIT TRAIL RECORDING (Placed safely outside the loop payload lifecycle)
+        # AUDIT TRAIL RECORDING
         username = current_user.get("sub", "UNKNOWN")
         files_count = len(file_names_list)
         files_str = ", ".join([f"'{name}'" for name in file_names_list])
         
         audit_details = f"Uploaded {files_count} attachment(s). File list: [{files_str}]."
-        client_ip = request.client.host if request.client else "Unknown"
-        
-        log_user_action(
-            user_name=username,
-            action_type="UPLOAD_ATTACHMENTS",
-            target_id=str(issue_id),
-            details=audit_details,
-            ip_address=client_ip
-        )
+        log_user_action(user_name=username, action_type="UPLOAD_ATTACHMENTS", target_id=str(issue_id), details=audit_details, ip_address=client_ip)
         
         return {
             "message": "Attachments successfully uploaded.", 
             "server_upload_directory": UPLOAD_DIR,
             "files": uploaded_files_info
-        }
+        }, 200
     except Exception as e:
         connection.rollback()
-        raise HTTPException(status_code=500, detail=f"Upload error: {str(e)}")
+        return {"error": f"Upload error: {str(e)}"}, 500
     finally:
         cursor.close()
         connection.close()
 
 
-# =====================================================================
-# 🚨 NEW ROUTE: SERVE / STREAM ATTACHMENTS DIRECTLY TO BROWSER
-# =====================================================================
-@router.get("/{issue_id}/attachments/{filename}")
-def get_attachment_file(
-    issue_id: int, 
-    filename: str, 
-    token: Optional[str] = None, 
-    request: Request = None
-):
+def get_attachment_file(issue_id, filename):
     """
-    Serves a specific attachment file directly to the browser.
-    Maintains folder format consistency using 'ticket_{issue_id}.0'.
+    Returns the absolute path of the attachment so main.py can stream it to the browser.
     """
     ticket_folder = os.path.join(UPLOAD_DIR, f"ticket_{issue_id}.0")
     file_path = os.path.join(ticket_folder, filename)
     
     # Check if the requested file actually exists on the disk
     if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Attachment file not found on server.")
+        return {"error": "Attachment file not found on server."}, 404
         
-    # FileResponse automatically handles media types (images, video streams, etc.)
-    # and allows inline viewing without forcing a download prompt.
-    return FileResponse(path=file_path)
+    # On renvoie le chemin au main.py, qui utilisera send_file() de Flask
+    return {"file_path": file_path}, 200
 
-@router.delete("/{issue_id}/attachments/{filename}")
-def delete_attachment(
-    issue_id: int, 
-    filename: str, 
-    request: Request,
-    background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
-):
+
+def delete_attachment(issue_id, filename, current_user, client_ip):
     """Performs a Soft Delete on a specific attachment from the database."""
     connection = get_db_connection()
     if not connection:
-        raise HTTPException(status_code=500, detail="Oracle Database connection error.")
+        return {"error": "Oracle Database connection error."}, 500
         
     ticket_folder = os.path.join(UPLOAD_DIR, f"ticket_{issue_id}.0")
     file_path = os.path.join(ticket_folder, filename)
@@ -173,29 +135,21 @@ def delete_attachment(
         cursor.execute(soft_delete_qry, [issue_id, f"%{filename}%"])
         connection.commit()
         
-        # 2. Remove from actual Server Disk (Safe check to avoid missing file errors)
+        # 2. Remove from actual Server Disk
         if os.path.exists(file_path):
             os.remove(file_path)
         else:
             logger.warning(f"File {filename} was already missing from physical disk storage.")
             
         # 3. AUDIT TRAIL RECORDING
-        client_ip = request.client.host if request.client else "Unknown"
         username = current_user.get("sub", "UNKNOWN")
-        
-        log_user_action(
-            user_name=username,
-            action_type="DELETE_ATTACHMENT",
-            target_id=str(issue_id),
-            details=f"Soft deleted attachment file: '{filename}'.",
-            ip_address=client_ip
-        )
+        log_user_action(user_name=username, action_type="DELETE_ATTACHMENT", target_id=str(issue_id), details=f"Soft deleted attachment file: '{filename}'.", ip_address=client_ip)
             
-        return {"message": "Attachment successfully flagged as removed."}
+        return {"message": "Attachment successfully flagged as removed."}, 200
         
     except Exception as e:
         connection.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e)}, 500
     finally:
         cursor.close()
         connection.close()

@@ -1,5 +1,5 @@
 // Define your base API URL
-const API_URL = "http://localhost:8000/api/issues";
+const API_URL = "http://localhost:8080/issues";
 
 // --- Helper function to get the security headers ---
 const getAuthHeaders = () => {

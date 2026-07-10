@@ -112,8 +112,8 @@ function TicketForm() {
     ping: '',
   })
 
-  const workingDirUrl = `http://localhost:8000/api/issues/${ticketId}/download/working_dir`
-  const logsUrl = `http://localhost:8000/api/issues/${ticketId}/download/logs`
+  const workingDirUrl = `http://localhost:8080/issues/${ticketId}/download/working_dir`
+  const logsUrl = `http://localhost:8080/issues/${ticketId}/download/logs`
 
   const handleFileDownload = async (url: string, defaultFilename: string) => {
     try {
@@ -169,7 +169,7 @@ function TicketForm() {
         setUserInfo(backupUser)
 
         try {
-          const response = await fetch('http://localhost:8000/api/issues/users/me', {
+          const response = await fetch('http://localhost:8080/issues/users/me', {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
           })
           
@@ -199,7 +199,7 @@ function TicketForm() {
       }
 
       try {
-        const response = await fetch(`http://localhost:8000/api/issues/${ticketId}`, {
+        const response = await fetch(`http://localhost:8080/issues/${ticketId}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`
           }
@@ -315,8 +315,8 @@ function TicketForm() {
 
     try {
       const url = isNewTicket 
-        ? `http://localhost:8000/api/issues/create` 
-        : `http://localhost:8000/api/issues/${ticketId}/validate`
+        ? `http://localhost:8080/issues/create` 
+        : `http://localhost:8080/issues/${ticketId}/validate`
         
       const httpMethod = isNewTicket ? 'POST' : 'PUT'
 
@@ -339,7 +339,7 @@ function TicketForm() {
             formData.append('files', file)
           })
 
-          const attachmentsResponse = await fetch(`http://localhost:8000/api/issues/${targetTicketId}/attachments`, {
+          const attachmentsResponse = await fetch(`http://localhost:8080/issues/${targetTicketId}/attachments`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`
@@ -382,7 +382,7 @@ function TicketForm() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/issues/${ticketId}/cancel`, {
+      const response = await fetch(`http://localhost:8080/issues/${ticketId}/cancel`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
       });
@@ -411,7 +411,7 @@ function TicketForm() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/issues/${ticketId}/close`, {
+      const response = await fetch(`http://localhost:8080/issues/${ticketId}/close`, {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`,
@@ -442,7 +442,7 @@ function TicketForm() {
     if (!window.confirm("Are you sure you want to delete this file?")) return;
 
     try {
-      const response = await fetch(`http://localhost:8000/api/issues/${ticketId}/attachments/${filename}`, {
+      const response = await fetch(`http://localhost:8080/issues/${ticketId}/attachments/${filename}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`
@@ -478,7 +478,7 @@ function TicketForm() {
   const fetchComments = async () => {
     if (!ticketId) return
     try {
-      const response = await fetch(`http://localhost:8000/api/issues/${ticketId}/comments`, {
+      const response = await fetch(`http://localhost:8080/issues/${ticketId}/comments`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
       })
       if (response.ok) {
@@ -497,7 +497,7 @@ function TicketForm() {
 
     try {
       // 1. On poste le texte du commentaire
-      const response = await fetch(`http://localhost:8000/api/issues/${ticketId}/comments`, {
+      const response = await fetch(`http://localhost:8080/issues/${ticketId}/comments`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ comment_text: newComment })
@@ -511,7 +511,7 @@ function TicketForm() {
         if (commentFiles.length > 0 && newCommentId) {
           const formData = new FormData()
           commentFiles.forEach((file) => formData.append('files', file))
-          await fetch(`http://localhost:8000/api/issues/${ticketId}/comments/${newCommentId}/attachments`, {
+          await fetch(`http://localhost:8080/issues/${ticketId}/comments/${newCommentId}/attachments`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` },
             body: formData
@@ -685,7 +685,7 @@ function TicketForm() {
                   .map((file, index) => {
                     const filename = file.url_path ? file.url_path.replace(/\\/g, '/').split('/').pop() : file.attachment_name;
                     const displayName = file.attachment_name || filename || 'Unknown_File';
-                    const fileUrl = `http://localhost:8000/api/issues/${ticketId}/attachments/${filename}`;
+                    const fileUrl = `http://localhost:8080/issues/${ticketId}/attachments/${filename}`;
                     const fileType = file.attachment_type;
 
                     return (
@@ -853,7 +853,7 @@ function TicketForm() {
                     <div className={styles.commentAttachmentsRow}>
                       {comment.attachments.map((file: any, i: number) => {
                         const filename = file.url_path ? file.url_path.replace(/\\/g, '/').split('/').pop() : file.attachment_name;
-                        const fileUrl = `http://localhost:8000/api/issues/${ticketId}/attachments/${filename}`;
+                        const fileUrl = `http://localhost:8080/issues/${ticketId}/attachments/${filename}`;
                         
                         return (
                           <div key={i} className={styles.commentAttachmentPill} onClick={() => {

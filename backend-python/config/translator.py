@@ -1,3 +1,5 @@
+
+#Script a ne pas déployer juste utilitaire pour la génération des traductions. 
 import json
 import os
 from deep_translator import GoogleTranslator

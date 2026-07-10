@@ -57,13 +57,15 @@ function Dashboard() {
 
   useEffect(() => {
     fetchAllIssues()
-      .then((data) => {
-        setTickets(data)
-        setLoading(false)
+      .then((response) => {
+        // ✅ CORRECTION ICI : On extrait la clé 'data' renvoyée par GCP
+        const listeTickets = response.data || [];
+        setTickets(listeTickets);
+        setLoading(false);
       })
       .catch((err) => {
-        setError(err.message)
-        setLoading(false)
+        setError(err.message);
+        setLoading(false);
       })
   }, [])
 

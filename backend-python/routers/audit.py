@@ -1,15 +1,10 @@
 import logging
-from fastapi import APIRouter, HTTPException, Depends
 from config.database import get_db_connection
-from .security import get_current_user
 
 logger = logging.getLogger(__name__)
 
-# Create a dedicated sub-router for audit operations
-audit_router = APIRouter(prefix="/audit", tags=["Audit"])
-
 def log_user_action(user_name: str, action_type: str, target_id: str = None, details: str = None, ip_address: str = None):
-    """Asynchronously records a user action into the audit trail table."""
+    """Records a user action into the audit trail table (Synchronous on GCP)."""
     connection = get_db_connection()
     if not connection:
         logger.error("Audit Trail: Unable to connect to the database.")
@@ -30,17 +25,17 @@ def log_user_action(user_name: str, action_type: str, target_id: str = None, det
         connection.close()
 
 
-@audit_router.get("/logs")
-def get_audit_logs(current_user: dict = Depends(get_current_user)):
+def get_audit_logs(current_user):
     """Fetches all audit trail logs (Restricted to administrators)."""
     user_role = current_user.get("role")
 
+    # Vérification des droits d'accès
     if user_role not in ["IT_TEAM", "LOCAL_ADMIN"]:
-        raise HTTPException(status_code=403, detail="Access denied. Restricted to administrators.")
+        return {"error": "Access denied. Restricted to administrators."}, 403
 
     connection = get_db_connection()
     if not connection:
-        raise HTTPException(status_code=500, detail="Database connection error.")
+        return {"error": "Database connection error."}, 500
 
     try:
         cursor = connection.cursor()
@@ -69,9 +64,12 @@ def get_audit_logs(current_user: dict = Depends(get_current_user)):
                 "ip_address": row[5] or "Unknown",
                 "created_at": row[6]
             })
-        return logs
+            
+        # Succès : on retourne la liste et le code 200
+        return logs, 200
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Oracle Error: {str(e)}")
+        return {"error": f"Oracle Error: {str(e)}"}, 500
     finally:
         cursor.close()
         connection.close()

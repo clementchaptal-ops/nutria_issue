@@ -38,7 +38,7 @@ function Login() {
 
   const loginToServer = async (token: string, selectedProfile?: string) => {
     try {
-      const response = await fetch('http://localhost:8000/api/auth/google', {
+      const response = await fetch('http://localhost:8080/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

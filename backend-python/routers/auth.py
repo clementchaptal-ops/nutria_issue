@@ -1,10 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
-from typing import Optional
+import os
 import jwt
 from datetime import datetime, timedelta
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+from pydantic import ValidationError
 
 # Database configuration import
 from config.database import get_db_connection 
@@ -12,30 +11,14 @@ from config.database import get_db_connection
 # Role management script import
 from config.admin_role import get_google_groups
 
+# --- LOCAL FILE IMPORTS ---
+from .schemas import GoogleTokenRequest # Assuming you move GoogleTokenRequest to schemas.py or keep it here
+
 # --- CONFIGURATION ---
-GOOGLE_CLIENT_ID = "549394697229-tvgof9to9fcu4um4260vnigbtt57o9fo.apps.googleusercontent.com" 
-JWT_SECRET_KEY = "your_super_secret_key_change_this_in_production"
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "549394697229-tvgof9to9fcu4um4260vnigbtt57o9fo.apps.googleusercontent.com") 
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "your_super_secret_key_change_this_in_production")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 120
-
-router = APIRouter(
-    prefix="/api/auth",
-    tags=["Authentication"]
-)
-
-# --- MODELS ---
-class GoogleTokenRequest(BaseModel):
-    credential: str
-    token: Optional[str] = None
-    selected_profile: Optional[str] = None
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str
-    user_name: str
-    full_name: str
-    role: str       # User role (USER, LOCAL_ADMIN, IT_TEAM)
-    location: str   # User country/location
 
 # --- HELPER FUNCTIONS ---
 def create_access_token(data: dict, expires_delta: timedelta):
@@ -46,27 +29,40 @@ def create_access_token(data: dict, expires_delta: timedelta):
     return encoded_jwt
 
 # --- ROUTES ---
-@router.post("/google")
-def google_auth(request: GoogleTokenRequest):
+def google_auth(request_json):
+    """
+    Handles the Google Single Sign-On flow, validates the token,
+    checks the Oracle LIMS database for the user profile,
+    determines the role via Google Apps Script, and issues a JWT.
+    """
+    try:
+        # Validate incoming JSON data
+        auth_request = GoogleTokenRequest(**request_json)
+    except ValidationError as e:
+        return {"error": "Format des donnees invalide", "details": e.errors()}, 400
+
     try:
         # 1. Verify the Google Token
         try:
             idinfo = id_token.verify_oauth2_token(
-                request.credential, 
+                auth_request.credential, 
                 google_requests.Request(), 
                 GOOGLE_CLIENT_ID
             )
         except ValueError as token_err:
             print(f"=== GOOGLE TOKEN ERROR ===\n{token_err}")
-            raise HTTPException(status_code=401, detail="Invalid Google token.")
+            return {"error": "Invalid Google token."}, 401
 
         # 2. Extract email
         user_email = idinfo.get("email")
         if not user_email:
-            raise HTTPException(status_code=400, detail="Email not provided by Google.")
+            return {"error": "Email not provided by Google."}, 400
 
         # 3. Query the Oracle Database
         connection = get_db_connection()
+        if not connection:
+            return {"error": "Database connection error."}, 500
+            
         cursor = connection.cursor()
 
         query = """
@@ -75,49 +71,45 @@ def google_auth(request: GoogleTokenRequest):
             WHERE LOWER(EMAIL_ADDR) = LOWER(:1)
         """
         cursor.execute(query, (user_email,))
-        user_rows = cursor.fetchall()  # Fetch all matching rows to support multiple profiles
+        user_rows = cursor.fetchall()  
 
         cursor.close()
         connection.close()
 
         # 4. Check if user exists
         if not user_rows:
-            raise HTTPException(
-                status_code=403, 
-                detail=f"User not found in LIMS database with email: {user_email}"
-            )
+            return {"error": f"User not found in LIMS database with email: {user_email}"}, 403
 
         # --- MULTIPLE PROFILES MANAGEMENT LOGIC ---
         
         # Case A: User has multiple profiles BUT has not chosen one yet
-        if len(user_rows) > 1 and not request.selected_profile:
+        if len(user_rows) > 1 and not auth_request.selected_profile:
             profiles_list = [
                 {"user_name": row[0], "full_name": row[1], "location": row[2]} 
                 for row in user_rows
             ]
-            # Send the profiles list back to React with a special flag
             return {
                 "require_selection": True,
                 "profiles": profiles_list
-            }
+            }, 200
 
         # Case B: User has only one profile OR has already selected one
-        selected_row = user_rows[0]  # Default to the first profile
+        selected_row = user_rows[0]  
         
-        if request.selected_profile:
+        if auth_request.selected_profile:
             # Find the exact row matching the user's choice
-            matched_row = next((row for row in user_rows if row[0] == request.selected_profile), None)
+            matched_row = next((row for row in user_rows if row[0] == auth_request.selected_profile), None)
             if matched_row:
                 selected_row = matched_row
             else:
-                raise HTTPException(status_code=400, detail="Invalid selected profile.")
+                return {"error": "Invalid selected profile."}, 400
 
         # 5. Extract database values based on the final selection
         db_username = selected_row[0]  
         db_fullname = selected_row[1]
         db_location = selected_row[2]
 
-       # ---------------------------------------------------------
+        # ---------------------------------------------------------
         # 6. DETERMINE ROLE VIA GOOGLE APPS SCRIPT
         # ---------------------------------------------------------  
         role = "USER"  # Default role
@@ -141,23 +133,6 @@ def google_auth(request: GoogleTokenRequest):
         elif cleaned_user_email in cleaned_admin_list:
             role = "LOCAL_ADMIN"
 
-        
-        # =====================================================================
-        
-        # ---- CAS 1 : Tester en tant que membre de l'équipe IT globale ----
-        #role = "IT_TEAM"
-        ##db_location = "PL-WAW"
-        
-        # ---- CAS 2 : Tester en tant qu'Administrateur Local  ----
-        #role = "LOCAL_ADMIN"
-        #db_location = "PT_OPO"
-        
-        # ---- CAS 3 : Tester en tant qu'Utilisateur Standard ----
-        # role = "USER"
-        #db_location = "PL-WAW"
-
-        # =====================================================================
-                
         print(f"\n=> MATCH RESULT FORCED FOR DEV: {db_username} as {role} ({db_location})\n")
 
         # 7. Generate the JWT Access Token
@@ -180,12 +155,9 @@ def google_auth(request: GoogleTokenRequest):
             "full_name": db_fullname,
             "role": role,
             "location": db_location
-        }
-
-    except HTTPException as http_err:
-        raise http_err
+        }, 200
 
     except Exception as e:
         print("=== UNEXPECTED SYSTEM ERROR ===")
         print(e)
-        raise HTTPException(status_code=500, detail="Internal server error during authentication.")
+        return {"error": "Internal server error during authentication."}, 500

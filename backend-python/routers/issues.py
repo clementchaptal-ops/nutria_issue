@@ -1,42 +1,24 @@
-from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks, Request, UploadFile, File, Form
 import os
-from fastapi.responses import FileResponse
-from config.database import get_db_connection
-from pydantic import BaseModel
-from typing import Optional, List
 import uuid
+from config.database import get_db_connection
+from pydantic import ValidationError
 
 # --- LOCAL FILE IMPORTS ---
 from .schemas import TicketCreate, TicketUpdate, StatusUpdate
-from .security import get_current_user
-from .audit import log_user_action, audit_router
-
-# --- ROUTER CONFIGURATION ---
-router = APIRouter(
-    prefix="/api/issues",
-    tags=["Issues"]
-)
-
-# Mounting the audit sub-router
-router.include_router(audit_router)
-
-# --- PYDANTIC SCHEMAS ---
-class CommentCreate(BaseModel):
-    comment_text: str
+from .audit import log_user_action
 
 # =====================================================================
-# 1. STATIC ROUTES (WITHOUT PATH VARIABLES {ID}) 
+# 1. ROUTES STATIQUES
 # =====================================================================
 
-@router.get("")
-def get_all_issues(current_user: dict = Depends(get_current_user)):
+def get_all_issues(current_user):
     """Fetches all tickets from the database, filtering them based on the user's role and site location code prefix."""
     user_role = current_user.get("role")
     user_location = current_user.get("location")
 
     connection = get_db_connection()
     if not connection:
-        raise HTTPException(status_code=500, detail="Oracle Database connection error.")
+        return {"error": "Oracle Database connection error."}, 500
         
     cursor = connection.cursor()
     tickets = []
@@ -80,19 +62,18 @@ def get_all_issues(current_user: dict = Depends(get_current_user)):
                 "creation_date": row[7] if row[7] else "",
                 "criticity": row[8] if row[8] else "N/A"
             })
-        return tickets
+        return tickets, 200
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Oracle Error: {str(e)}")
+        return {"error": f"Oracle Error: {str(e)}"}, 500
     finally:
         cursor.close()
         connection.close()
 
-@router.get("/users/me")
-def get_my_profile(current_user: dict = Depends(get_current_user)):
+def get_my_profile(current_user):
     """Fetches true LIMS user profile details for the currently logged-in account."""
     connection = get_db_connection()
     if not connection:
-        raise HTTPException(status_code=500, detail="Database connection error.")
+        return {"error": "Database connection error."}, 500
         
     try:
         cursor = connection.cursor()
@@ -107,23 +88,28 @@ def get_my_profile(current_user: dict = Depends(get_current_user)):
         row = cursor.fetchone()
         
         if not row:
-            raise HTTPException(status_code=404, detail="LIMS user account not found.")
+            return {"error": "LIMS user account not found."}, 404
             
         return {
             "user_name": row[0], "full_name": row[1], "user_email": row[2],
             "current_role": row[3], "lab": row[4], "location": row[5]
-        }
+        }, 200
     finally:
         cursor.close()
         connection.close()
 
-@router.post("/create", status_code=status.HTTP_201_CREATED)
-def create_issue(ticket: TicketCreate, request: Request, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
+def create_issue(request_json, current_user, client_ip):
     """Creates a new manual ticket through the web platform and routes it straight to 'IN PROGRESS'."""
+    try:
+        # Validation Pydantic manuelle
+        ticket = TicketCreate(**request_json)
+    except ValidationError as e:
+        return {"error": "Format des donnees invalide", "details": e.errors()}, 400
+
     username = current_user.get("sub") 
     connection = get_db_connection()
     if not connection:
-        raise HTTPException(status_code=500, detail="Oracle Database connection error.")
+        return {"error": "Oracle Database connection error."}, 500
         
     try:
         cursor = connection.cursor()
@@ -136,29 +122,28 @@ def create_issue(ticket: TicketCreate, request: Request, background_tasks: Backg
         connection.commit()
         next_id = new_id_var.getvalue()[0]
 
-        client_ip = request.client.host if request.client else "Unknown"
-        background_tasks.add_task(log_user_action, user_name=username, action_type="CREATE_TICKET", target_id=str(next_id), details=f"Manual web creation. Title: '{ticket.title}'", ip_address=client_ip)
+        # Remplacement de BackgroundTasks par un appel direct (synchrone et très rapide)
+        log_user_action(user_name=username, action_type="CREATE_TICKET", target_id=str(next_id), details=f"Manual web creation. Title: '{ticket.title}'", ip_address=client_ip)
         
-        return {"id_issue": next_id, "message": "Ticket successfully created."}
+        return {"id_issue": next_id, "message": "Ticket successfully created."}, 201
     except Exception as e:
         connection.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
 
 # =====================================================================
-# 2. DYNAMIC ROUTES (WITH PATH VARIABLES {issue_id})
+# 2. ROUTES DYNAMIQUES
 # =====================================================================
 
-@router.get("/{issue_id}")
-def get_issue(issue_id: int, current_user: dict = Depends(get_current_user)):
+def get_issue(issue_id, current_user):
     """Fetches detailed technical data and contextual information, including its attachments."""
     user_role = current_user.get("role")
     user_location = current_user.get("location")
     connection = get_db_connection()
     if not connection:
-        raise HTTPException(status_code=500, detail="Oracle Database connection error.")
+        return {"error": "Oracle Database connection error."}, 500
     
     try:
         cursor = connection.cursor()
@@ -180,7 +165,7 @@ def get_issue(issue_id: int, current_user: dict = Depends(get_current_user)):
         row = cursor.fetchone()
         
         if not row:
-            raise HTTPException(status_code=404, detail="Issue not found.")
+            return {"error": "Issue not found."}, 404
             
         issue_data = dict(zip(columns, row))
         
@@ -189,7 +174,7 @@ def get_issue(issue_id: int, current_user: dict = Depends(get_current_user)):
         safe_ticket_loc = str(ticket_location).strip().upper() if ticket_location else "NONE"
 
         if user_role != "IT_TEAM" and safe_ticket_loc != safe_user_loc:
-            raise HTTPException(status_code=403, detail="Access denied.")
+            return {"error": "Access denied."}, 403
             
         attachments_qry = """
             SELECT id_attachment, attachment_name, attachment_type, url_path
@@ -203,24 +188,22 @@ def get_issue(issue_id: int, current_user: dict = Depends(get_current_user)):
         attachments_list = [dict(zip(attach_cols, r)) for r in attach_rows]
         issue_data["attachments"] = attachments_list
         
-        return issue_data
+        return issue_data, 200
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database query error: {str(e)}")
+        return {"error": f"Database query error: {str(e)}"}, 500
     finally:
         cursor.close()
         connection.close()
 
-@router.get("/{issue_id}/comments")
-def get_issue_comments(issue_id: int, current_user: dict = Depends(get_current_user)):
+def get_issue_comments(issue_id, current_user):
     connection = get_db_connection()
     if not connection:
-        raise HTTPException(status_code=500, detail="Database connection error.")
+        return {"error": "Database connection error."}, 500
         
     try:
         cursor = connection.cursor()
         
-        # 1. On récupère les commentaires
         qry = """
             SELECT c.id_comment, c.user_name, u.full_name, c.comment_text, 
                    TO_CHAR(c.created_on, 'YYYY-MM-DD HH24:MI') as c_date
@@ -245,12 +228,11 @@ def get_issue_comments(issue_id: int, current_user: dict = Depends(get_current_u
                 "full_name": row[2] if row[2] else row[1],
                 "comment_text": comment_str,
                 "created_on": row[4],
-                "attachments": [] # 👈 On prépare une liste vide pour les fichiers
+                "attachments": [] 
             }
             comments_dict[c_id] = comment_obj
             comments_list.append(comment_obj)
             
-        # 2. On récupère TOUTES les pièces jointes liées aux commentaires de ce ticket
         if comments_list:
             attach_qry = """
                 SELECT id_comment, attachment_name, attachment_type, url_path
@@ -267,58 +249,49 @@ def get_issue_comments(issue_id: int, current_user: dict = Depends(get_current_u
                         "url_path": att_row[3]
                     })
                     
-        return comments_list
+        return comments_list, 200
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
         
-@router.post("/{issue_id}/comments")
-def add_issue_comment(
-    issue_id: int, 
-    payload: CommentCreate, 
-    request: Request, 
-    current_user: dict = Depends(get_current_user)
-):
+def add_issue_comment(issue_id, payload_data, current_user, client_ip):
     connection = get_db_connection()
     if not connection:
-        raise HTTPException(status_code=500, detail="Database connection error.")
+        return {"error": "Database connection error."}, 500
         
     username = current_user.get("sub", "UNKNOWN")
-    client_ip = request.client.host if request.client else "Unknown"
+    comment_text = payload_data.get("comment_text", "")
     
     try:
         cursor = connection.cursor()
         
-        # On utilise RETURNING pour récupérer l'ID du nouveau commentaire
         qry = """
             INSERT INTO c_issue_comments (id_issue, user_name, comment_text)
             VALUES (:1, :2, :3) RETURNING id_comment INTO :4
         """
         new_id_var = cursor.var(int)
-        cursor.execute(qry, [issue_id, username, payload.comment_text, new_id_var])
+        cursor.execute(qry, [issue_id, username, comment_text, new_id_var])
         connection.commit()
         
         new_comment_id = new_id_var.getvalue()[0]
         
-        preview = payload.comment_text[:50] + "..." if len(payload.comment_text) > 50 else payload.comment_text
+        preview = comment_text[:50] + "..." if len(comment_text) > 50 else comment_text
         log_user_action(
             user_name=username, action_type="ADD_COMMENT", target_id=str(issue_id),
             details=f"Added a comment: '{preview}'", ip_address=client_ip
         )
         
-        # 👈 On renvoie l'ID au frontend pour qu'il puisse y attacher les fichiers
-        return {"id_comment": new_comment_id, "message": "Comment successfully added."}
+        return {"id_comment": new_comment_id, "message": "Comment successfully added."}, 201
         
     except Exception as e:
         connection.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
 
-# 🚀 NOUVELLE ROUTE : UPLOAD DE FICHIERS SUR UN COMMENTAIRE
 def get_oracle_attachment_type(content_type: str, filename: str) -> str:
     content_type = content_type.lower()
     if content_type.startswith('image/'): return 'IMAGE'
@@ -326,53 +299,53 @@ def get_oracle_attachment_type(content_type: str, filename: str) -> str:
     elif 'zip' in content_type or filename.lower().endswith('.zip'): return 'ZIP'
     else: return 'DOCUMENT'
 
-@router.post("/{issue_id}/comments/{comment_id}/attachments")
-def upload_comment_attachments(
-    issue_id: int, 
-    comment_id: int,
-    files: List[UploadFile] = File(...),
-    current_user: dict = Depends(get_current_user)
-):
+def upload_comment_attachments(issue_id, comment_id, files_data, current_user):
+    """Note: files_data doit être une liste de tuples (filename, content_type, file_content_bytes) fournis par Flask"""
     connection = get_db_connection()
     if not connection:
-        raise HTTPException(status_code=500, detail="Database connection error.")
+        return {"error": "Database connection error."}, 500
         
     folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "stored_attachments", f"ticket_{issue_id}.0"))
     os.makedirs(folder_path, exist_ok=True)
     
     cursor = connection.cursor()
     try:
-        for file in files:
+        for file_info in files_data:
+            filename = file_info["filename"]
+            content_type = file_info["content_type"]
+            file_bytes = file_info["bytes"]
+
             unique_prefix = uuid.uuid4().hex[:8]
-            safe_file_name = f"com_{unique_prefix}_{file.filename}"
+            safe_file_name = f"com_{unique_prefix}_{filename}"
             file_destination_path = os.path.join(folder_path, safe_file_name)
             
-            file.file.seek(0)
             with open(file_destination_path, "wb") as buffer:
-                while chunk := file.file.read(1024 * 1024):
-                    buffer.write(chunk)
+                buffer.write(file_bytes)
             
-            attach_type = get_oracle_attachment_type(file.content_type, file.filename)
+            attach_type = get_oracle_attachment_type(content_type, filename)
             
-            # On insère avec l'id_comment !
             qry = """
                 INSERT INTO c_issue_attachment (id_issue, id_comment, attachment_name, attachment_type, url_path) 
                 VALUES (:1, :2, :3, :4, :5)
             """
-            cursor.execute(qry, [issue_id, comment_id, file.filename, attach_type, file_destination_path])
+            cursor.execute(qry, [issue_id, comment_id, filename, attach_type, file_destination_path])
             
         connection.commit()
-        return {"message": "Comment attachments uploaded."}
+        return {"message": "Comment attachments uploaded."}, 200
     except Exception as e:
         connection.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
 
-@router.put("/{issue_id}/validate")
-def validate_issue(issue_id: int, ticket: TicketUpdate, request: Request, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
+def validate_issue(issue_id, request_json, current_user, client_ip):
     """Validates data alterations and updates an issue payload to 'IN PROGRESS' status."""
+    try:
+        ticket = TicketUpdate(**request_json)
+    except ValidationError as e:
+        return {"error": "Donnees invalides", "details": e.errors()}, 400
+
     user_email = current_user.get("email")
     user_role = current_user.get("role")
     user_location = current_user.get("location")
@@ -380,7 +353,7 @@ def validate_issue(issue_id: int, ticket: TicketUpdate, request: Request, backgr
 
     connection = get_db_connection()
     if not connection:
-        raise HTTPException(status_code=500, detail="Oracle Database connection error.")
+        return {"error": "Oracle Database connection error."}, 500
         
     try:
         cursor = connection.cursor()
@@ -389,7 +362,7 @@ def validate_issue(issue_id: int, ticket: TicketUpdate, request: Request, backgr
         ticket_row = cursor.fetchone()
         
         if not ticket_row:
-            raise HTTPException(status_code=404, detail="Issue not found.")
+            return {"error": "Issue not found."}, 404
             
         safe_user_email = str(user_email).strip().lower() if user_email else "NONE"
         safe_ticket_email = str(ticket_row[1]).strip().lower() if ticket_row[1] else "NONE"
@@ -397,65 +370,43 @@ def validate_issue(issue_id: int, ticket: TicketUpdate, request: Request, backgr
         safe_ticket_loc = str(ticket_row[0]).strip().upper() if ticket_row[0] else "NONE"
 
         if user_role == "USER" and safe_ticket_email != safe_user_email:
-            raise HTTPException(status_code=403, detail="Forbidden.")
+            return {"error": "Forbidden."}, 403
         elif user_role == "LOCAL_ADMIN" and safe_ticket_loc != safe_user_loc:
-            raise HTTPException(status_code=403, detail="Forbidden.")
+            return {"error": "Forbidden."}, 403
 
         update_qry = """
             UPDATE c_issue 
-            SET title = :1, 
-                issue_type = :2, 
-                criticity = :3, 
-                frequency = :4, 
-                blocking_issue = :5, 
-                description = :6, 
-                sspticket = :7,
-                current_project = :8,
-                current_batch = :9,
-                current_sample = :10,
-                current_analysis = :11,
-                current_analysis_variation = :12,
-                current_customer = :13,
-                status = 'IN PROGRESS', 
-                changed_on = SYSDATE, 
-                changed_by = :14
+            SET title = :1, issue_type = :2, criticity = :3, frequency = :4, 
+                blocking_issue = :5, description = :6, sspticket = :7,
+                current_project = :8, current_batch = :9, current_sample = :10,
+                current_analysis = :11, current_analysis_variation = :12,
+                current_customer = :13, status = 'IN PROGRESS', 
+                changed_on = SYSDATE, changed_by = :14
             WHERE id_issue = :15 AND status NOT IN ('CANCELED', 'CLOSED')
         """
         cursor.execute(update_qry, [
-            ticket.title, 
-            ticket.issue_type, 
-            ticket.criticity, 
-            ticket.frequency, 
-            ticket.blocking_issue, 
-            ticket.description, 
-            ticket.sspticket,
-            ticket.current_project,
-            ticket.current_batch,
-            ticket.current_sample,
-            ticket.current_analysis,
-            ticket.current_analysis_variation,
-            ticket.current_customer,
-            username,
-            issue_id
+            ticket.title, ticket.issue_type, ticket.criticity, ticket.frequency, 
+            ticket.blocking_issue, ticket.description, ticket.sspticket,
+            ticket.current_project, ticket.current_batch, ticket.current_sample,
+            ticket.current_analysis, ticket.current_analysis_variation,
+            ticket.current_customer, username, issue_id
         ])
         connection.commit()
         
         if cursor.rowcount == 0:
-            raise HTTPException(status_code=400, detail="Unable to modify this specific ticket.")
+            return {"error": "Unable to modify this specific ticket."}, 400
 
-        client_ip = request.client.host if request.client else "Unknown"
-        background_tasks.add_task(log_user_action, user_name=username, action_type="UPDATE_TICKET", target_id=str(issue_id), details=f"Ticket updated/validated. New title: '{ticket.title}'", ip_address=client_ip)
+        log_user_action(user_name=username, action_type="UPDATE_TICKET", target_id=str(issue_id), details=f"Ticket updated/validated. New title: '{ticket.title}'", ip_address=client_ip)
             
-        return {"message": "Issue validated successfully."}
+        return {"message": "Issue validated successfully."}, 200
     except Exception as e:
         connection.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
 
-@router.put("/{issue_id}/cancel")
-def cancel_issue(issue_id: int, request: Request, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
+def cancel_issue(issue_id, current_user, client_ip):
     """Flags a target active ticket with the 'CANCELED' status."""
     user_email = current_user.get("email")
     user_role = current_user.get("role")
@@ -464,7 +415,7 @@ def cancel_issue(issue_id: int, request: Request, background_tasks: BackgroundTa
 
     connection = get_db_connection()
     if not connection:
-        raise HTTPException(status_code=500, detail="Oracle Database connection error.")
+        return {"error": "Oracle Database connection error."}, 500
         
     try:
         cursor = connection.cursor()
@@ -473,7 +424,7 @@ def cancel_issue(issue_id: int, request: Request, background_tasks: BackgroundTa
         ticket_row = cursor.fetchone()
         
         if not ticket_row:
-            raise HTTPException(status_code=404, detail="Issue not found.")
+            return {"error": "Issue not found."}, 404
             
         safe_ticket_loc = str(ticket_row[0]).strip().upper() if ticket_row[0] else "NONE"
         safe_ticket_email = str(ticket_row[1]).strip().lower() if ticket_row[1] else "NONE"
@@ -481,87 +432,85 @@ def cancel_issue(issue_id: int, request: Request, background_tasks: BackgroundTa
         safe_user_loc = str(user_location).strip().upper() if user_location else "NONE"
 
         if user_role == "USER" and safe_ticket_email != safe_user_email:
-            raise HTTPException(status_code=403, detail="You can only cancel your own tickets.")
+            return {"error": "You can only cancel your own tickets."}, 403
         elif user_role == "LOCAL_ADMIN" and safe_ticket_loc != safe_user_loc:
-            raise HTTPException(status_code=403, detail="This ticket falls outside your local jurisdiction.")
+            return {"error": "This ticket falls outside your local jurisdiction."}, 403
 
         cursor.execute("UPDATE c_issue SET status = 'CANCELED', changed_on = SYSDATE WHERE id_issue = :1", [issue_id])
         connection.commit()
 
-        client_ip = request.client.host if request.client else "Unknown"
-        background_tasks.add_task(log_user_action, user_name=username, action_type="CANCEL_TICKET", target_id=str(issue_id), details="Ticket canceled by user.", ip_address=client_ip)
-        return {"message": "Ticket successfully canceled."}
+        log_user_action(user_name=username, action_type="CANCEL_TICKET", target_id=str(issue_id), details="Ticket canceled by user.", ip_address=client_ip)
+        return {"message": "Ticket successfully canceled."}, 200
     except Exception as e:
         connection.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
 
-@router.get("/{ticket_id}/download/working_dir")
-def download_working_dir(ticket_id: str, request: Request, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
-    """Serves the automated LabWare system local working directory setup zip archive."""
+def download_file_path(ticket_id, file_type, current_user, client_ip):
+    """Returns the absolute path of the requested file (logs or working_dir) so main.py can send it."""
     folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "stored_attachments", f"ticket_{ticket_id}.0"))
-    file_name = f"Issue_{ticket_id}_WorkingDir.zip"
-    file_path = os.path.join(folder_path, file_name)
     
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail=f"File {file_name} not found.")
+    if file_type == "working_dir":
+        file_name = f"Issue_{ticket_id}_WorkingDir.zip"
+        action_type = "DOWNLOAD_WORKING_DIR"
+        details = "Downloaded contextual Working Directory."
+    elif file_type == "logs":
+        file_name = f"Issue_{ticket_id}_Logs.zip"
+        action_type = "DOWNLOAD_LOGS"
+        details = "Downloaded system Logs files."
+    else:
+        return {"error": "Type de fichier invalide."}, 400
 
-    client_ip = request.client.host if request.client else "Unknown"
-    background_tasks.add_task(log_user_action, user_name=current_user.get("sub", "UNKNOWN"), action_type="DOWNLOAD_WORKING_DIR", target_id=ticket_id, details="Downloaded contextual Working Directory.", ip_address=client_ip)
-    return FileResponse(path=file_path, filename=file_name, media_type="application/zip")
-
-@router.get("/{ticket_id}/download/logs")
-def download_logs(ticket_id: str, request: Request, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
-    """Serves the system diagnostic environmental log file dump zip archive."""
-    folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "stored_attachments", f"ticket_{ticket_id}.0"))
-    file_name = f"Issue_{ticket_id}_Logs.zip"
     file_path = os.path.join(folder_path, file_name) 
     
     if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail=f"File {file_name} not found.")
+        return {"error": f"File {file_name} not found."}, 404
 
-    client_ip = request.client.host if request.client else "Unknown"
-    background_tasks.add_task(log_user_action, user_name=current_user.get("sub", "UNKNOWN"), action_type="DOWNLOAD_LOGS", target_id=ticket_id, details="Downloaded system Logs files.", ip_address=client_ip)
-    return FileResponse(path=file_path, filename=file_name, media_type="application/zip")
+    log_user_action(user_name=current_user.get("sub", "UNKNOWN"), action_type=action_type, target_id=ticket_id, details=details, ip_address=client_ip)
+    
+    return {"file_path": file_path, "file_name": file_name}, 200
 
-@router.put("/{issue_id}/close")
-def close_ticket(issue_id: int, payload: StatusUpdate, request: Request, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
+def close_ticket(issue_id, request_json, current_user, client_ip):
     """Transitions the resolution status lifecycle parameters to 'RESOLVED' or 'CLOSED'."""
+    try:
+        payload = StatusUpdate(**request_json)
+    except ValidationError as e:
+        return {"error": "Format invalide", "details": e.errors()}, 400
+
     valid_statuses = ["CLOSED", "RESOLVED"]
     if payload.new_status not in valid_statuses:
-        raise HTTPException(status_code=400, detail="Invalid status option. Please choose CLOSED or RESOLVED.")
+        return {"error": "Invalid status option. Please choose CLOSED or RESOLVED."}, 400
 
     user_role = current_user.get("role")
     user_trigram = current_user.get("sub", "").lower()
 
     connection = get_db_connection()
     if not connection:
-        raise HTTPException(status_code=500, detail="Database connection error.")
+        return {"error": "Database connection error."}, 500
     
     try:
         cursor = connection.cursor()
         cursor.execute("SELECT user_name FROM c_issue WHERE id_issue = :1", [issue_id])
         row = cursor.fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="Ticket not found.")
+            return {"error": "Ticket not found."}, 404
             
         ticket_owner = row[0].lower() if row[0] else ""
         if user_role not in ["IT_TEAM", "LOCAL_ADMIN"] and user_trigram != ticket_owner:
-            raise HTTPException(status_code=403, detail="You do not possess the required permissions to finalize and close this ticket.")
+            return {"error": "You do not possess the required permissions to finalize and close this ticket."}, 403
 
         cursor.execute("UPDATE c_issue SET status = :1, changed_on = SYSDATE WHERE id_issue = :2", [payload.new_status, issue_id])
         connection.commit()
 
-        client_ip = request.client.host if request.client else "Unknown"
         action_type = "RESOLVE_TICKET" if payload.new_status == "RESOLVED" else "CLOSE_TICKET"
-        background_tasks.add_task(log_user_action, user_name=current_user.get("sub", "UNKNOWN"), action_type=action_type, target_id=str(issue_id), details=f"Status modification validated: {payload.new_status}", ip_address=client_ip)
+        log_user_action(user_name=current_user.get("sub", "UNKNOWN"), action_type=action_type, target_id=str(issue_id), details=f"Status modification validated: {payload.new_status}", ip_address=client_ip)
 
-        return {"message": f"Ticket status successfully set to {payload.new_status}."}
+        return {"message": f"Ticket status successfully set to {payload.new_status}."}, 200
     except Exception as e:
         connection.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e)}, 500
     finally:
         cursor.close()
         connection.close()

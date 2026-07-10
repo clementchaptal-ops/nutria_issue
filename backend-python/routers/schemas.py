@@ -33,3 +33,8 @@ class TicketUpdate(BaseModel):
 
 class StatusUpdate(BaseModel):
     new_status: str
+
+class GoogleTokenRequest(BaseModel):
+    credential: str
+    token: Optional[str] = None
+    selected_profile: Optional[str] = None
