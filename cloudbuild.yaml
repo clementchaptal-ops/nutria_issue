@@ -1,4 +1,13 @@
 steps:
+  # 1. On active l'API Cloud Functions (déjà fait, mais on la garde par sécurité)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    args: ['gcloud', 'services', 'enable', 'cloudfunctions.googleapis.com']
+
+  # 2. 🌟 NOUVEAU : On active l'API Cloud Resource Manager pour valider les permissions
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    args: ['gcloud', 'services', 'enable', 'cloudresourcemanager.googleapis.com']
+
+  # 3. Ton étape de déploiement habituelle
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args:
       - 'gcloud'
@@ -12,6 +21,5 @@ steps:
       - '--entry-point=nutria_api'
     dir: 'backend-python'
 
-# 🛠️ AJOUT POUR CORRIGER L'ERREUR DE LOGS / SERVICE ACCOUNT
 options:
   logging: CLOUD_LOGGING_ONLY
