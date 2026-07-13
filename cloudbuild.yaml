@@ -1,13 +1,13 @@
 steps:
-  # 1. On active l'API Cloud Functions (déjà fait, mais on la garde par sécurité)
+  # 1. On active l'API Cloud Functions
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args: ['gcloud', 'services', 'enable', 'cloudfunctions.googleapis.com']
 
-  # 2. 🌟 NOUVEAU : On active l'API Cloud Resource Manager pour valider les permissions
+  # 2. On active l'API Cloud Resource Manager
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args: ['gcloud', 'services', 'enable', 'cloudresourcemanager.googleapis.com']
 
-  # 3. Ton étape de déploiement habituelle
+  # 3. Étape de déploiement (sans la ligne allow-unauthenticated)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args:
       - 'gcloud'
@@ -16,7 +16,6 @@ steps:
       - 'nutria_api'
       - '--runtime=python311'
       - '--trigger-http'
-      - '--allow-unauthenticated'
       - '--region=europe-west1'
       - '--entry-point=nutria_api'
     dir: 'backend-python'
