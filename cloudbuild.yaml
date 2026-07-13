@@ -1,0 +1,13 @@
+steps:
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    args:
+      - 'gcloud'
+      - 'functions'
+      - 'deploy'
+      - 'nutria_api'
+      - '--runtime=python311'
+      - '--trigger-http'
+      - '--allow-unauthenticated'
+      - '--region=europe-west1'
+      - '--entry-point=nutria_api'
+    dir: 'backend-python' # Se place dans le sous-dossier backend

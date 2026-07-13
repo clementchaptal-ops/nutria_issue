@@ -1,0 +1,8 @@
+.git/
+.gitignore
+.gcloudignore
+frontend-react/
+.vscode/
+
+# 📁 ON IGNORE LE STOCKAGE LOCAL DES PIÈCES JOINTES
+backend-python/stored_attachments/
