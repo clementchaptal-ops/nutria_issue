@@ -13,7 +13,7 @@ function AuditLogs() {
   useEffect(() => {
     const fetchLogs = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/issues/audit/logs', {
+        const response = await fetch('https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/api/issues/audit/logs', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`
           }

@@ -38,7 +38,7 @@ function Login() {
 
   const loginToServer = async (token: string, selectedProfile?: string) => {
     try {
-      const response = await fetch('http://localhost:8080/auth', {
+      const response = await fetch('https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
