@@ -10,4 +10,8 @@ steps:
       - '--allow-unauthenticated'
       - '--region=europe-west1'
       - '--entry-point=nutria_api'
-    dir: 'backend-python' # Se place dans le sous-dossier backend
+    dir: 'backend-python'
+
+# 🛠️ AJOUT POUR CORRIGER L'ERREUR DE LOGS / SERVICE ACCOUNT
+options:
+  logging: CLOUD_LOGGING_ONLY
