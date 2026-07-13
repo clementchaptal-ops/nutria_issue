@@ -1,7 +1,6 @@
-import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ErrorMessage from '../components/ErrorMessage'
 import styles from './Login.module.css'
 
@@ -11,29 +10,26 @@ interface LimsProfile {
   location: string
 }
 
-function LoginContent() {
-  const { t } = useTranslation() // i18n hook
+function Login() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation() 
   const [authError, setAuthError] = useState<string | null>(null)
 
-  // États pour la gestion des profils multiples
   const [profiles, setProfiles] = useState<LimsProfile[]>([])
   const [googleToken, setGoogleToken] = useState<string | null>(null)
   const [requireSelection, setRequireSelection] = useState<boolean>(false)
 
+  const GOOGLE_CLIENT_ID = "549394697229-tvgof9to9fcu4um4260vnigbtt57o9fo.apps.googleusercontent.com"
   const from = location.state?.from || '/dashboard'
 
-  // --- ANALYSE DE L'URL LABWARE (BLINDÉE) ---
+  // --- ANALYSE DE L'URL LABWARE ---
   let searchString = from.includes('?') ? from.substring(from.indexOf('?')) : ''
-  
   if (!searchString && location.search) {
     searchString = location.search
   }
-  
   const searchParams = new URLSearchParams(searchString)
   const preselectedProfile = searchParams.get('user_name') || undefined
-  // ------------------------------------------
 
   const loginToServer = async (token: string, selectedProfile?: string) => {
     try {
@@ -72,7 +68,6 @@ function LoginContent() {
       
     } catch (err: any) {
       if (selectedProfile) {
-        console.warn("Le profil pré-sélectionné a été rejeté par l'API, bascule sur le choix manuel.");
         loginToServer(token, undefined)
       } else {
         setAuthError(err.message || t('login.error.server_fail', 'Unable to connect to the Nutria server.'))
@@ -80,16 +75,30 @@ function LoginContent() {
     }
   }
 
-  // --- NOUVELLE CONNEXION GOOGLE SANS IFRAME ---
-  const loginWithGoogle = useGoogleLogin({
-    onSuccess: (credentialResponse) => {
-      setAuthError(null)
-      if (credentialResponse.access_token) {
-        loginToServer(credentialResponse.access_token, preselectedProfile)
+  // --- LE COEUR DE LA SOLUTION : RÉCUPÉRATION DU JETON SANS POP-UP ---
+  useEffect(() => {
+    // On regarde si Google nous a renvoyé sur le site avec le jeton dans l'URL
+    const hash = window.location.hash;
+    if (hash.includes('id_token=')) {
+      const params = new URLSearchParams(hash.replace('#', '?'));
+      const idToken = params.get('id_token');
+      
+      if (idToken) {
+        // On efface immédiatement le jeton de l'URL pour que ce soit propre
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        // On envoie le jeton au backend Python (exactement le format attendu)
+        loginToServer(idToken, preselectedProfile);
       }
-    },
-    onError: () => setAuthError(t('login.error.google_fail', 'Google authentication failed.')),
-  })
+    }
+  }, []);
+
+  // --- REDIRECTION VERS GOOGLE ---
+  const handleGoogleRedirect = () => {
+    const REDIRECT_URI = window.location.origin + window.location.pathname; // ex: https://nutria.../login
+    // On force une redirection classique de toute la page
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=id_token&scope=email profile openid&nonce=nutria123&prompt=select_account`;
+    window.location.href = authUrl;
+  }
 
   const handleProfileSelect = (profileName: string) => {
     if (googleToken) {
@@ -110,24 +119,17 @@ function LoginContent() {
           <div className={styles.cardHeader}>
             <span className={styles.subtitle}>{t('login.subtitle', 'NUTRIA ISSUE REPORT')}</span>
           </div>
-          
           <div className={styles.divider}></div>
-          
           <ErrorMessage message={authError} />
 
           {requireSelection ? (
             <div className={styles.profileSelectionContainer}>
               <h3 className={styles.selectionTitle}>
-                {t('login.choose_profile', 'Multiple LIMS profiles detected. Please choose one:')}
+                {t('login.choose_profile', 'Multiple LIMS profiles detected.')}
               </h3>
-              
               <div className={styles.profileList}>
                 {profiles.map((prof) => (
-                  <button
-                    key={prof.user_name}
-                    onClick={() => handleProfileSelect(prof.user_name)}
-                    className={styles.profileButton}
-                  >
+                  <button key={prof.user_name} onClick={() => handleProfileSelect(prof.user_name)} className={styles.profileButton}>
                     <span className={styles.profileIcon}>👤</span>
                     <div className={styles.profileInfo}>
                       <span className={styles.profileName}>{prof.user_name}</span>
@@ -136,41 +138,22 @@ function LoginContent() {
                   </button>
                 ))}
               </div>
-              
-              <button 
-                onClick={() => setRequireSelection(false)} 
-                className={styles.backButton}
-              >
-                ← {t('login.back', 'Back')}
-              </button>
+              <button onClick={() => setRequireSelection(false)} className={styles.backButton}>← {t('login.back', 'Back')}</button>
             </div>
           ) : (
             <>
               <p className={styles.instructions}>
-                {t('login.instructions', 'Please log in with your Mérieux NutriSciences account to access the platform.')}
+                {t('login.instructions', 'Please log in with your Mérieux NutriSciences account.')}
               </p>
-              
               <div className={styles.buttonWrapper}>
-                {/* --- NOUVEAU BOUTON PERSONNALISÉ --- */}
                 <button 
-                  onClick={() => loginWithGoogle()}
+                  onClick={handleGoogleRedirect}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '12px',
-                    width: '100%',
-                    padding: '10px 24px',
-                    backgroundColor: '#ffffff',
-                    color: '#3c4043',
-                    border: '1px solid #dadce0',
-                    borderRadius: '24px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    fontFamily: '"Google Sans", Roboto, Arial, sans-serif',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s',
-                    boxShadow: '0 1px 2px 0 rgba(60,64,67,0.3)'
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
+                    width: '100%', padding: '10px 24px', backgroundColor: '#ffffff', color: '#3c4043',
+                    border: '1px solid #dadce0', borderRadius: '24px', fontSize: '14px', fontWeight: '500',
+                    fontFamily: '"Google Sans", Roboto, Arial, sans-serif', cursor: 'pointer',
+                    transition: 'background-color 0.2s', boxShadow: '0 1px 2px 0 rgba(60,64,67,0.3)'
                   }}
                   onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8f9fa'}
                   onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
@@ -180,7 +163,6 @@ function LoginContent() {
                     <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
                     <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
                     <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                    <path fill="none" d="M0 0h48v48H0z"/>
                   </svg>
                   {t('login.signin_with', 'Sign in with Google')}
                 </button>
@@ -190,17 +172,6 @@ function LoginContent() {
         </div>
       </main>
     </div>
-  )
-}
-
-// Composant principal qui enveloppe tout avec le Provider
-function Login() {
-  const GOOGLE_CLIENT_ID = "549394697229-tvgof9to9fcu4um4260vnigbtt57o9fo.apps.googleusercontent.com"
-  
-  return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <LoginContent />
-    </GoogleOAuthProvider>
   )
 }
 
