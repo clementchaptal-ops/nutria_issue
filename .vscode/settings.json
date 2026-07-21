@@ -1,7 +1,7 @@
 {
   "files.exclude": {
     "**/.gitignore": false,
-    "**/package-lock.json": true,
+    "**/package-lock.json": false,
     "**/tsconfig*.json": true,
     "**/vite.config.ts": false,
     "**/.eslintrc*": true,

@@ -19,6 +19,7 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "549394697229-tvgof9to9fcu
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "your_super_secret_key_change_this_in_production")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 120
+USE_MOCK_DATA = os.environ.get("USE_MOCK_DATA", "True") == "True"
 
 # --- HELPER FUNCTIONS ---
 def create_access_token(data: dict, expires_delta: timedelta):
@@ -58,24 +59,37 @@ def google_auth(request_json):
         if not user_email:
             return {"error": "Email not provided by Google."}, 400
 
-        # 3. Query the Oracle Database
-        connection = get_db_connection()
-        if not connection:
-            return {"error": "Database connection error."}, 500
+        # 3. Query the Database (Mock or Oracle)
+        if USE_MOCK_DATA:
+            print(f"=== MOCK MODE ENABLED ===\nBypassing Oracle for user: {user_email}")
             
-        cursor = connection.cursor()
+            # Generate a fake username based on the email prefix
+            fake_username = user_email.split('@')[0].upper()
+            
+            # Simulate the exact response format expected from Oracle
+            user_rows = [
+                (fake_username, "Demo User", "Demo Laboratory")
+            ]
+            
+        else:
+            print(f"=== PRODUCTION MODE ===\nConnecting to Oracle for user: {user_email}")
+            connection = get_db_connection()
+            if not connection:
+                return {"error": "Database connection error."}, 500
+                
+            cursor = connection.cursor()
 
-        query = """
-            SELECT user_name, full_name, location 
-            FROM LIMS_USERS 
-            WHERE LOWER(EMAIL_ADDR) = LOWER(:1)
-        """
-        cursor.execute(query, (user_email,))
-        user_rows = cursor.fetchall()  
+            query = """
+                SELECT user_name, full_name, location 
+                FROM LIMS_USERS 
+                WHERE LOWER(EMAIL_ADDR) = LOWER(:1)
+            """
+            cursor.execute(query, (user_email,))
+            user_rows = cursor.fetchall()  
 
-        cursor.close()
-        connection.close()
-
+            cursor.close()
+            connection.close()
+            
         # 4. Check if user exists
         if not user_rows:
             return {"error": f"User not found in LIMS database with email: {user_email}"}, 403
