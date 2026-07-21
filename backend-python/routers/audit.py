@@ -12,11 +12,12 @@ def log_user_action(user_name: str, action_type: str, target_id: str = None, det
         
     try:
         cursor = connection.cursor()
+        # ✅ Syntaxe PostgreSQL : %s au lieu de :1
         query = """
             INSERT INTO c_issue_audit_logs (user_name, action_type, target_id, details, ip_address)
-            VALUES (:1, :2, :3, :4, :5)
+            VALUES (%s, %s, %s, %s, %s)
         """
-        cursor.execute(query, [user_name, action_type, target_id, details, ip_address])
+        cursor.execute(query, (user_name, action_type, target_id, details, ip_address))
         connection.commit()
     except Exception as e:
         logger.error(f"Audit Trail Error: {e}")
@@ -39,6 +40,7 @@ def get_audit_logs(current_user):
 
     try:
         cursor = connection.cursor()
+        # Note : TO_CHAR fonctionne à l'identique entre Oracle et PostgreSQL !
         qry = """
             SELECT id_log, user_name, action_type, target_id, details, ip_address, 
                    TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as c_date
@@ -50,10 +52,9 @@ def get_audit_logs(current_user):
 
         logs = []
         for row in rows:
-            # Special handling for Oracle CLOB 'details' column data streaming
+            # ✅ Plus besoin de gérer les CLOB complexes d'Oracle.
+            # PostgreSQL renvoie directement le texte (string).
             details_val = row[4]
-            if details_val is not None and hasattr(details_val, 'read'):
-                details_val = details_val.read()
 
             logs.append({
                 "id_log": row[0],
@@ -65,11 +66,10 @@ def get_audit_logs(current_user):
                 "created_at": row[6]
             })
             
-        # Succès : on retourne la liste et le code 200
         return logs, 200
         
     except Exception as e:
-        return {"error": f"Oracle Error: {str(e)}"}, 500
+        return {"error": f"PostgreSQL Error: {str(e)}"}, 500
     finally:
         cursor.close()
         connection.close()

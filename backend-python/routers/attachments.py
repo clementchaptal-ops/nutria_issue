@@ -91,9 +91,9 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
         files_str = ", ".join([f"'{name}'" for name in file_names_list])
         audit_details = f"Uploaded {files_count} attachment(s) to GCS. File list: [{files_str}]."
 
-        # 2. SAVE METADATA (Mock vs Oracle)
+        # 2. SAVE METADATA (Mock vs PostgreSQL)
         if USE_MOCK_DATA:
-            logger.info(f"=== MOCK MODE === Skipping Oracle DB insert for attachments")
+            logger.info(f"=== MOCK MODE === Skipping DB insert for attachments")
             
             log_user_action(user_name=username, action_type="UPLOAD_ATTACHMENTS", target_id=str(issue_id), details=audit_details, ip_address=client_ip)
             
@@ -104,29 +104,29 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
             }, 200
 
         else:
-            logger.info(f"=== PRODUCTION MODE === Saving GCS URLs to Oracle DB")
+            logger.info(f"=== PRODUCTION MODE === Saving GCS URLs to PostgreSQL DB")
             connection = get_db_connection()
             if not connection:
-                return {"error": "Oracle Database connection error."}, 500
+                return {"error": "Database connection error."}, 500
                 
             cursor = connection.cursor()
 
             try:
                 for file_data in uploaded_files_info:
+                    # ✅ Syntaxe PostgreSQL : %s au lieu de :1, :2...
                     qry = """
                         INSERT INTO c_issue_attachment (
                             id_issue, attachment_name, attachment_type, url_path
-                        ) VALUES (:1, :2, :3, :4)
+                        ) VALUES (%s, %s, %s, %s)
                     """
-                    # We save the Google Cloud Storage URL directly in Oracle
-                    cursor.execute(qry, [issue_id, file_data["original_name"], file_data["type"], file_data["url_path"]])
+                    cursor.execute(qry, (issue_id, file_data["original_name"], file_data["type"], file_data["url_path"]))
 
                 connection.commit()
                 
                 log_user_action(user_name=username, action_type="UPLOAD_ATTACHMENTS", target_id=str(issue_id), details=audit_details, ip_address=client_ip)
 
                 return {
-                    "message": "Attachments uploaded to GCS and saved in Oracle.",
+                    "message": "Attachments uploaded to GCS and saved in PostgreSQL.",
                     "bucket": BUCKET_NAME,
                     "files": uploaded_files_info
                 }, 200
@@ -149,8 +149,6 @@ def get_attachment_file(issue_id, filename):
 
 
 def delete_attachment(issue_id, filename, current_user, client_ip):
-    # Only the database soft-delete changes between Mock and Oracle. 
-    # In a real scenario, you might also delete the blob from GCS here using `blob.delete()`
     username = current_user.get("sub", "UNKNOWN")
 
     if USE_MOCK_DATA:
@@ -160,19 +158,20 @@ def delete_attachment(issue_id, filename, current_user, client_ip):
     else:
         connection = get_db_connection()
         if not connection:
-            return {"error": "Oracle Database connection error."}, 500
+            return {"error": "Database connection error."}, 500
 
         try:
             cursor = connection.cursor()
+            # ✅ Syntaxe PostgreSQL : %s
             soft_delete_qry = """
                 UPDATE c_issue_attachment 
                 SET removed = 'T'
-                WHERE id_issue = :1 AND url_path LIKE :2
+                WHERE id_issue = %s AND url_path LIKE %s
             """
-            cursor.execute(soft_delete_qry, [issue_id, f"%{filename}%"])
+            cursor.execute(soft_delete_qry, (issue_id, f"%{filename}%"))
             connection.commit()
             
-            return {"message": "Attachment flagged as removed in Oracle."}, 200
+            return {"message": "Attachment flagged as removed in PostgreSQL."}, 200
         except Exception as e:
             connection.rollback()
             return {"error": str(e)}, 500

@@ -7,6 +7,8 @@ from pydantic import ValidationError
 from .schemas import TicketCreate, TicketUpdate, StatusUpdate
 from .audit import log_user_action
 
+BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
+
 # =====================================================================
 # 1. ROUTES STATIQUES
 # =====================================================================
@@ -18,7 +20,7 @@ def get_all_issues(current_user):
 
     connection = get_db_connection()
     if not connection:
-        return {"error": "Oracle Database connection error."}, 500
+        return {"error": "Database connection error."}, 500
         
     cursor = connection.cursor()
     tickets = []
@@ -43,11 +45,12 @@ def get_all_issues(current_user):
             else:
                 site_root = safe_location
 
+            # ✅ PostgreSQL : %s 
             qry = base_qry + """
-                WHERE TRIM(UPPER(u.location)) LIKE TRIM(UPPER(:1)) || '%' 
+                WHERE TRIM(UPPER(u.location)) LIKE TRIM(UPPER(%s)) || '%%' 
                 ORDER BY i.id_issue DESC
             """
-            cursor.execute(qry, [site_root])
+            cursor.execute(qry, (site_root,))
             
         rows = cursor.fetchall()
         for row in rows:
@@ -64,10 +67,11 @@ def get_all_issues(current_user):
             })
         return tickets, 200
     except Exception as e:
-        return {"error": f"Oracle Error: {str(e)}"}, 500
+        return {"error": f"PostgreSQL Error: {str(e)}"}, 500
     finally:
         cursor.close()
         connection.close()
+
 
 def get_my_profile(current_user):
     """Fetches true LIMS user profile details for the currently logged-in account."""
@@ -82,9 +86,9 @@ def get_my_profile(current_user):
         qry = """
             SELECT user_name, full_name, email_addr, user_role, lab, location
             FROM lims_users
-            WHERE TRIM(UPPER(user_name)) = TRIM(UPPER(:1))
+            WHERE TRIM(UPPER(user_name)) = TRIM(UPPER(%s))
         """
-        cursor.execute(qry, [username])
+        cursor.execute(qry, (username,))
         row = cursor.fetchone()
         
         if not row:
@@ -98,10 +102,10 @@ def get_my_profile(current_user):
         cursor.close()
         connection.close()
 
+
 def create_issue(request_json, current_user, client_ip):
     """Creates a new manual ticket through the web platform and routes it straight to 'IN PROGRESS'."""
     try:
-        # Validation Pydantic manuelle
         ticket = TicketCreate(**request_json)
     except ValidationError as e:
         return {"error": "Format des donnees invalide", "details": e.errors()}, 400
@@ -109,20 +113,22 @@ def create_issue(request_json, current_user, client_ip):
     username = current_user.get("sub") 
     connection = get_db_connection()
     if not connection:
-        return {"error": "Oracle Database connection error."}, 500
+        return {"error": "Database connection error."}, 500
         
     try:
         cursor = connection.cursor()
+        # ✅ PostgreSQL : RETURNING id_issue et variables %s (CURRENT_TIMESTAMP remplace SYSDATE)
         insert_qry = """
             INSERT INTO c_issue (title, issue_type, criticity, frequency, description, status, user_name, created_on, changed_on) 
-            VALUES (:1, :2, :3, :4, :5, 'IN PROGRESS', :6, SYSDATE, SYSDATE) RETURNING id_issue INTO :7
+            VALUES (%s, %s, %s, %s, %s, 'IN PROGRESS', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
+            RETURNING id_issue
         """
-        new_id_var = cursor.var(int)
-        cursor.execute(insert_qry, [ticket.title, ticket.issue_type, ticket.criticity, ticket.frequency, ticket.description, username, new_id_var])
+        cursor.execute(insert_qry, (ticket.title, ticket.issue_type, ticket.criticity, ticket.frequency, ticket.description, username))
+        
+        # Récupération de l'ID généré
+        next_id = cursor.fetchone()[0]
         connection.commit()
-        next_id = new_id_var.getvalue()[0]
 
-        # Remplacement de BackgroundTasks par un appel direct (synchrone et très rapide)
         log_user_action(user_name=username, action_type="CREATE_TICKET", target_id=str(next_id), details=f"Manual web creation. Title: '{ticket.title}'", ip_address=client_ip)
         
         return {"id_issue": next_id, "message": "Ticket successfully created."}, 201
@@ -143,7 +149,7 @@ def get_issue(issue_id, current_user):
     user_location = current_user.get("location")
     connection = get_db_connection()
     if not connection:
-        return {"error": "Oracle Database connection error."}, 500
+        return {"error": "Database connection error."}, 500
     
     try:
         cursor = connection.cursor()
@@ -158,9 +164,9 @@ def get_issue(issue_id, current_user):
                    TO_CHAR(i.created_on, 'YYYY-MM-DD HH24:MI:SS') as created_on
             FROM c_issue i
             LEFT JOIN lims_users u ON TRIM(UPPER(i.user_name)) = TRIM(UPPER(u.user_name))
-            WHERE i.id_issue = :1
+            WHERE i.id_issue = %s
         """
-        cursor.execute(qry, [issue_id])
+        cursor.execute(qry, (issue_id,))
         columns = [col[0].lower() for col in cursor.description]
         row = cursor.fetchone()
         
@@ -179,9 +185,9 @@ def get_issue(issue_id, current_user):
         attachments_qry = """
             SELECT id_attachment, attachment_name, attachment_type, url_path
             FROM c_issue_attachment
-            WHERE id_issue = :1 AND REMOVED = 'F' AND id_comment IS NULL
+            WHERE id_issue = %s AND REMOVED = 'F' AND id_comment IS NULL
         """
-        cursor.execute(attachments_qry, [issue_id])
+        cursor.execute(attachments_qry, (issue_id,))
         attach_cols = [col[0].lower() for col in cursor.description]
         attach_rows = cursor.fetchall()
         
@@ -196,6 +202,7 @@ def get_issue(issue_id, current_user):
         cursor.close()
         connection.close()
 
+
 def get_issue_comments(issue_id, current_user):
     connection = get_db_connection()
     if not connection:
@@ -209,17 +216,17 @@ def get_issue_comments(issue_id, current_user):
                    TO_CHAR(c.created_on, 'YYYY-MM-DD HH24:MI') as c_date
             FROM c_issue_comments c
             LEFT JOIN lims_users u ON TRIM(UPPER(c.user_name)) = TRIM(UPPER(u.user_name))
-            WHERE c.id_issue = :1
+            WHERE c.id_issue = %s
             ORDER BY c.created_on ASC
         """
-        cursor.execute(qry, [issue_id])
+        cursor.execute(qry, (issue_id,))
         
         comments_dict = {}
         comments_list = []
         
         for row in cursor.fetchall():
-            raw_text = row[3]
-            comment_str = raw_text.read() if hasattr(raw_text, 'read') else raw_text
+            # ✅ PostgreSQL : Le texte est déjà sous format string, pas besoin de .read()
+            comment_str = row[3]
             
             c_id = row[0]
             comment_obj = {
@@ -237,9 +244,9 @@ def get_issue_comments(issue_id, current_user):
             attach_qry = """
                 SELECT id_comment, attachment_name, attachment_type, url_path
                 FROM c_issue_attachment
-                WHERE id_issue = :1 AND id_comment IS NOT NULL AND removed = 'F'
+                WHERE id_issue = %s AND id_comment IS NOT NULL AND removed = 'F'
             """
-            cursor.execute(attach_qry, [issue_id])
+            cursor.execute(attach_qry, (issue_id,))
             for att_row in cursor.fetchall():
                 att_c_id = att_row[0]
                 if att_c_id in comments_dict:
@@ -255,7 +262,8 @@ def get_issue_comments(issue_id, current_user):
     finally:
         cursor.close()
         connection.close()
-        
+
+
 def add_issue_comment(issue_id, payload_data, current_user, client_ip):
     connection = get_db_connection()
     if not connection:
@@ -269,13 +277,12 @@ def add_issue_comment(issue_id, payload_data, current_user, client_ip):
         
         qry = """
             INSERT INTO c_issue_comments (id_issue, user_name, comment_text)
-            VALUES (:1, :2, :3) RETURNING id_comment INTO :4
+            VALUES (%s, %s, %s) RETURNING id_comment
         """
-        new_id_var = cursor.var(int)
-        cursor.execute(qry, [issue_id, username, comment_text, new_id_var])
-        connection.commit()
+        cursor.execute(qry, (issue_id, username, comment_text))
         
-        new_comment_id = new_id_var.getvalue()[0]
+        new_comment_id = cursor.fetchone()[0]
+        connection.commit()
         
         preview = comment_text[:50] + "..." if len(comment_text) > 50 else comment_text
         log_user_action(
@@ -292,6 +299,7 @@ def add_issue_comment(issue_id, payload_data, current_user, client_ip):
         cursor.close()
         connection.close()
 
+
 def get_oracle_attachment_type(content_type: str, filename: str) -> str:
     content_type = content_type.lower()
     if content_type.startswith('image/'): return 'IMAGE'
@@ -299,17 +307,19 @@ def get_oracle_attachment_type(content_type: str, filename: str) -> str:
     elif 'zip' in content_type or filename.lower().endswith('.zip'): return 'ZIP'
     else: return 'DOCUMENT'
 
+
 def upload_comment_attachments(issue_id, comment_id, files_data, current_user):
-    """Note: files_data doit être une liste de tuples (filename, content_type, file_content_bytes) fournis par Flask"""
+    """Uploads comment attachments to Google Cloud Storage (Cloud Run standard)."""
     connection = get_db_connection()
     if not connection:
         return {"error": "Database connection error."}, 500
         
-    folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "stored_attachments", f"ticket_{issue_id}.0"))
-    os.makedirs(folder_path, exist_ok=True)
-    
-    cursor = connection.cursor()
     try:
+        from google.cloud import storage
+        client = storage.Client()
+        bucket = client.bucket(BUCKET_NAME)
+        
+        cursor = connection.cursor()
         for file_info in files_data:
             filename = file_info["filename"]
             content_type = file_info["content_type"]
@@ -317,27 +327,30 @@ def upload_comment_attachments(issue_id, comment_id, files_data, current_user):
 
             unique_prefix = uuid.uuid4().hex[:8]
             safe_file_name = f"com_{unique_prefix}_{filename}"
-            file_destination_path = os.path.join(folder_path, safe_file_name)
+            blob_path = f"tickets/ticket_{issue_id}/comments/{safe_file_name}"
             
-            with open(file_destination_path, "wb") as buffer:
-                buffer.write(file_bytes)
+            # Upload to GCS
+            blob = bucket.blob(blob_path)
+            blob.upload_from_string(file_bytes)
+            public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{blob_path}"
             
             attach_type = get_oracle_attachment_type(content_type, filename)
             
             qry = """
                 INSERT INTO c_issue_attachment (id_issue, id_comment, attachment_name, attachment_type, url_path) 
-                VALUES (:1, :2, :3, :4, :5)
+                VALUES (%s, %s, %s, %s, %s)
             """
-            cursor.execute(qry, [issue_id, comment_id, filename, attach_type, file_destination_path])
+            cursor.execute(qry, (issue_id, comment_id, filename, attach_type, public_url))
             
         connection.commit()
-        return {"message": "Comment attachments uploaded."}, 200
+        return {"message": "Comment attachments uploaded to Cloud Storage."}, 200
     except Exception as e:
         connection.rollback()
         return {"error": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
+
 
 def validate_issue(issue_id, request_json, current_user, client_ip):
     """Validates data alterations and updates an issue payload to 'IN PROGRESS' status."""
@@ -353,12 +366,12 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
 
     connection = get_db_connection()
     if not connection:
-        return {"error": "Oracle Database connection error."}, 500
+        return {"error": "Database connection error."}, 500
         
     try:
         cursor = connection.cursor()
-        check_qry = "SELECT u.location, u.email_addr FROM c_issue i LEFT JOIN lims_users u ON TRIM(UPPER(i.user_name)) = TRIM(UPPER(u.user_name)) WHERE i.id_issue = :1"
-        cursor.execute(check_qry, [issue_id])
+        check_qry = "SELECT u.location, u.email_addr FROM c_issue i LEFT JOIN lims_users u ON TRIM(UPPER(i.user_name)) = TRIM(UPPER(u.user_name)) WHERE i.id_issue = %s"
+        cursor.execute(check_qry, (issue_id,))
         ticket_row = cursor.fetchone()
         
         if not ticket_row:
@@ -374,23 +387,24 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
         elif user_role == "LOCAL_ADMIN" and safe_ticket_loc != safe_user_loc:
             return {"error": "Forbidden."}, 403
 
+        # ✅ PostgreSQL : CURRENT_TIMESTAMP au lieu de SYSDATE
         update_qry = """
             UPDATE c_issue 
-            SET title = :1, issue_type = :2, criticity = :3, frequency = :4, 
-                blocking_issue = :5, description = :6, sspticket = :7,
-                current_project = :8, current_batch = :9, current_sample = :10,
-                current_analysis = :11, current_analysis_variation = :12,
-                current_customer = :13, status = 'IN PROGRESS', 
-                changed_on = SYSDATE, changed_by = :14
-            WHERE id_issue = :15 AND status NOT IN ('CANCELED', 'CLOSED')
+            SET title = %s, issue_type = %s, criticity = %s, frequency = %s, 
+                blocking_issue = %s, description = %s, sspticket = %s,
+                current_project = %s, current_batch = %s, current_sample = %s,
+                current_analysis = %s, current_analysis_variation = %s,
+                current_customer = %s, status = 'IN PROGRESS', 
+                changed_on = CURRENT_TIMESTAMP, changed_by = %s
+            WHERE id_issue = %s AND status NOT IN ('CANCELED', 'CLOSED')
         """
-        cursor.execute(update_qry, [
+        cursor.execute(update_qry, (
             ticket.title, ticket.issue_type, ticket.criticity, ticket.frequency, 
             ticket.blocking_issue, ticket.description, ticket.sspticket,
             ticket.current_project, ticket.current_batch, ticket.current_sample,
             ticket.current_analysis, ticket.current_analysis_variation,
             ticket.current_customer, username, issue_id
-        ])
+        ))
         connection.commit()
         
         if cursor.rowcount == 0:
@@ -406,6 +420,7 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
         cursor.close()
         connection.close()
 
+
 def cancel_issue(issue_id, current_user, client_ip):
     """Flags a target active ticket with the 'CANCELED' status."""
     user_email = current_user.get("email")
@@ -415,12 +430,12 @@ def cancel_issue(issue_id, current_user, client_ip):
 
     connection = get_db_connection()
     if not connection:
-        return {"error": "Oracle Database connection error."}, 500
+        return {"error": "Database connection error."}, 500
         
     try:
         cursor = connection.cursor()
-        check_qry = "SELECT u.location, u.email_addr FROM c_issue i LEFT JOIN lims_users u ON TRIM(UPPER(i.user_name)) = TRIM(UPPER(u.user_name)) WHERE i.id_issue = :1"
-        cursor.execute(check_qry, [issue_id])
+        check_qry = "SELECT u.location, u.email_addr FROM c_issue i LEFT JOIN lims_users u ON TRIM(UPPER(i.user_name)) = TRIM(UPPER(u.user_name)) WHERE i.id_issue = %s"
+        cursor.execute(check_qry, (issue_id,))
         ticket_row = cursor.fetchone()
         
         if not ticket_row:
@@ -436,7 +451,7 @@ def cancel_issue(issue_id, current_user, client_ip):
         elif user_role == "LOCAL_ADMIN" and safe_ticket_loc != safe_user_loc:
             return {"error": "This ticket falls outside your local jurisdiction."}, 403
 
-        cursor.execute("UPDATE c_issue SET status = 'CANCELED', changed_on = SYSDATE WHERE id_issue = :1", [issue_id])
+        cursor.execute("UPDATE c_issue SET status = 'CANCELED', changed_on = CURRENT_TIMESTAMP WHERE id_issue = %s", (issue_id,))
         connection.commit()
 
         log_user_action(user_name=username, action_type="CANCEL_TICKET", target_id=str(issue_id), details="Ticket canceled by user.", ip_address=client_ip)
@@ -448,10 +463,12 @@ def cancel_issue(issue_id, current_user, client_ip):
         cursor.close()
         connection.close()
 
+
 def download_file_path(ticket_id, file_type, current_user, client_ip):
-    """Returns the absolute path of the requested file (logs or working_dir) so main.py can send it."""
-    folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "stored_attachments", f"ticket_{ticket_id}.0"))
-    
+    """
+    On GCP, files are in Cloud Storage, not on the local disk.
+    This route now redirects to the GCS URL or handles the download via the Storage API.
+    """
     if file_type == "working_dir":
         file_name = f"Issue_{ticket_id}_WorkingDir.zip"
         action_type = "DOWNLOAD_WORKING_DIR"
@@ -463,14 +480,14 @@ def download_file_path(ticket_id, file_type, current_user, client_ip):
     else:
         return {"error": "Type de fichier invalide."}, 400
 
-    file_path = os.path.join(folder_path, file_name) 
+    # The public URL approach for GCP 
+    public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/tickets/ticket_{ticket_id}/{file_name}"
     
-    if not os.path.exists(file_path):
-        return {"error": f"File {file_name} not found."}, 404
-
     log_user_action(user_name=current_user.get("sub", "UNKNOWN"), action_type=action_type, target_id=ticket_id, details=details, ip_address=client_ip)
     
-    return {"file_path": file_path, "file_name": file_name}, 200
+    # We return a redirect URL for the frontend instead of a local path
+    return {"public_url": public_url, "file_name": file_name}, 200
+
 
 def close_ticket(issue_id, request_json, current_user, client_ip):
     """Transitions the resolution status lifecycle parameters to 'RESOLVED' or 'CLOSED'."""
@@ -492,7 +509,7 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
     
     try:
         cursor = connection.cursor()
-        cursor.execute("SELECT user_name FROM c_issue WHERE id_issue = :1", [issue_id])
+        cursor.execute("SELECT user_name FROM c_issue WHERE id_issue = %s", (issue_id,))
         row = cursor.fetchone()
         if not row:
             return {"error": "Ticket not found."}, 404
@@ -501,7 +518,7 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
         if user_role not in ["IT_TEAM", "LOCAL_ADMIN"] and user_trigram != ticket_owner:
             return {"error": "You do not possess the required permissions to finalize and close this ticket."}, 403
 
-        cursor.execute("UPDATE c_issue SET status = :1, changed_on = SYSDATE WHERE id_issue = :2", [payload.new_status, issue_id])
+        cursor.execute("UPDATE c_issue SET status = %s, changed_on = CURRENT_TIMESTAMP WHERE id_issue = %s", (payload.new_status, issue_id))
         connection.commit()
 
         action_type = "RESOLVE_TICKET" if payload.new_status == "RESOLVED" else "CLOSE_TICKET"
