@@ -1,29 +1,34 @@
-import jwt
 import os
+import jwt
 
-# C'est toujours mieux de lire la clé depuis les variables d'environnement (ou le .env en local)
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "your_super_secret_key_change_this_in_production")
 JWT_ALGORITHM = "HS256"
 
-def verify_token(auth_header):
+# Clé secrète dédiée à Citrix (à définir dans les variables Cloud Run ou par défaut ici)
+SYSTEM_API_KEY = os.environ.get("SYSTEM_API_KEY", "Nutria_Citrix_Secret_2026_XYZ")
+
+def verify_token_or_system_key(headers):
     """
-    Vérifie et décode le token JWT envoyé par le Frontend React.
-    Retourne un tuple : (payload_utilisateur, message_erreur)
+    Vérifie si la requête vient du script Citrix (X-System-Key) 
+    OU de l'application Web React (Authorization Bearer JWT).
     """
-    # 1. Vérifier si l'en-tête existe et commence bien par "Bearer "
+    # 1. Vérification de la clé système Citrix
+    system_key = headers.get("X-System-Key")
+    if system_key and system_key == SYSTEM_API_KEY:
+        # Authentification réussie pour le script automatique !
+        return {"sub": "CITRIX_SYSTEM", "role": "IT_TEAM", "location": "GLOBAL"}, None
+
+    # 2. Vérification classique du token JWT Web
+    auth_header = headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         return None, "Token d'authentification manquant ou mal formate."
 
-    # 2. Extraire le token (on coupe au niveau de l'espace et on prend la 2ème partie)
     token = auth_header.split(" ")[1]
 
-    # 3. Décoder le token avec la bibliothèque PyJWT
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-        return payload, None  # Succès : on retourne les données, et aucune erreur
-        
+        return payload, None
     except jwt.ExpiredSignatureError:
-        return None, "Session expiree. Veuillez vous reconnecter."
-        
+        return None, "Session expiree."
     except jwt.InvalidTokenError:
-        return None, "Token de securite invalide."
+        return None, "Token invalide."
