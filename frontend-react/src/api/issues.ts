@@ -1,5 +1,6 @@
-// Define your base API URL
-const API_URL = "http://localhost:8080/issues";
+// Base URL pointant vers GCP Cloud Functions / Cloud Run
+const API_BASE_URL = "https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api";
+const API_URL = `${API_BASE_URL}/issues`;
 
 // --- Helper function to get the security headers ---
 const getAuthHeaders = () => {
@@ -18,7 +19,7 @@ export const fetchAllIssues = async () => {
     try {
         const response = await fetch(API_URL, {
             method: 'GET',
-            headers: getAuthHeaders() // <-- INJECT THE TOKEN HERE
+            headers: getAuthHeaders()
         });
 
         if (!response.ok) {
@@ -39,7 +40,7 @@ export const fetchIssueById = async (issueId: number) => {
     try {
         const response = await fetch(`${API_URL}/${issueId}`, {
             method: 'GET',
-            headers: getAuthHeaders() // <-- INJECT THE TOKEN HERE
+            headers: getAuthHeaders()
         });
 
         if (!response.ok) {
@@ -60,7 +61,7 @@ export const validateIssue = async (issueId: number, updateData: any) => {
     try {
         const response = await fetch(`${API_URL}/${issueId}/validate`, {
             method: 'PUT',
-            headers: getAuthHeaders(), // <-- INJECT THE TOKEN HERE
+            headers: getAuthHeaders(),
             body: JSON.stringify(updateData)
         });
 

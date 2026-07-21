@@ -336,7 +336,7 @@ function TicketForm() {
         if (attachments.length > 0 && targetTicketId) {
           const formData = new FormData()
           attachments.forEach((file) => {
-            formData.append('files', file)
+            formData.append('file', file)
           })
 
           const attachmentsResponse = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${targetTicketId}/attachments`, {
@@ -510,7 +510,7 @@ function TicketForm() {
         // 2. Si on a des fichiers, on les envoie vers la nouvelle route
         if (commentFiles.length > 0 && newCommentId) {
           const formData = new FormData()
-          commentFiles.forEach((file) => formData.append('files', file))
+          commentFiles.forEach((file) => formData.append('file', file))
           await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/comments/${newCommentId}/attachments`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` },
