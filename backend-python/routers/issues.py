@@ -1,18 +1,21 @@
 import os
 import uuid
-from config.database import get_db_connection
-from pydantic import ValidationError
 import datetime
+import google.auth
+from google.auth.transport import requests
 from google.cloud import storage
 
-# --- LOCAL FILE IMPORTS ---
+from config.database import get_db_connection
+from pydantic import ValidationError
+
+# Local file imports
 from .schemas import TicketCreate, TicketUpdate, StatusUpdate
 from .audit import log_user_action
 
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 
 def make_signed_url(public_url: str) -> str:
-    """Génère une URL signée temporaire (15 min) à partir d'une URL d'origine GCS."""
+    """Generates a temporary signed URL (15 min) compatible with Cloud Run and GCP IAM Credentials."""
     if not public_url or "storage.googleapis.com" not in public_url:
         return public_url
 
@@ -23,19 +26,28 @@ def make_signed_url(public_url: str) -> str:
     bucket_name, blob_name = parts[0], parts[1]
 
     try:
-        client = storage.Client()
+        # Fetch default service account credentials from Cloud Run environment
+        credentials, _ = google.auth.default()
+        
+        # Refresh the short-lived OAuth access token
+        auth_request = requests.Request()
+        credentials.refresh(auth_request)
+
+        client = storage.Client(credentials=credentials)
         bucket = client.bucket(bucket_name)
         blob = bucket.blob(blob_name)
 
+        # Generate signed URL using IAM SignBlob API via access token
         return blob.generate_signed_url(
             version="v4",
             expiration=datetime.timedelta(minutes=15),
-            method="GET"
+            method="GET",
+            service_account_email=credentials.service_account_email,
+            access_token=credentials.token
         )
     except Exception as e:
-        print(f"Erreur génération Signed URL: {e}")
+        print(f"Error generating Signed URL: {e}")
         return public_url
-
 
 # =====================================================================
 # 1. ROUTES STATIQUES
