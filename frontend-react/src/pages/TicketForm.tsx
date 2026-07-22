@@ -14,37 +14,6 @@ const getDecodedToken = () => {
   }
 };
 
-// Composant pour afficher une image protégée par un Token JWT
-function SecureImage({ src, alt, className, onClick }: { src: string, alt: string, className?: string, onClick?: () => void }) {
-  const [imageBlobUrl, setImageBlobUrl] = useState<string>('');
-
-  useEffect(() => {
-    const loadImage = async () => {
-      try {
-        const response = await fetch(src, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
-        });
-        if (response.ok) {
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
-          setImageBlobUrl(url);
-        }
-      } catch (error) {
-        console.error("Error loading secure image:", error);
-      }
-    };
-
-    loadImage();
-
-    return () => {
-      if (imageBlobUrl) URL.revokeObjectURL(imageBlobUrl);
-    };
-  }, [src]);
-
-  if (!imageBlobUrl) return <span style={{ fontSize: '12px', color: '#7a869a' }}>Loading preview...</span>;
-  return <img src={imageBlobUrl} alt={alt} className={className} onClick={onClick} />;
-}
-
 function TicketForm() {
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
@@ -64,7 +33,7 @@ function TicketForm() {
   const [isEditing, setIsEditing] = useState(false) 
   const [canEdit, setCanEdit] = useState(false)
   
-  // ✅ NOUVEL ÉTAT POUR L'ANTI-SPAM
+  // ✅ ÉTAT POUR L'ANTI-SPAM
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [title, setTitle] = useState('')
@@ -117,7 +86,6 @@ function TicketForm() {
   const workingDirUrl = `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/download/working_dir`
   const logsUrl = `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/download/logs`
 
-  // ✅ DÉPLACEMENT : LA FONCTION fetchComments DOIT ÊTRE DÉCLARÉE AVANT LE RETURN CONDITIONNEL
   const fetchComments = async () => {
     if (!ticketId) return
     try {
@@ -141,7 +109,6 @@ function TicketForm() {
     }
   }
 
-  // ✅ DÉPLACEMENT : LE USE_EFFECT DES COMMENTAIRES DOIT ÊTRE ICI
   useEffect(() => {
     if (ticketId && !isNewTicket) {
       fetchComments()
@@ -328,7 +295,7 @@ function TicketForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!isFormValid || isSubmitting) return // ✅ PROTECTION ANTI-SPAM
+    if (!isFormValid || isSubmitting) return
 
     setIsSubmitting(true)
 
@@ -409,7 +376,7 @@ function TicketForm() {
     } catch (error) {
       console.error("Error updating ticket or uploading files:", error)
     } finally {
-      setIsSubmitting(false) // ✅ ON LIBÈRE LE BOUTON
+      setIsSubmitting(false) 
     }
   }
 
@@ -509,7 +476,6 @@ function TicketForm() {
     }
   };
 
-  // ✅ LE RETURN CONDITIONNEL DOIT SE TROUVER ICI, APRÈS TOUS LES HOOKS (useEffect, useState)
   if (isLoading) {
     return <div className={styles.loading}>{t('common.loading', 'Loading ticket data...')}</div>
   }
@@ -597,9 +563,6 @@ function TicketForm() {
         )}
       </div>
 
-      {/* =========================================================
-          GRILLE PRINCIPALE (2/3 - 1/3)
-      ========================================================= */}
       <div className={styles.gridContainer}>
         
         {/* === COLONNE DE GAUCHE : FORMULAIRE & PIÈCES JOINTES === */}
@@ -678,7 +641,6 @@ function TicketForm() {
 
               {isEditing && (
                 <div className={styles.actionContainer}>
-                  {/* ✅ BOUTON AVEC ÉTAT DE CHARGEMENT */}
                   <button 
                     type="submit" 
                     disabled={!isFormValid || isSubmitting} 
@@ -713,41 +675,44 @@ function TicketForm() {
                            !path.includes('workingdir') && !path.includes('logs.zip');
                   })
                   .map((file, index) => {
-                    const filename = file.url_path ? file.url_path.replace(/\\/g, '/').split('/').pop() : file.attachment_name;
-                    const displayName = file.attachment_name || filename || 'Unknown_File';
-                    const fileUrl = file.url_path || `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/attachments/${filename}`;
+                    const displayName = file.attachment_name || 'Unknown_File';
+                    const fileUrl = file.url_path || `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/attachments/${file.attachment_name}`;
                     const fileType = file.attachment_type;
-
+                  
                     return (
                       <div key={index} className={styles.attachmentItem}>
-                        {fileType === 'IMAGE' && (
+                        {(fileType === 'IMAGE' || fileType?.includes('IMAGE')) && (
                           <div className={styles.imagePreviewContainer}>
-                            <img src={fileUrl} alt={displayName} className={styles.imagePreview} onClick={() => setLightboxMedia({ url: fileUrl, type: fileType })} />
+                            <img 
+                              src={fileUrl} 
+                              alt={displayName} 
+                              className={styles.imagePreview} 
+                              onClick={() => setLightboxMedia({ url: fileUrl, type: 'IMAGE' })} 
+                            />
                             <span className={styles.fileName}>{displayName}</span>
                           </div>
                         )}
-
+                  
                         {fileType === 'VIDEO' && (
                           <div className={styles.fileItemContainer}>
                             <div className={styles.videoPreviewBox} onClick={() => setLightboxMedia({ url: fileUrl, type: fileType })} title="Click to watch video">▶️</div>
                             <span onClick={() => setLightboxMedia({ url: fileUrl, type: fileType })} className={styles.downloadLink} title={displayName}>📺 Watch: {displayName}</span>
-                            <span onClick={() => handleFileDownload(fileUrl, displayName)} className={styles.fileName} style={{ cursor: 'pointer', textDecoration: 'underline' }}>⬇️ Download instead</span>
                           </div>
                         )}
-
-                        {fileType !== 'IMAGE' && fileType !== 'VIDEO' && (
+                  
+                        {fileType !== 'IMAGE' && !fileType?.includes('IMAGE') && fileType !== 'VIDEO' && (
                           <div className={styles.fileItemContainer}>
                             <div className={styles.filePreviewBox}>📄</div>
-                            <span onClick={() => handleFileDownload(fileUrl, displayName)} className={styles.downloadLink} title={displayName}>{displayName}</span>
+                            <a href={fileUrl} target="_blank" rel="noopener noreferrer" className={styles.downloadLink} title={displayName}>{displayName}</a>
                           </div>
                         )}
-
+                  
                         {isEditing && (
-                          <button type="button" onClick={() => handleDeleteAttachment(filename || '')} className={styles.deleteBtn} title="Delete file">🗑️</button>
+                          <button type="button" onClick={() => handleDeleteAttachment(file.attachment_name || '')} className={styles.deleteBtn} title="Delete file">🗑️</button>
                         )}
                       </div>
                     );
-                })}
+                  })}
               </div>
             </div>
           )}
@@ -850,7 +815,6 @@ function TicketForm() {
           )}
         </div>
       </div> 
-      {/* FIN DE LA GRILLE PRINCIPALE */}
 
       {/* =========================================================
           💬 SECTION COMMENTAIRES (PLEINE LARGEUR)
@@ -861,7 +825,7 @@ function TicketForm() {
           
           <div className={styles.commentsList}>
             {comments.length === 0 ? (
-              <p className={styles.noComments}>{t('ticket.no_comments', 'No comment for the momment')}</p>
+              <p className={styles.noComments}>{t('ticket.no_comments', 'No comment for the moment')}</p>
             ) : (
               comments.map((comment) => (
                 <div key={comment.id_comment} className={styles.commentBubble}>
@@ -878,22 +842,21 @@ function TicketForm() {
                     ))}
                   </div>
                   
-                  {/* AFFICHAGE DES FICHIERS DU COMMENTAIRE */}
                   {comment.attachments && comment.attachments.length > 0 && (
                     <div className={styles.commentAttachmentsRow}>
                       {comment.attachments.map((file: any, i: number) => {
-                        const filename = file.url_path ? file.url_path.replace(/\\/g, '/').split('/').pop() : file.attachment_name;
-                        const fileUrl = `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/attachments/${filename}`;
+                        const fileUrl = file.url_path;
+                        const isImg = file.attachment_type === 'IMAGE' || file.attachment_type?.includes('IMAGE');
                         
                         return (
                           <div key={i} className={styles.commentAttachmentPill} onClick={() => {
-                            if (file.attachment_type === 'IMAGE' || file.attachment_type === 'VIDEO') {
-                              setLightboxMedia({ url: fileUrl, type: file.attachment_type })
+                            if (isImg || file.attachment_type === 'VIDEO') {
+                              setLightboxMedia({ url: fileUrl, type: isImg ? 'IMAGE' : 'VIDEO' })
                             } else {
-                              handleFileDownload(fileUrl, file.attachment_name)
+                              window.open(fileUrl, '_blank')
                             }
                           }}>
-                            {file.attachment_type === 'IMAGE' ? '🖼️' : file.attachment_type === 'VIDEO' ? '🎥' : '📄'} 
+                            {isImg ? '🖼️' : file.attachment_type === 'VIDEO' ? '🎥' : '📄'} 
                             <span className={styles.pillText}>{file.attachment_name}</span>
                           </div>
                         )
@@ -905,7 +868,6 @@ function TicketForm() {
             )}
           </div>
 
-          {/* ZONE DE SAISIE DU COMMENTAIRE + UPLOAD */}
           <div className={styles.commentInputArea}>
             <textarea 
               value={newComment} 
@@ -949,14 +911,14 @@ function TicketForm() {
                 alt="Aperçu agrandi" 
                 className={styles.lightboxMedia} 
               />
-              ) : (
-                <video 
-                  src={lightboxMedia.url} 
-                  controls 
-                  autoPlay
-                  className={styles.lightboxMedia} 
-                />
-              )}
+            ) : (
+              <video 
+                src={lightboxMedia.url} 
+                controls 
+                autoPlay
+                className={styles.lightboxMedia} 
+              />
+            )}
           </div>
         </div>
       )}
