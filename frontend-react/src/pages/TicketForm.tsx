@@ -63,6 +63,9 @@ function TicketForm() {
   const [status, setStatus] = useState('PRETICKET') 
   const [isEditing, setIsEditing] = useState(false) 
   const [canEdit, setCanEdit] = useState(false)
+  
+  // ✅ NOUVEL ÉTAT POUR L'ANTI-SPAM
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [title, setTitle] = useState('')
   const [sspTicket, setSspTicket] = useState('')
@@ -81,7 +84,6 @@ function TicketForm() {
   const [isPostingComment, setIsPostingComment] = useState(false)
   
   const [commentFiles, setCommentFiles] = useState<File[]>([])
-  // 🖼️ ÉTAT DE LA LIGHTBOX
   const [lightboxMedia, setLightboxMedia] = useState<{url: string, type: string} | null>(null)
   
   const [userInfo, setUserInfo] = useState({
@@ -115,37 +117,36 @@ function TicketForm() {
   const workingDirUrl = `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/download/working_dir`
   const logsUrl = `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/download/logs`
 
-  const handleFileDownload = async (url: string, defaultFilename: string) => {
+  // ✅ DÉPLACEMENT : LA FONCTION fetchComments DOIT ÊTRE DÉCLARÉE AVANT LE RETURN CONDITIONNEL
+  const fetchComments = async () => {
+    if (!ticketId) return
     try {
-      const response = await fetch(url, {
+      const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/comments`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
       })
-      if (!response.ok) {
-        throw new Error('Changement ou lecture du fichier impossible')
+      if (response.ok) {
+        const data = await response.json()
+        
+        if (Array.isArray(data)) {
+          setComments(data)
+        } else if (data && Array.isArray(data.comments)) {
+          setComments(data.comments)
+        } else {
+          setComments([]) 
+        }
       }
-
-      const disposition = response.headers.get('content-disposition')
-      let filename = defaultFilename
-      if (disposition && disposition.includes('filename=')) {
-        filename = disposition.split('filename=')[1].replace(/"/g, '').trim()
-      }
-
-      const blob = await response.blob()
-      const blobUrl = window.URL.createObjectURL(blob)
-      
-      const link = document.createElement('a')
-      link.href = blobUrl
-      link.setAttribute('download', filename) 
-      document.body.appendChild(link)
-      link.click()
-      
-      link.remove()
-      window.URL.revokeObjectURL(blobUrl)
     } catch (error) {
-      console.error("Download error:", error)
-      alert(t('ticket.download_error', 'Failed to download file. Please check if backend is running.'))
+      console.error("Error loading comments:", error)
+      setComments([]) 
     }
   }
+
+  // ✅ DÉPLACEMENT : LE USE_EFFECT DES COMMENTAIRES DOIT ÊTRE ICI
+  useEffect(() => {
+    if (ticketId && !isNewTicket) {
+      fetchComments()
+    }
+  }, [ticketId, isNewTicket])
 
   useEffect(() => {
     const fetchTicketData = async () => {
@@ -291,11 +292,45 @@ function TicketForm() {
     fetchTicketData()
   }, [ticketId, isNewTicket, navigate, t])
 
+  const handleFileDownload = async (url: string, defaultFilename: string) => {
+    try {
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
+      })
+      if (!response.ok) {
+        throw new Error('Changement ou lecture du fichier impossible')
+      }
+
+      const disposition = response.headers.get('content-disposition')
+      let filename = defaultFilename
+      if (disposition && disposition.includes('filename=')) {
+        filename = disposition.split('filename=')[1].replace(/"/g, '').trim()
+      }
+
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.setAttribute('download', filename) 
+      document.body.appendChild(link)
+      link.click()
+      
+      link.remove()
+      window.URL.revokeObjectURL(blobUrl)
+    } catch (error) {
+      console.error("Download error:", error)
+      alert(t('ticket.download_error', 'Failed to download file. Please check if backend is running.'))
+    }
+  }
+
   const isFormValid = title.trim() !== '' && issueType !== '' && criticity !== '' && frequency !== '' && description.trim() !== ''
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!isFormValid) return
+    if (!isFormValid || isSubmitting) return // ✅ PROTECTION ANTI-SPAM
+
+    setIsSubmitting(true)
 
     const payloadData = {
       title: title,
@@ -373,6 +408,8 @@ function TicketForm() {
       }
     } catch (error) {
       console.error("Error updating ticket or uploading files:", error)
+    } finally {
+      setIsSubmitting(false) // ✅ ON LIBÈRE LE BOUTON
     }
   }
 
@@ -472,44 +509,16 @@ function TicketForm() {
     }
   };
 
+  // ✅ LE RETURN CONDITIONNEL DOIT SE TROUVER ICI, APRÈS TOUS LES HOOKS (useEffect, useState)
   if (isLoading) {
     return <div className={styles.loading}>{t('common.loading', 'Loading ticket data...')}</div>
   }
-  const fetchComments = async () => {
-    if (!ticketId) return
-    try {
-      const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/comments`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        
-        if (Array.isArray(data)) {
-          setComments(data)
-        } else if (data && Array.isArray(data.comments)) {
-          setComments(data.comments)
-        } else {
-          setComments([]) // Si c'est un format inattendu, on met un tableau vide
-        }
-      }
-    } catch (error) {
-      console.error("Error loading comments:", error)
-      setComments([]) // Sécurité en cas d'erreur réseau
-    }
-  }
-  useEffect(() => {
-    if (ticketId && !isNewTicket) {
-      fetchComments()
-    }
-  }, [ticketId, isNewTicket])
-
-  // 📤 Fonction pour envoyer un commentaire
+  
   const handlePostComment = async () => {
-    if (!newComment.trim()) return
+    if (!newComment.trim() || isPostingComment) return
     setIsPostingComment(true)
 
     try {
-      // 1. On poste le texte du commentaire
       const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/comments`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`, 'Content-Type': 'application/json' },
@@ -520,7 +529,6 @@ function TicketForm() {
         const data = await response.json()
         const newCommentId = data.id_comment
 
-        // 2. Si on a des fichiers, on les envoie vers la nouvelle route
         if (commentFiles.length > 0 && newCommentId) {
           const formData = new FormData()
           commentFiles.forEach((file) => formData.append('file', file))
@@ -532,7 +540,7 @@ function TicketForm() {
         }
 
         setNewComment('') 
-        setCommentFiles([]) // 👈 On vide les fichiers après l'envoi
+        setCommentFiles([]) 
         fetchComments()   
       } else {
         const err = await response.json()
@@ -544,6 +552,7 @@ function TicketForm() {
       setIsPostingComment(false)
     }
   }
+  
   return (
     <div className={styles.pageContainer}>
       
@@ -669,8 +678,16 @@ function TicketForm() {
 
               {isEditing && (
                 <div className={styles.actionContainer}>
-                  <button type="submit" disabled={!isFormValid} className={`${styles.submitBtn} ${isFormValid ? styles.active : styles.disabled}`}>
-                    {isNewTicket ? t('ticket.submit_create', 'Create Ticket') : t('ticket.submit_update', 'Submit & Update Ticket')}
+                  {/* ✅ BOUTON AVEC ÉTAT DE CHARGEMENT */}
+                  <button 
+                    type="submit" 
+                    disabled={!isFormValid || isSubmitting} 
+                    className={`${styles.submitBtn} ${isFormValid && !isSubmitting ? styles.active : styles.disabled}`}
+                  >
+                    {isSubmitting 
+                      ? '⏳...' 
+                      : (isNewTicket ? t('ticket.submit_create', 'Create Ticket') : t('ticket.submit_update', 'Submit & Update Ticket'))
+                    }
                   </button>
                 </div>
               )}
