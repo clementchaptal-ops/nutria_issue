@@ -24,28 +24,28 @@ function AuditLogs() {
             navigate('/dashboard') // Kicks out non-admins
             return
           }
-          throw new Error('Error while fetching audit logs.')
+          throw new Error(t('audit.error.fetch_failed', 'Error while fetching audit logs.'))
         }
 
         const data = await response.json()
 
-        // ✅ Sécurisation : On s'assure que data est bien un tableau avant de faire setLogs
+        // Security check: Ensure data is an array before setting logs
         if (Array.isArray(data)) {
           setLogs(data)
         } else {
-          setError(data.error || 'Invalid response format from server.')
-          setLogs([]) // Garde une liste vide pour éviter le crash .map() !
+          setError(data.error || t('audit.error.invalid_format', 'Invalid response format from server.'))
+          setLogs([]) // Keep an empty array to prevent .map() crashes
         }
       } catch (err: any) {
         setError(err.message)
-        setLogs([]) // Sécurité supplémentaire
+        setLogs([]) // Additional fallback safety
       } finally {
         setLoading(false)
       }
     }
 
     fetchLogs()
-  }, [navigate])
+  }, [navigate, t])
 
   if (loading) return <p style={{ padding: '40px', textAlign: 'center' }}>{t('common.loading', 'Loading data...')}</p>
 

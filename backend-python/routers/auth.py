@@ -39,7 +39,7 @@ def google_auth(request_json):
     try:
         auth_request = GoogleTokenRequest(**request_json)
     except ValidationError as e:
-        return {"error": "Format des donnees invalide", "details": e.errors()}, 400
+        return {"error": "Invalid data format", "details": e.errors()}, 400
 
     try:
         # 1. Verify the Google Token
@@ -49,8 +49,7 @@ def google_auth(request_json):
                 google_requests.Request(), 
                 GOOGLE_CLIENT_ID
             )
-        except ValueError as token_err:
-            print(f"=== GOOGLE TOKEN ERROR ===\n{token_err}")
+        except ValueError:
             return {"error": "Invalid Google token."}, 401
 
         # 2. Extract email
@@ -60,21 +59,19 @@ def google_auth(request_json):
 
         # 3. Query the Database
         if USE_MOCK_DATA:
-            print(f"=== MOCK MODE ENABLED ===\nBypassing DB for user: {user_email}")
             fake_username = user_email.split('@')[0].upper()
             user_rows = [
                 (fake_username, "Demo User", "Demo Laboratory")
             ]
             
         else:
-            print(f"=== PRODUCTION MODE ===\nConnecting to PostgreSQL for user: {user_email}")
             connection = get_db_connection()
             if not connection:
                 return {"error": "Database connection error."}, 500
                 
             cursor = connection.cursor()
 
-            # ✅ CORRECTION ICI : Remplacement de :1 (Oracle) par %s (PostgreSQL)
+            # PostgreSQL syntax: %s placeholder instead of :1
             query = """
                 SELECT user_name, full_name, location 
                 FROM lims_users 
@@ -133,8 +130,6 @@ def google_auth(request_json):
         elif cleaned_user_email in cleaned_admin_list:
             role = "LOCAL_ADMIN"
 
-        print(f"\n=> MATCH RESULT FORCED FOR DEV: {db_username} as {role} ({db_location})\n")
-
         # 7. Generate the JWT Access Token
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
@@ -156,7 +151,5 @@ def google_auth(request_json):
             "location": db_location
         }, 200
 
-    except Exception as e:
-        print("=== UNEXPECTED SYSTEM ERROR ===")
-        print(e)
+    except Exception:
         return {"error": "Internal server error during authentication."}, 500

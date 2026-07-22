@@ -45,12 +45,12 @@ def make_signed_url(public_url: str) -> str:
             service_account_email=credentials.service_account_email,
             access_token=credentials.token
         )
-    except Exception as e:
-        print(f"Error generating Signed URL: {e}")
+    except Exception:
+        # Exception caught silently to avoid log pollution, returning fallback URL
         return public_url
 
 # =====================================================================
-# 1. ROUTES STATIQUES
+# 1. STATIC ROUTES
 # =====================================================================
 
 def get_all_issues(current_user):
@@ -60,7 +60,7 @@ def get_all_issues(current_user):
 
     connection = get_db_connection()
     if not connection:
-        return {"error": "Database connection error."}, 500
+        return {"error": "error.database_connection"}, 500
         
     cursor = connection.cursor()
     tickets = []
@@ -85,7 +85,7 @@ def get_all_issues(current_user):
             else:
                 site_root = safe_location
 
-            # ✅ PostgreSQL : %s 
+            # PostgreSQL parameterized query
             qry = base_qry + """
                 WHERE TRIM(UPPER(u.location)) LIKE TRIM(UPPER(%s)) || '%%' 
                 ORDER BY i.id_issue DESC
@@ -107,7 +107,7 @@ def get_all_issues(current_user):
             })
         return tickets, 200
     except Exception as e:
-        return {"error": f"PostgreSQL Error: {str(e)}"}, 500
+        return {"error": "error.database_query", "details": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
@@ -117,7 +117,7 @@ def get_my_profile(current_user):
     """Fetches true LIMS user profile details for the currently logged-in account."""
     connection = get_db_connection()
     if not connection:
-        return {"error": "Database connection error."}, 500
+        return {"error": "error.database_connection"}, 500
         
     try:
         cursor = connection.cursor()
@@ -132,7 +132,7 @@ def get_my_profile(current_user):
         row = cursor.fetchone()
         
         if not row:
-            return {"error": "LIMS user account not found."}, 404
+            return {"error": "error.user_not_found"}, 404
             
         return {
             "user_name": row[0], "full_name": row[1], "user_email": row[2],
@@ -148,16 +148,16 @@ def create_issue(request_json, current_user, client_ip):
     try:
         ticket = TicketCreate(**request_json)
     except ValidationError as e:
-        return {"error": "Format des donnees invalide", "details": e.errors()}, 400
+        return {"error": "error.invalid_data_format", "details": e.errors()}, 400
 
     username = current_user.get("sub") 
     connection = get_db_connection()
     if not connection:
-        return {"error": "Database connection error."}, 500
+        return {"error": "error.database_connection"}, 500
         
     try:
         cursor = connection.cursor()
-        # ✅ PostgreSQL : RETURNING id_issue et variables %s (CURRENT_TIMESTAMP remplace SYSDATE)
+        # PostgreSQL: RETURNING id_issue and %s variables (CURRENT_TIMESTAMP replaces SYSDATE)
         insert_qry = """
             INSERT INTO c_issue (title, issue_type, criticity, frequency, description, status, user_name, created_on, changed_on) 
             VALUES (%s, %s, %s, %s, %s, 'IN PROGRESS', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
@@ -165,22 +165,22 @@ def create_issue(request_json, current_user, client_ip):
         """
         cursor.execute(insert_qry, (ticket.title, ticket.issue_type, ticket.criticity, ticket.frequency, ticket.description, username))
         
-        # Récupération de l'ID généré
+        # Retrieve generated primary key
         next_id = cursor.fetchone()[0]
         connection.commit()
 
         log_user_action(user_name=username, action_type="CREATE_TICKET", target_id=str(next_id), details=f"Manual web creation. Title: '{ticket.title}'", ip_address=client_ip)
         
-        return {"id_issue": next_id, "message": "Ticket successfully created."}, 201
+        return {"id_issue": next_id, "message": "success.ticket_created"}, 201
     except Exception as e:
         connection.rollback()
-        return {"error": str(e)}, 500
+        return {"error": "error.database_query", "details": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
 
 # =====================================================================
-# 2. ROUTES DYNAMIQUES
+# 2. DYNAMIC ROUTES
 # =====================================================================
 
 def get_issue(issue_id, current_user):
@@ -189,7 +189,7 @@ def get_issue(issue_id, current_user):
     user_location = current_user.get("location")
     connection = get_db_connection()
     if not connection:
-        return {"error": "Database connection error."}, 500
+        return {"error": "error.database_connection"}, 500
     
     try:
         cursor = connection.cursor()
@@ -211,7 +211,7 @@ def get_issue(issue_id, current_user):
         row = cursor.fetchone()
         
         if not row:
-            return {"error": "Issue not found."}, 404
+            return {"error": "error.issue_not_found"}, 404
             
         issue_data = dict(zip(columns, row))
         
@@ -220,7 +220,7 @@ def get_issue(issue_id, current_user):
         safe_ticket_loc = str(ticket_location).strip().upper() if ticket_location else "NONE"
 
         if user_role != "IT_TEAM" and safe_ticket_loc != safe_user_loc:
-            return {"error": "Access denied."}, 403
+            return {"error": "error.access_denied"}, 403
             
         attachments_qry = """
             SELECT id_attachment, attachment_name, attachment_type, url_path
@@ -233,7 +233,7 @@ def get_issue(issue_id, current_user):
         
         attachments_list = [dict(zip(attach_cols, r)) for r in attach_rows]
         
-        # Application de l'URL signée
+        # Apply signed URLs
         for att in attachments_list:
             att["url_path"] = make_signed_url(att["url_path"])
             
@@ -242,16 +242,17 @@ def get_issue(issue_id, current_user):
         return issue_data, 200
         
     except Exception as e:
-        return {"error": f"Database query error: {str(e)}"}, 500
+        return {"error": "error.database_query", "details": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
 
 
 def get_issue_comments(issue_id, current_user):
+    """Fetches comments and their respective attachments for a specific issue."""
     connection = get_db_connection()
     if not connection:
-        return {"error": "Database connection error."}, 500
+        return {"error": "error.database_connection"}, 500
         
     try:
         cursor = connection.cursor()
@@ -297,21 +298,22 @@ def get_issue_comments(issue_id, current_user):
                     comments_dict[att_c_id]["attachments"].append({
                         "attachment_name": att_row[1],
                         "attachment_type": att_row[2],
-                        "url_path": make_signed_url(att_row[3]) # ✅ L'URL SIGNÉE EST APPLIQUÉE ICI
+                        "url_path": make_signed_url(att_row[3]) # Signed URL applied here
                     })
                     
         return comments_list, 200
     except Exception as e:
-        return {"error": str(e)}, 500
+        return {"error": "error.database_query", "details": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
 
 
 def add_issue_comment(issue_id, payload_data, current_user, client_ip):
+    """Adds a text comment to a specific issue."""
     connection = get_db_connection()
     if not connection:
-        return {"error": "Database connection error."}, 500
+        return {"error": "error.database_connection"}, 500
         
     username = current_user.get("sub", "UNKNOWN")
     comment_text = payload_data.get("comment_text", "")
@@ -334,17 +336,18 @@ def add_issue_comment(issue_id, payload_data, current_user, client_ip):
             details=f"Added a comment: '{preview}'", ip_address=client_ip
         )
         
-        return {"id_comment": new_comment_id, "message": "Comment successfully added."}, 201
+        return {"id_comment": new_comment_id, "message": "success.comment_added"}, 201
         
     except Exception as e:
         connection.rollback()
-        return {"error": str(e)}, 500
+        return {"error": "error.database_query", "details": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
 
 
 def get_oracle_attachment_type(content_type: str, filename: str) -> str:
+    """Evaluates the MIME type to return the legacy Oracle attachment type."""
     content_type = content_type.lower()
     if content_type.startswith('image/'): return 'IMAGE'
     elif content_type.startswith('video/'): return 'VIDEO'
@@ -356,10 +359,9 @@ def upload_comment_attachments(issue_id, comment_id, files_data, current_user):
     """Uploads comment attachments to Google Cloud Storage (Cloud Run standard)."""
     connection = get_db_connection()
     if not connection:
-        return {"error": "Database connection error."}, 500
+        return {"error": "error.database_connection"}, 500
         
     try:
-        from google.cloud import storage
         client = storage.Client()
         bucket = client.bucket(BUCKET_NAME)
         
@@ -387,10 +389,10 @@ def upload_comment_attachments(issue_id, comment_id, files_data, current_user):
             cursor.execute(qry, (issue_id, comment_id, filename, attach_type, public_url))
             
         connection.commit()
-        return {"message": "Comment attachments uploaded to Cloud Storage."}, 200
+        return {"message": "success.attachments_uploaded"}, 200
     except Exception as e:
         connection.rollback()
-        return {"error": str(e)}, 500
+        return {"error": "error.storage_upload", "details": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
@@ -401,7 +403,7 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
     try:
         ticket = TicketUpdate(**request_json)
     except ValidationError as e:
-        return {"error": "Donnees invalides", "details": e.errors()}, 400
+        return {"error": "error.invalid_data_format", "details": e.errors()}, 400
 
     user_email = current_user.get("email")
     user_role = current_user.get("role")
@@ -410,7 +412,7 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
 
     connection = get_db_connection()
     if not connection:
-        return {"error": "Database connection error."}, 500
+        return {"error": "error.database_connection"}, 500
         
     try:
         cursor = connection.cursor()
@@ -419,7 +421,7 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
         ticket_row = cursor.fetchone()
         
         if not ticket_row:
-            return {"error": "Issue not found."}, 404
+            return {"error": "error.issue_not_found"}, 404
             
         safe_user_email = str(user_email).strip().lower() if user_email else "NONE"
         safe_ticket_email = str(ticket_row[1]).strip().lower() if ticket_row[1] else "NONE"
@@ -427,11 +429,11 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
         safe_ticket_loc = str(ticket_row[0]).strip().upper() if ticket_row[0] else "NONE"
 
         if user_role == "USER" and safe_ticket_email != safe_user_email:
-            return {"error": "Forbidden."}, 403
+            return {"error": "error.forbidden_access"}, 403
         elif user_role == "LOCAL_ADMIN" and safe_ticket_loc != safe_user_loc:
-            return {"error": "Forbidden."}, 403
+            return {"error": "error.forbidden_access"}, 403
 
-        # ✅ PostgreSQL : CURRENT_TIMESTAMP au lieu de SYSDATE
+        # PostgreSQL update query
         update_qry = """
             UPDATE c_issue 
             SET title = %s, issue_type = %s, criticity = %s, frequency = %s, 
@@ -452,14 +454,14 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
         connection.commit()
         
         if cursor.rowcount == 0:
-            return {"error": "Unable to modify this specific ticket."}, 400
+            return {"error": "error.unable_to_modify_ticket"}, 400
 
         log_user_action(user_name=username, action_type="UPDATE_TICKET", target_id=str(issue_id), details=f"Ticket updated/validated. New title: '{ticket.title}'", ip_address=client_ip)
             
-        return {"message": "Issue validated successfully."}, 200
+        return {"message": "success.issue_validated"}, 200
     except Exception as e:
         connection.rollback()
-        return {"error": str(e)}, 500
+        return {"error": "error.database_query", "details": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
@@ -474,7 +476,7 @@ def cancel_issue(issue_id, current_user, client_ip):
 
     connection = get_db_connection()
     if not connection:
-        return {"error": "Database connection error."}, 500
+        return {"error": "error.database_connection"}, 500
         
     try:
         cursor = connection.cursor()
@@ -483,7 +485,7 @@ def cancel_issue(issue_id, current_user, client_ip):
         ticket_row = cursor.fetchone()
         
         if not ticket_row:
-            return {"error": "Issue not found."}, 404
+            return {"error": "error.issue_not_found"}, 404
             
         safe_ticket_loc = str(ticket_row[0]).strip().upper() if ticket_row[0] else "NONE"
         safe_ticket_email = str(ticket_row[1]).strip().lower() if ticket_row[1] else "NONE"
@@ -491,18 +493,18 @@ def cancel_issue(issue_id, current_user, client_ip):
         safe_user_loc = str(user_location).strip().upper() if user_location else "NONE"
 
         if user_role == "USER" and safe_ticket_email != safe_user_email:
-            return {"error": "You can only cancel your own tickets."}, 403
+            return {"error": "error.cancel_forbidden_ownership"}, 403
         elif user_role == "LOCAL_ADMIN" and safe_ticket_loc != safe_user_loc:
-            return {"error": "This ticket falls outside your local jurisdiction."}, 403
+            return {"error": "error.cancel_forbidden_jurisdiction"}, 403
 
         cursor.execute("UPDATE c_issue SET status = 'CANCELED', changed_on = CURRENT_TIMESTAMP WHERE id_issue = %s", (issue_id,))
         connection.commit()
 
         log_user_action(user_name=username, action_type="CANCEL_TICKET", target_id=str(issue_id), details="Ticket canceled by user.", ip_address=client_ip)
-        return {"message": "Ticket successfully canceled."}, 200
+        return {"message": "success.ticket_canceled"}, 200
     except Exception as e:
         connection.rollback()
-        return {"error": str(e)}, 500
+        return {"error": "error.database_query", "details": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
@@ -511,7 +513,7 @@ def cancel_issue(issue_id, current_user, client_ip):
 def download_file_path(ticket_id, file_type, current_user, client_ip):
     """
     On GCP, files are in Cloud Storage, not on the local disk.
-    This route now redirects to the GCS URL or handles the download via the Storage API.
+    This route redirects to the GCS URL using the Storage API.
     """
     if file_type == "working_dir":
         file_name = f"Issue_{ticket_id}_WorkingDir.zip"
@@ -522,17 +524,15 @@ def download_file_path(ticket_id, file_type, current_user, client_ip):
         action_type = "DOWNLOAD_LOGS"
         details = "Downloaded system Logs files."
     else:
-        return {"error": "Type de fichier invalide."}, 400
+        return {"error": "error.invalid_file_type"}, 400
 
-    # The public URL approach for GCP 
     public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/tickets/ticket_{ticket_id}/{file_name}"
     
-    # ✅ ON SIGNE AUSSI CETTE URL POUR POUVOIR LA TÉLÉCHARGER
+    # Sign this URL to allow secure downloading
     signed_url = make_signed_url(public_url)
     
     log_user_action(user_name=current_user.get("sub", "UNKNOWN"), action_type=action_type, target_id=ticket_id, details=details, ip_address=client_ip)
     
-    # We return a redirect URL for the frontend instead of a local path
     return {"file_path": signed_url, "file_name": file_name}, 200
 
 
@@ -541,29 +541,29 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
     try:
         payload = StatusUpdate(**request_json)
     except ValidationError as e:
-        return {"error": "Format invalide", "details": e.errors()}, 400
+        return {"error": "error.invalid_data_format", "details": e.errors()}, 400
 
     valid_statuses = ["CLOSED", "RESOLVED"]
     if payload.new_status not in valid_statuses:
-        return {"error": "Invalid status option. Please choose CLOSED or RESOLVED."}, 400
+        return {"error": "error.invalid_status_option"}, 400
 
     user_role = current_user.get("role")
     user_trigram = current_user.get("sub", "").lower()
 
     connection = get_db_connection()
     if not connection:
-        return {"error": "Database connection error."}, 500
+        return {"error": "error.database_connection"}, 500
     
     try:
         cursor = connection.cursor()
         cursor.execute("SELECT user_name FROM c_issue WHERE id_issue = %s", (issue_id,))
         row = cursor.fetchone()
         if not row:
-            return {"error": "Ticket not found."}, 404
+            return {"error": "error.issue_not_found"}, 404
             
         ticket_owner = row[0].lower() if row[0] else ""
         if user_role not in ["IT_TEAM", "LOCAL_ADMIN"] and user_trigram != ticket_owner:
-            return {"error": "You do not possess the required permissions to finalize and close this ticket."}, 403
+            return {"error": "error.close_forbidden_permissions"}, 403
 
         cursor.execute("UPDATE c_issue SET status = %s, changed_on = CURRENT_TIMESTAMP WHERE id_issue = %s", (payload.new_status, issue_id))
         connection.commit()
@@ -571,10 +571,10 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
         action_type = "RESOLVE_TICKET" if payload.new_status == "RESOLVED" else "CLOSE_TICKET"
         log_user_action(user_name=current_user.get("sub", "UNKNOWN"), action_type=action_type, target_id=str(issue_id), details=f"Status modification validated: {payload.new_status}", ip_address=client_ip)
 
-        return {"message": f"Ticket status successfully set to {payload.new_status}."}, 200
+        return {"message": "success.ticket_status_updated", "new_status": payload.new_status}, 200
     except Exception as e:
         connection.rollback()
-        return {"error": str(e)}, 500
+        return {"error": "error.database_query", "details": str(e)}, 500
     finally:
         cursor.close()
         connection.close()

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import toast from 'react-hot-toast' // ✅ IMPORT DE TOAST
+import toast from 'react-hot-toast' // Toast import
 import { fetchAllIssues } from '../api/issues'
 import styles from './Dashboard.module.css'
 
@@ -62,10 +62,11 @@ function Dashboard() {
         setLoading(false);
       })
       .catch((err) => {
-        toast.error(`Erreur réseau : ${err.message}`); // ✅ TOAST D'ERREUR ICI AU LIEU DE <ErrorMessage />
+        // Error toast used here instead of ErrorMessage component
+        toast.error(t('dashboard.error.network', 'Network error: {{message}}', { message: err.message }));
         setLoading(false);
       })
-  }, [])
+  }, [t])
 
   const requestSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc'
@@ -142,22 +143,22 @@ function Dashboard() {
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
         
         <div onClick={() => toggleStatusFilter('PRETICKET', !showPreticket)} style={{ flex: 1, padding: '15px', background: '#fff', borderRadius: '8px', border: '1px solid #dfe1e6', cursor: 'pointer', textAlign: 'center', boxShadow: showPreticket ? '0 0 0 2px #ffab00' : 'none' }}>
-          <div style={{ fontSize: '12px', color: '#7a869a' }}>Pretickets</div>
+          <div style={{ fontSize: '12px', color: '#7a869a' }}>{t('dashboard.status.preticket', 'Pretickets')}</div>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ffab00' }}>{preticketCount}</div>
         </div>
 
         <div onClick={() => toggleStatusFilter('IN PROGRESS', !showInProgress)} style={{ flex: 1, padding: '15px', background: '#fff', borderRadius: '8px', border: '1px solid #dfe1e6', cursor: 'pointer', textAlign: 'center', boxShadow: showInProgress ? '0 0 0 2px #0052cc' : 'none' }}>
-          <div style={{ fontSize: '12px', color: '#7a869a' }}>In Progress</div>
+          <div style={{ fontSize: '12px', color: '#7a869a' }}>{t('dashboard.status.in_progress', 'In Progress')}</div>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#0052cc' }}>{inProgressCount}</div>
         </div>
 
         <div onClick={() => toggleStatusFilter('RESOLVED', !showResolved)} style={{ flex: 1, padding: '15px', background: '#fff', borderRadius: '8px', border: '1px solid #dfe1e6', cursor: 'pointer', textAlign: 'center', boxShadow: showResolved ? '0 0 0 2px #36b37e' : 'none' }}>
-          <div style={{ fontSize: '12px', color: '#7a869a' }}>Resolved</div>
+          <div style={{ fontSize: '12px', color: '#7a869a' }}>{t('dashboard.status.resolved', 'Resolved')}</div>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#36b37e' }}>{resolvedCount}</div>
         </div>
 
         <div onClick={() => toggleStatusFilter('CLOSED', !showClosed)} style={{ flex: 1, padding: '15px', background: '#fff', borderRadius: '8px', border: '1px solid #dfe1e6', cursor: 'pointer', textAlign: 'center', boxShadow: showClosed ? '0 0 0 2px #42526e' : 'none' }}>
-          <div style={{ fontSize: '12px', color: '#7a869a' }}>Closed</div>
+          <div style={{ fontSize: '12px', color: '#7a869a' }}>{t('dashboard.status.closed', 'Closed')}</div>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#42526e' }}>{closedCount}</div>
         </div>
 
@@ -243,7 +244,7 @@ function Dashboard() {
         </button>
       </div>
 
-      {/* ✅ PLUS BESOIN DE <ErrorMessage message={error} /> grâce aux toasts */}
+      {/* ErrorMessage component removed in favor of hot-toast */}
 
       {filteredTickets.length === 0 ? (
         <div className={styles.emptyState}>

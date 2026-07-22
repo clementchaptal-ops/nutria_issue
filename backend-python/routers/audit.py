@@ -1,26 +1,23 @@
-import logging
 from config.database import get_db_connection
 
-logger = logging.getLogger(__name__)
 
 def log_user_action(user_name: str, action_type: str, target_id: str = None, details: str = None, ip_address: str = None):
     """Records a user action into the audit trail table (Synchronous on GCP)."""
     connection = get_db_connection()
     if not connection:
-        logger.error("Audit Trail: Unable to connect to the database.")
         return
         
     try:
         cursor = connection.cursor()
-        # ✅ Syntaxe PostgreSQL : %s au lieu de :1
+        # PostgreSQL syntax: %s instead of :1
         query = """
             INSERT INTO c_issue_audit_logs (user_name, action_type, target_id, details, ip_address)
             VALUES (%s, %s, %s, %s, %s)
         """
         cursor.execute(query, (user_name, action_type, target_id, details, ip_address))
         connection.commit()
-    except Exception as e:
-        logger.error(f"Audit Trail Error: {e}")
+    except Exception:
+        pass
     finally:
         cursor.close()
         connection.close()

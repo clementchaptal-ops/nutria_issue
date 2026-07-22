@@ -7,23 +7,23 @@ SYSTEM_API_KEY = os.environ.get("SYSTEM_API_KEY", "Nutria_Citrix_Secret_2026_XYZ
 
 def verify_token(auth_header=None, request_headers=None):
     """
-    Vérifie l'authentification.
-    Supporte soit le Token JWT Web (Authorization: Bearer ...),
-    soit la clé d'API Citrix (X-System-Key: ...).
+    Verifies authentication.
+    Supports either the Web JWT Token (Authorization: Bearer ...)
+    or the Citrix API key (X-System-Key: ...).
     """
-    # 1. Si les headers complets sont passés, on cherche d'abord la clé Citrix
+    # 1. If full headers are provided, check for Citrix key first
     if request_headers:
         system_key = request_headers.get("X-System-Key")
         if system_key and system_key == SYSTEM_API_KEY:
             return {"sub": "CITRIX_SYSTEM", "role": "IT_TEAM", "location": "GLOBAL"}, None
 
-    # Si auth_header n'a pas été passé directement, on tente de le récupérer depuis request_headers
+    # If auth_header was not passed directly, try retrieving it from request_headers
     if not auth_header and request_headers:
         auth_header = request_headers.get("Authorization")
 
-    # 2. Vérification classique du Token JWT
+    # 2. Standard JWT token verification
     if not auth_header or not auth_header.startswith("Bearer "):
-        return None, "Token d'authentification manquant ou mal formate."
+        return None, "Missing or malformed authentication token."
 
     token = auth_header.split(" ")[1]
 
@@ -31,6 +31,6 @@ def verify_token(auth_header=None, request_headers=None):
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         return payload, None
     except jwt.ExpiredSignatureError:
-        return None, "Session expiree. Veuillez vous reconnecter."
+        return None, "Session expired. Please log in again."
     except jwt.InvalidTokenError:
-        return None, "Token de securite invalide."
+        return None, "Invalid security token."

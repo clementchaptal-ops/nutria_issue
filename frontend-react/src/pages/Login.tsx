@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useState, useEffect } from 'react'
-import toast from 'react-hot-toast' // ✅ IMPORT DE TOAST
+import toast from 'react-hot-toast' // Toast import
 import styles from './Login.module.css'
 
 interface LimsProfile {
@@ -22,7 +22,7 @@ function Login() {
   const GOOGLE_CLIENT_ID = "549394697229-tvgof9to9fcu4um4260vnigbtt57o9fo.apps.googleusercontent.com"
   const from = location.state?.from || '/dashboard'
 
-  // --- ANALYSE DE L'URL LABWARE ---
+  // --- LABWARE URL ANALYSIS ---
   let searchString = from.includes('?') ? from.substring(from.indexOf('?')) : ''
   if (!searchString && location.search) {
     searchString = location.search
@@ -63,8 +63,8 @@ function Login() {
         location: data.location  
       }))
       
-      // ✅ Petit message de bienvenue optionnel (tu peux l'enlever si tu veux que ce soit transparent)
-      toast.success(t('login.success', `Bienvenue ${data.full_name || data.user_name} !`))
+      // Optional welcome message
+      toast.success(t('login.success', `Welcome ${data.full_name || data.user_name}!`))
       
       navigate(from, { replace: true })
       
@@ -72,13 +72,13 @@ function Login() {
       if (selectedProfile) {
         loginToServer(token, undefined)
       } else {
-        // ✅ ON UTILISE TOAST ICI AU LIEU DE SETAUTHERROR
+        // Using toast here instead of ErrorMessage component
         toast.error(err.message || t('login.error.server_fail', 'Unable to connect to the Nutria server.'))
       }
     }
   }
 
-  // --- LE COEUR DE LA SOLUTION : RÉCUPÉRATION DU JETON SANS POP-UP ---
+  // --- CORE SOLUTION: TOKEN RETRIEVAL WITHOUT POP-UP ---
   useEffect(() => {
     const hash = window.location.hash;
     if (hash.includes('id_token=')) {
@@ -92,7 +92,7 @@ function Login() {
     }
   }, []);
 
-  // --- REDIRECTION VERS GOOGLE ---
+  // --- GOOGLE REDIRECTION ---
   const handleGoogleRedirect = () => {
     const REDIRECT_URI = window.location.origin + window.location.pathname;
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=id_token&scope=email profile openid&nonce=nutria123&prompt=select_account`;
@@ -120,7 +120,7 @@ function Login() {
           </div>
           <div className={styles.divider}></div>
           
-          {/* ❌ L'ANCIEN <ErrorMessage message={authError} /> A ÉTÉ SUPPRIMÉ ! */}
+          {/* The old ErrorMessage component has been removed */}
 
           {requireSelection ? (
             <div className={styles.profileSelectionContainer}>

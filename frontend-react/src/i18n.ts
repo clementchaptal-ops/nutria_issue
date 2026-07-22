@@ -1,19 +1,19 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import HttpApi from 'i18next-http-backend';
-import LanguageDetector from 'i18next-browser-languagedetector'; // <-- Nouvel import
+import LanguageDetector from 'i18next-browser-languagedetector';
 
 i18n
   .use(HttpApi)
-  .use(LanguageDetector) // <-- On demande à i18n d'utiliser le détecteur
+  .use(LanguageDetector) // Tell i18n to use the language detector
   .use(initReactI18next)
   .init({
-    fallbackLng: 'en', // Langue de secours universelle
+    fallbackLng: 'en', // Universal fallback language
     detection: {
-      // Ordre des vérifications : d'abord l'URL (si on force ?lng=fr), 
-      // puis le stockage local, puis les paramètres du navigateur Chrome/Edge
+      // Order of checks: first the URL (if forced via ?lng=fr), 
+      // then local storage, then browser settings (Chrome/Edge/etc.)
       order: ['querystring', 'localStorage', 'navigator'],
-      caches: ['localStorage'], // Garde en mémoire la langue pour les prochaines visites
+      caches: ['localStorage'], // Caches the detected language for future visits
       lookupQuerystring: 'lng'
     },
     backend: {

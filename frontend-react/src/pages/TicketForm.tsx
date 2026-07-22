@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import FileUploader from '../components/FileUploader'
-import toast from 'react-hot-toast' // ✅ IMPORT DE TOAST
+import toast from 'react-hot-toast'
 import styles from './TicketForm.module.css'
 
 const getDecodedToken = () => {
@@ -15,8 +15,8 @@ const getDecodedToken = () => {
   }
 };
 
-// ✅ FONCTION UTILITAIRE POUR LES CONFIRMATIONS ÉLÉGANTES
-const showConfirmToast = (message: string, onConfirm: () => void) => {
+// Utility function for elegant confirmations (accepts translated button texts)
+const showConfirmToast = (message: string, confirmText: string, cancelText: string, onConfirm: () => void) => {
   toast((t) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <span style={{ fontSize: '14px', fontWeight: 500 }}>{message}</span>
@@ -25,7 +25,7 @@ const showConfirmToast = (message: string, onConfirm: () => void) => {
           onClick={() => toast.dismiss(t.id)}
           style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid #ccc', background: '#fff', cursor: 'pointer', fontSize: '12px' }}
         >
-          Non, annuler
+          {cancelText}
         </button>
         <button
           onClick={() => {
@@ -34,7 +34,7 @@ const showConfirmToast = (message: string, onConfirm: () => void) => {
           }}
           style={{ padding: '4px 10px', borderRadius: '4px', border: 'none', background: '#de350b', color: '#fff', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}
         >
-          Oui, confirmer
+          {confirmText}
         </button>
       </div>
     </div>
@@ -109,7 +109,6 @@ function TicketForm() {
         else setComments([]) 
       }
     } catch (error) {
-      console.error("Error loading comments:", error)
       setComments([]) 
     }
   }
@@ -157,7 +156,7 @@ function TicketForm() {
             })
           }
         } catch (error) {
-          console.error("Impossible de joindre l'API, mode dégradé activé.", error)
+          // Silent fallback in case of error
         } finally {
           setIsLoading(false)
         }
@@ -249,7 +248,7 @@ function TicketForm() {
         }
 
       } catch (error) {
-        console.error("Error loading ticket data:", error)
+        toast.error(t('ticket.error.fetch', 'Error loading ticket data.'))
       } finally {
         setIsLoading(false)
       }
@@ -263,7 +262,7 @@ function TicketForm() {
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
       })
-      if (!response.ok) throw new Error('Changement ou lecture du fichier impossible')
+      if (!response.ok) throw new Error('Download impossible')
 
       const disposition = response.headers.get('content-disposition')
       let filename = defaultFilename
@@ -283,8 +282,7 @@ function TicketForm() {
       link.remove()
       window.URL.revokeObjectURL(blobUrl)
     } catch (error) {
-      console.error("Download error:", error)
-      toast.error(t('ticket.download_error', 'Failed to download file.')) // ✅ Remplacé
+      toast.error(t('ticket.download_error', 'Failed to download file.'))
     }
   }
 
@@ -332,8 +330,7 @@ function TicketForm() {
           })
 
           if (!attachmentsResponse.ok) {
-            console.error("Failed to upload attachments.")
-            toast.error("Text saved, but files could not be uploaded.") // ✅ Remplacé
+            toast.error(t('ticket.error.upload_attachments', 'Text saved, but files could not be uploaded.'))
           }
         }
 
@@ -345,23 +342,22 @@ function TicketForm() {
           ? t('ticket.success_msg_create', 'Ticket successfully created!') 
           : t('ticket.success_msg_update', 'Ticket successfully updated!')
         
-        toast.success(successMsg) // ✅ Remplacé
+        toast.success(successMsg)
         
         if (isNewTicket) navigate('/dashboard')
         else window.location.reload()
       } else {
         const errorData = await response.json()
-        toast.error(`Error : ${errorData.detail}`) // ✅ Remplacé
+        toast.error(t('common.error_detail', 'Error: {{detail}}', { detail: errorData.detail }))
       }
     } catch (error) {
-      console.error("Error updating ticket or uploading files:", error)
-      toast.error("Une erreur s'est produite lors de l'envoi.")
+      toast.error(t('ticket.error.submit_failed', 'An error occurred during submission.'))
     } finally {
       setIsSubmitting(false) 
     }
   }
 
-  // ✅ Logique extraite pour être appelée par le toast
+  // Logic extracted to be called by the toast
   const executeCancelTicket = async () => {
     try {
       const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/cancel`, {
@@ -373,22 +369,26 @@ function TicketForm() {
         setStatus('CANCELED')
         setIsEditing(false)
         setCanEdit(false) 
-        toast.success(t('ticket.cancel_success', 'Ticket successfully canceled.')) // ✅ Remplacé
+        toast.success(t('ticket.cancel_success', 'Ticket successfully canceled.'))
       } else {
         const errorData = await response.json()
-        toast.error(`Error : ${errorData.detail}`) // ✅ Remplacé
+        toast.error(t('common.error_detail', 'Error: {{detail}}', { detail: errorData.detail }))
       }
     } catch (error) {
-      console.error("Error canceling ticket:", error)
-      toast.error("Network error while canceling ticket.")
+      toast.error(t('ticket.error.network_cancel', 'Network error while canceling ticket.'))
     }
   }
 
   const handleCancelTicket = () => {
-    showConfirmToast(t('ticket.confirm_cancel', 'Are you sure you want to cancel this ticket? This action cannot be undone.'), executeCancelTicket)
+    showConfirmToast(
+      t('ticket.confirm_cancel', 'Are you sure you want to cancel this ticket? This action cannot be undone.'), 
+      t('common.yes_confirm', 'Yes, confirm'), 
+      t('common.no_cancel', 'No, cancel'), 
+      executeCancelTicket
+    )
   }
 
-  // ✅ Logique extraite pour être appelée par le toast
+  // Logic extracted to be called by the toast
   const executeCloseTicket = async (targetStatus: 'RESOLVED' | 'CLOSED') => {
     try {
       const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/close`, {
@@ -405,14 +405,13 @@ function TicketForm() {
         const successMessage = targetStatus === 'RESOLVED'
           ? t('ticket.resolve_success', 'Ticket successfully resolved.')
           : t('ticket.close_success', 'Ticket successfully closed.')
-        toast.success(successMessage) // ✅ Remplacé
+        toast.success(successMessage)
       } else {
         const errorData = await response.json()
-        toast.error(`Error : ${errorData.detail}`) // ✅ Remplacé
+        toast.error(t('common.error_detail', 'Error: {{detail}}', { detail: errorData.detail }))
       }
     } catch (error) {
-      console.error(`Error changing ticket to ${targetStatus}:`, error)
-      toast.error(`Network error while changing status to ${targetStatus}.`)
+      toast.error(t('ticket.error.network_status', 'Network error while changing status.'))
     }
   }
 
@@ -421,10 +420,15 @@ function TicketForm() {
       ? t('ticket.confirm_resolve', 'Are you sure you want to resolve this ticket?')
       : t('ticket.confirm_close', 'Are you sure you want to close this ticket?');
     
-    showConfirmToast(confirmMessage, () => executeCloseTicket(targetStatus))
+    showConfirmToast(
+      confirmMessage, 
+      t('common.yes_confirm', 'Yes, confirm'), 
+      t('common.no_cancel', 'No, cancel'), 
+      () => executeCloseTicket(targetStatus)
+    )
   }
 
-  // ✅ Logique extraite pour être appelée par le toast
+  // Logic extracted to be called by the toast
   const executeDeleteAttachment = async (filename: string) => {
     try {
       const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/attachments/${filename}`, {
@@ -434,19 +438,23 @@ function TicketForm() {
 
       if (response.ok) {
         setExistingFiles(prev => prev.filter(f => f.attachment_name !== filename));
-        toast.success("File deleted successfully."); // ✅ Petit bonus d'expérience utilisateur
+        toast.success(t('ticket.success.file_deleted', 'File deleted successfully.'));
       } else {
         const err = await response.json();
-        toast.error(`Error: ${err.detail}`); // ✅ Remplacé
+        toast.error(t('common.error_detail', 'Error: {{detail}}', { detail: err.detail }));
       }
     } catch (error) {
-      console.error("Error deleting file:", error);
-      toast.error("Network error while deleting file.");
+      toast.error(t('ticket.error.network_delete', 'Network error while deleting file.'));
     }
   }
 
   const handleDeleteAttachment = (filename: string) => {
-    showConfirmToast("Are you sure you want to delete this file?", () => executeDeleteAttachment(filename))
+    showConfirmToast(
+      t('ticket.confirm_delete_file', 'Are you sure you want to delete this file?'), 
+      t('common.yes_confirm', 'Yes, confirm'), 
+      t('common.no_cancel', 'No, cancel'), 
+      () => executeDeleteAttachment(filename)
+    )
   };
 
   const handleCancelEdit = () => {
@@ -491,11 +499,10 @@ function TicketForm() {
         fetchComments()   
       } else {
         const err = await response.json()
-        toast.error(`Error: ${err.detail}`) // ✅ Remplacé
+        toast.error(t('common.error_detail', 'Error: {{detail}}', { detail: err.detail }))
       }
     } catch (error) {
-      console.error("Error posting comment:", error)
-      toast.error("Network error while posting comment.")
+      toast.error(t('ticket.error.network_comment', 'Network error while posting comment.'))
     } finally {
       setIsPostingComment(false)
     }
@@ -504,7 +511,7 @@ function TicketForm() {
   return (
     <div className={styles.pageContainer}>
       
-      {/* BANDEAU DE STATUT */}
+      {/* STATUS BANNER */}
       <div className={`${styles.statusBanner} ${styles[status.toLowerCase().replace(' ', '_')]}`} style={{ display: 'flex', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div className={styles.statusInfo}>
@@ -547,7 +554,7 @@ function TicketForm() {
 
       <div className={styles.gridContainer}>
         
-        {/* === COLONNE DE GAUCHE : FORMULAIRE & PIÈCES JOINTES === */}
+        {/* === LEFT COLUMN: FORM & ATTACHMENTS === */}
         <div className={styles.leftColumn}>
           <form onSubmit={handleSubmit}>
             <fieldset disabled={!isEditing} style={{ border: 'none', padding: 0, margin: 0 }}>
@@ -638,7 +645,7 @@ function TicketForm() {
             </fieldset>
           </form>
 
-          {/* GALERIE PIÈCES JOINTES TICKET */}
+          {/* TICKET ATTACHMENTS GALLERY */}
           {existingFiles && existingFiles.some(f => {
             const name = (f.attachment_name || '').toLowerCase();
             const path = (f.url_path || '').toLowerCase();
@@ -690,7 +697,7 @@ function TicketForm() {
                         )}
                   
                         {isEditing && (
-                          <button type="button" onClick={() => handleDeleteAttachment(file.attachment_name || '')} className={styles.deleteBtn} title="Delete file">🗑️</button>
+                          <button type="button" onClick={() => handleDeleteAttachment(file.attachment_name || '')} className={styles.deleteBtn} title={t('common.delete', 'Delete file')}>🗑️</button>
                         )}
                       </div>
                     );
@@ -699,7 +706,7 @@ function TicketForm() {
             </div>
           )}
           
-          {/* FICHIERS AUTO */}
+          {/* AUTO FILES */}
           {!isNewTicket && !isCreatedFromWeb && (
             <div className={styles.autoFilesSection} style={{ marginTop: '30px' }}>
               <h4 className={styles.autoFilesTitle}>{t('ticket.auto_collected', 'Auto-collected Context Files:')}</h4>
@@ -721,7 +728,7 @@ function TicketForm() {
           )}
         </div>
         
-        {/* === COLONNE DE DROITE : LECTURE SEULE === */}
+        {/* === RIGHT COLUMN: READ ONLY === */}
         <div className={styles.rightColumn}>
           <div className={`${styles.sidebarCard} ${styles.readOnlyCard}`}>
             <h3 className={styles.cardTitle}>👤 {t('sidebar.user_title', 'User Information')}</h3>
@@ -799,7 +806,7 @@ function TicketForm() {
       </div> 
 
       {/* =========================================================
-          💬 SECTION COMMENTAIRES (PLEINE LARGEUR)
+          💬 COMMENTS SECTION (FULL WIDTH)
       ========================================================= */}
       {!isNewTicket && !isEditing && (
         <div className={styles.commentsSection} style={{ width: '100%', marginTop: '30px' }}>
@@ -870,14 +877,14 @@ function TicketForm() {
               className={styles.commentBtn}
               style={{ marginTop: '10px' }}
             >
-              {isPostingComment ? '⏳...' : '✉️ Send'}
+              {isPostingComment ? '⏳...' : t('ticket.button_send', '✉️ Send')}
             </button>
           </div>
         </div>
       )}
 
       {/* =========================================================
-          🖼️ OVERLAY LIGHTBOX CLEAN & ROBUSTE
+          🖼️ OVERLAY LIGHTBOX CLEAN & ROBUST
       ========================================================= */}
       {lightboxMedia && (
         <div 
@@ -890,7 +897,7 @@ function TicketForm() {
             {lightboxMedia.type === 'IMAGE' ? (
               <img
                 src={lightboxMedia.url} 
-                alt="Aperçu agrandi" 
+                alt={t('ticket.lightbox_preview', 'Enlarged preview')} 
                 className={styles.lightboxMedia} 
               />
             ) : (

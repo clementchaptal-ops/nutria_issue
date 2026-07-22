@@ -1,16 +1,16 @@
 import os
 import psycopg2
 
-# Variables d'environnement (GCP Cloud Run ou .env local)
+# Environment variables (GCP Cloud Run or local .env)
 DB_HOST = os.environ.get("DB_HOST", "localhost")
 DB_USER = os.environ.get("DB_USER", "postgres")
-# Supporte DB_PASSWORD (ton ancien format) ou DB_PASS (format standard Cloud)
+# Supports DB_PASSWORD (your former format) or DB_PASS (standard Cloud format)
 DB_PASSWORD = os.environ.get("DB_PASSWORD", os.environ.get("DB_PASS", ""))
 DB_NAME = os.environ.get("DB_NAME", "postgres")
 DB_PORT = os.environ.get("DB_PORT", "5432")
 
 def get_db_connection():
-    """Crée et retourne une connexion à la base PostgreSQL NUTRIA."""
+    """Creates and returns a connection to the NUTRIA PostgreSQL database."""
     try:
         connection = psycopg2.connect(
             host=DB_HOST,
@@ -21,5 +21,5 @@ def get_db_connection():
         )
         return connection
     except Exception as e:
-        print(f"Erreur fatale de connexion PostgreSQL : {e}")
+        print(f"Fatal PostgreSQL connection error: {e}")
         return None

@@ -1,5 +1,4 @@
-
-#Script a ne pas déployer juste utilitaire pour la génération des traductions. 
+# Utility script for translation generation (do not deploy).
 import json
 import os
 from deep_translator import GoogleTranslator

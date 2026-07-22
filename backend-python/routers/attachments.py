@@ -1,6 +1,5 @@
 import os
 import uuid
-import logging
 from google.cloud import storage
 
 # Database configuration import
@@ -8,8 +7,6 @@ from config.database import get_db_connection
 
 # Local module imports
 from .audit import log_user_action
-
-logger = logging.getLogger(__name__)
 
 # --- CONFIGURATION ---
 USE_MOCK_DATA = os.environ.get("USE_MOCK_DATA", "True") == "True"
@@ -46,20 +43,17 @@ def upload_to_gcs(file_bytes: bytes, filename: str, issue_id) -> dict:
         gs_uri = f"gs://{BUCKET_NAME}/{blob_path}"
         public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{blob_path}"
 
-        logger.info(f"=== GCS UPLOAD SUCCESS === Saved at: {gs_uri}")
-
         return {
             "blob_path": blob_path,
             "gs_uri": gs_uri,
             "public_url": public_url
         }
     except Exception as e:
-        logger.error(f"=== GCS UPLOAD ERROR === {str(e)}")
         raise e
 
 
 # =====================================================================
-# ROUTES MÉTIER
+# BUSINESS ROUTES
 # =====================================================================
 
 def upload_attachments(issue_id, files_data, current_user, client_ip):
@@ -93,8 +87,6 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
 
         # 2. SAVE METADATA (Mock vs PostgreSQL)
         if USE_MOCK_DATA:
-            logger.info(f"=== MOCK MODE === Skipping DB insert for attachments")
-            
             log_user_action(user_name=username, action_type="UPLOAD_ATTACHMENTS", target_id=str(issue_id), details=audit_details, ip_address=client_ip)
             
             return {
@@ -104,7 +96,6 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
             }, 200
 
         else:
-            logger.info(f"=== PRODUCTION MODE === Saving GCS URLs to PostgreSQL DB")
             connection = get_db_connection()
             if not connection:
                 return {"error": "Database connection error."}, 500
@@ -113,7 +104,7 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
 
             try:
                 for file_data in uploaded_files_info:
-                    # ✅ Syntaxe PostgreSQL : %s au lieu de :1, :2...
+                    # PostgreSQL syntax: %s
                     qry = """
                         INSERT INTO c_issue_attachment (
                             id_issue, attachment_name, attachment_type, url_path
@@ -152,7 +143,6 @@ def delete_attachment(issue_id, filename, current_user, client_ip):
     username = current_user.get("sub", "UNKNOWN")
 
     if USE_MOCK_DATA:
-        logger.info(f"=== MOCK MODE === Mocking soft-delete for {filename}")
         return {"message": "Attachment removed (Mock)."}, 200
 
     else:
@@ -162,7 +152,7 @@ def delete_attachment(issue_id, filename, current_user, client_ip):
 
         try:
             cursor = connection.cursor()
-            # ✅ Syntaxe PostgreSQL : %s
+            # PostgreSQL syntax: %s
             soft_delete_qry = """
                 UPDATE c_issue_attachment 
                 SET removed = 'T'
