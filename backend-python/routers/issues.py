@@ -158,7 +158,7 @@ def get_issue(issue_id, current_user):
             SELECT i.id_issue, i.title, i.issue_type, i.description, i.user_name, i.ip_adress,
                    i.ip_config, i.ping, i.status, i.citrix_session, i.current_pc, i.frequency,
                    i.blocking_issue, i.criticity, i.sspticket, i.workstation, i.working_dir,
-                   i.current_role, i.current_project, i.current_batch, i.current_sample,
+                   i.current_active_role, i.current_project, i.current_batch, i.current_sample,
                    i.current_analysis, i.current_analysis_variation, i.current_customer,
                    u.location as creator_location, u.full_name, u.lab as creator_lab, u.email_addr as user_email,
                    TO_CHAR(i.created_on, 'YYYY-MM-DD HH24:MI:SS') as created_on
