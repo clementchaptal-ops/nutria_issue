@@ -19,7 +19,8 @@
     "react-dom": "^18.2.0",
     "react-i18next": "^17.0.8",
     "react-router-dom": "^7.18.1",
-    "serve": "^14.2.4"
+    "serve": "^14.2.4",
+    "react-hot-toast": "^2.4.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.55",
