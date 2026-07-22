@@ -27,10 +27,8 @@ def log_user_action(user_name: str, action_type: str, target_id: str = None, det
 
 
 def get_audit_logs(current_user):
-    """Fetches all audit trail logs (Restricted to administrators)."""
     user_role = current_user.get("role")
 
-    # Vérification des droits d'accès
     if user_role not in ["IT_TEAM", "LOCAL_ADMIN"]:
         return {"error": "Access denied. Restricted to administrators."}, 403
 
@@ -40,7 +38,6 @@ def get_audit_logs(current_user):
 
     try:
         cursor = connection.cursor()
-        # Note : TO_CHAR fonctionne à l'identique entre Oracle et PostgreSQL !
         qry = """
             SELECT id_log, user_name, action_type, target_id, details, ip_address, 
                    TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as c_date
@@ -52,18 +49,15 @@ def get_audit_logs(current_user):
 
         logs = []
         for row in rows:
-            # ✅ Plus besoin de gérer les CLOB complexes d'Oracle.
-            # PostgreSQL renvoie directement le texte (string).
             details_val = row[4]
-
             logs.append({
                 "id_log": row[0],
-                "user_name": row[1],
-                "action_type": row[2],
-                "target_id": row[3] or "-",
-                "details": str(details_val) if details_val else "",
-                "ip_address": row[5] or "Unknown",
-                "created_at": row[6]
+                "user_name": row[1] if row[1] else "UNKNOWN",
+                "action_type": row[2] if row[2] else "N/A",
+                "target_id": row[3] if row[3] else "-",
+                "details": str(details_val) if details_val is not None else "",
+                "ip_address": row[5] if row[5] else "Unknown",
+                "created_at": row[6] if row[6] else ""
             })
             
         return logs, 200

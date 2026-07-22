@@ -28,9 +28,17 @@ function AuditLogs() {
         }
 
         const data = await response.json()
-        setLogs(data)
+
+        // ✅ Sécurisation : On s'assure que data est bien un tableau avant de faire setLogs
+        if (Array.isArray(data)) {
+          setLogs(data)
+        } else {
+          setError(data.error || 'Invalid response format from server.')
+          setLogs([]) // Garde une liste vide pour éviter le crash .map() !
+        }
       } catch (err: any) {
         setError(err.message)
+        setLogs([]) // Sécurité supplémentaire
       } finally {
         setLoading(false)
       }
