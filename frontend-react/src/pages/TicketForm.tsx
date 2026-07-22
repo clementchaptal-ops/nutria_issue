@@ -715,14 +715,14 @@ function TicketForm() {
                   .map((file, index) => {
                     const filename = file.url_path ? file.url_path.replace(/\\/g, '/').split('/').pop() : file.attachment_name;
                     const displayName = file.attachment_name || filename || 'Unknown_File';
-                    const fileUrl = `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/attachments/${filename}`;
+                    const fileUrl = file.url_path || `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/attachments/${filename}`;
                     const fileType = file.attachment_type;
 
                     return (
                       <div key={index} className={styles.attachmentItem}>
                         {fileType === 'IMAGE' && (
                           <div className={styles.imagePreviewContainer}>
-                            <SecureImage src={fileUrl} alt={displayName} className={styles.imagePreview} onClick={() => setLightboxMedia({ url: fileUrl, type: fileType })} />
+                            <img src={fileUrl} alt={displayName} className={styles.imagePreview} onClick={() => setLightboxMedia({ url: fileUrl, type: fileType })} />
                             <span className={styles.fileName}>{displayName}</span>
                           </div>
                         )}
@@ -944,14 +944,14 @@ function TicketForm() {
 
           <div onClick={(e) => e.stopPropagation()}>
             {lightboxMedia.type === 'IMAGE' ? (
-              <SecureImage
+              <img
                 src={lightboxMedia.url} 
                 alt="Aperçu agrandi" 
                 className={styles.lightboxMedia} 
               />
               ) : (
                 <video 
-                  src={`${lightboxMedia.url}?token=${encodeURIComponent(localStorage.getItem('nutria_token') || '')}`} 
+                  src={lightboxMedia.url} 
                   controls 
                   autoPlay
                   className={styles.lightboxMedia} 
