@@ -60,8 +60,6 @@ def nutria_api(request):
             current_user, error_msg = verify_token(auth_header)
 
             # 🚨 BYPASS DE DÉVELOPPEMENT CORRIGÉ 🚨 
-            # Comme Google bloque le login sur localhost, on injecte un faux profil Admin
-            # pour forcer l'accès à la base Oracle locale.
             if error_msg:
                 print(f"⚠️ AVERTISSEMENT SÉCURITÉ: {error_msg}. Contournement actif pour Dev Local.")
                 current_user = {
@@ -71,38 +69,89 @@ def nutria_api(request):
                     "email": "dev.admin@mxns.com"
                 }
             
-            # Découpage de l'URL pour gérer les sous-routes (ex: "issues/users/me")
+            client_ip = request.remote_addr or "Unknown"
             parts = path.split("/")
             
-            # --- ROUTE A : GET /issues (Tableau de bord) ---
+            # --- ROUTE : GET /issues (Tableau de bord) ---
             if path == "issues" and request.method == "GET":
                 donnees, code_http = get_all_issues(current_user)
                 return jsonify({"status": "success", "data": donnees}), code_http, headers
                 
-            # --- ROUTE B : GET /issues/users/me (Profil utilisateur dans le formulaire) ---
+            # --- ROUTE : GET /issues/audit/logs (Audit Trail Admin) ---
+            elif path == "issues/audit/logs" and request.method == "GET":
+                from routers.audit import get_audit_logs
+                donnees, code_http = get_audit_logs(current_user)
+                return jsonify(donnees), code_http, headers
+                
+            # --- ROUTE : GET /issues/users/me (Profil utilisateur) ---
             elif path == "issues/users/me" and request.method == "GET":
                 from routers.issues import get_my_profile
                 donnees, code_http = get_my_profile(current_user)
                 return jsonify(donnees), code_http, headers
                 
-            # --- ROUTE C : POST /issues/create (Création manuelle de ticket) ---
+            # --- ROUTE : POST /issues/create (Création de ticket) ---
             elif path == "issues/create" and request.method == "POST":
                 from routers.issues import create_issue
                 request_json = request.get_json(silent=True) or {}
-                client_ip = request.remote_addr or "Unknown"
                 donnees, code_http = create_issue(request_json, current_user, client_ip)
                 return jsonify(donnees), code_http, headers
                 
-            # --- ROUTE D : GET /issues/{id} (Lecture d'un ticket spécifique) ---
+            # --- ROUTE : GET /issues/{id} (Lecture d'un ticket spécifique) ---
             elif len(parts) == 2 and parts[1].isdigit() and request.method == "GET":
                 from routers.issues import get_issue
                 issue_id = int(parts[1])
                 donnees, code_http = get_issue(issue_id, current_user)
                 return jsonify(donnees), code_http, headers
 
-            # --- AUTRES ROUTES ISSUES (Validate, Cancel, Comments...) ---
+            # --- ROUTE : PUT /issues/{id}/validate (Validation du ticket) ---
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "validate" and request.method == "PUT":
+                from routers.issues import validate_issue
+                issue_id = int(parts[1])
+                request_json = request.get_json(silent=True) or {}
+                donnees, code_http = validate_issue(issue_id, request_json, current_user, client_ip)
+                return jsonify(donnees), code_http, headers
+
+            # --- ROUTE : PUT /issues/{id}/cancel (Annulation du ticket) ---
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "cancel" and request.method == "PUT":
+                from routers.issues import cancel_issue
+                issue_id = int(parts[1])
+                donnees, code_http = cancel_issue(issue_id, current_user, client_ip)
+                return jsonify(donnees), code_http, headers
+
+            # --- ROUTE : PUT /issues/{id}/close (Clôture / Résolution du ticket) ---
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "close" and request.method == "PUT":
+                from routers.issues import close_ticket
+                issue_id = int(parts[1])
+                request_json = request.get_json(silent=True) or {}
+                donnees, code_http = close_ticket(issue_id, request_json, current_user, client_ip)
+                return jsonify(donnees), code_http, headers
+
+            # --- ROUTE : GET /issues/{id}/comments (Récupération des commentaires) ---
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "comments" and request.method == "GET":
+                from routers.issues import get_issue_comments
+                issue_id = int(parts[1])
+                donnees, code_http = get_issue_comments(issue_id, current_user)
+                return jsonify(donnees), code_http, headers
+
+            # --- ROUTE : POST /issues/{id}/comments (Ajout d'un commentaire) ---
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "comments" and request.method == "POST":
+                from routers.issues import add_issue_comment
+                issue_id = int(parts[1])
+                request_json = request.get_json(silent=True) or {}
+                donnees, code_http = add_issue_comment(issue_id, request_json, current_user, client_ip)
+                return jsonify(donnees), code_http, headers
+
+            # --- ROUTE : GET /issues/{id}/download/{file_type} (Téléchargement Logs/Working Dir) ---
+            elif len(parts) == 4 and parts[1].isdigit() and parts[2] == "download" and request.method == "GET":
+                from routers.issues import download_file_path
+                issue_id = int(parts[1])
+                file_type = parts[3]
+                donnees, code_http = download_file_path(issue_id, file_type, current_user, client_ip)
+                return jsonify(donnees), code_http, headers
+
+            # --- AUTRES ROUTES ISSUES (Fallback) ---
             else:
-                return jsonify({"status": "success", "message": f"Sous-route issue interceptée ({path}), prête pour branchement."}), 200, headers
+                return jsonify({"status": "success", "message": f"Sous-route issue non définie explicitement interceptée ({path})."}), 200, headers
             
         # ---------------------------------------------------------
         # AUTRES MODULES (Mocks temporaires)
@@ -118,5 +167,5 @@ def nutria_api(request):
 
     except Exception as e:
         import traceback
-        traceback.print_exc() # Affiche l'erreur complète dans ton terminal VS Code si ça plante
+        traceback.print_exc() # Affiche l'erreur complète dans le log serveur (Cloud Run / Functions)
         return jsonify({"error": f"Erreur interne : {str(e)}"}), 500, headers
