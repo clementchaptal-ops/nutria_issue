@@ -2,12 +2,40 @@ import os
 import uuid
 from config.database import get_db_connection
 from pydantic import ValidationError
+import datetime
+from google.cloud import storage
 
 # --- LOCAL FILE IMPORTS ---
 from .schemas import TicketCreate, TicketUpdate, StatusUpdate
 from .audit import log_user_action
 
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
+
+def make_signed_url(public_url: str) -> str:
+    """Génère une URL signée temporaire (15 min) à partir d'une URL d'origine GCS."""
+    if not public_url or "storage.googleapis.com" not in public_url:
+        return public_url
+
+    parts = public_url.replace("https://storage.googleapis.com/", "").split("/", 1)
+    if len(parts) != 2:
+        return public_url
+
+    bucket_name, blob_name = parts[0], parts[1]
+
+    try:
+        client = storage.Client()
+        bucket = client.bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+
+        return blob.generate_signed_url(
+            version="v4",
+            expiration=datetime.timedelta(minutes=15),
+            method="GET"
+        )
+    except Exception as e:
+        print(f"Erreur génération Signed URL: {e}")
+        return public_url
+
 
 # =====================================================================
 # 1. ROUTES STATIQUES
@@ -192,6 +220,11 @@ def get_issue(issue_id, current_user):
         attach_rows = cursor.fetchall()
         
         attachments_list = [dict(zip(attach_cols, r)) for r in attach_rows]
+        
+        # Application de l'URL signée
+        for att in attachments_list:
+            att["url_path"] = make_signed_url(att["url_path"])
+            
         issue_data["attachments"] = attachments_list
         
         return issue_data, 200
@@ -225,7 +258,6 @@ def get_issue_comments(issue_id, current_user):
         comments_list = []
         
         for row in cursor.fetchall():
-            # ✅ PostgreSQL : Le texte est déjà sous format string, pas besoin de .read()
             comment_str = row[3]
             
             c_id = row[0]
@@ -253,7 +285,7 @@ def get_issue_comments(issue_id, current_user):
                     comments_dict[att_c_id]["attachments"].append({
                         "attachment_name": att_row[1],
                         "attachment_type": att_row[2],
-                        "url_path": att_row[3]
+                        "url_path": make_signed_url(att_row[3]) # ✅ L'URL SIGNÉE EST APPLIQUÉE ICI
                     })
                     
         return comments_list, 200
@@ -483,10 +515,13 @@ def download_file_path(ticket_id, file_type, current_user, client_ip):
     # The public URL approach for GCP 
     public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/tickets/ticket_{ticket_id}/{file_name}"
     
+    # ✅ ON SIGNE AUSSI CETTE URL POUR POUVOIR LA TÉLÉCHARGER
+    signed_url = make_signed_url(public_url)
+    
     log_user_action(user_name=current_user.get("sub", "UNKNOWN"), action_type=action_type, target_id=ticket_id, details=details, ip_address=client_ip)
     
     # We return a redirect URL for the frontend instead of a local path
-    return {"file_path": public_url, "file_name": file_name}, 200
+    return {"file_path": signed_url, "file_name": file_name}, 200
 
 
 def close_ticket(issue_id, request_json, current_user, client_ip):
