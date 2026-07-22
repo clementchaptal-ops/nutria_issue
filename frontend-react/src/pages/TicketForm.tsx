@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import FileUploader from '../components/FileUploader'
+import toast from 'react-hot-toast' // ✅ IMPORT DE TOAST
 import styles from './TicketForm.module.css'
 
 const getDecodedToken = () => {
@@ -13,6 +14,32 @@ const getDecodedToken = () => {
     return null;
   }
 };
+
+// ✅ FONCTION UTILITAIRE POUR LES CONFIRMATIONS ÉLÉGANTES
+const showConfirmToast = (message: string, onConfirm: () => void) => {
+  toast((t) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <span style={{ fontSize: '14px', fontWeight: 500 }}>{message}</span>
+      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        <button
+          onClick={() => toast.dismiss(t.id)}
+          style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid #ccc', background: '#fff', cursor: 'pointer', fontSize: '12px' }}
+        >
+          Non, annuler
+        </button>
+        <button
+          onClick={() => {
+            toast.dismiss(t.id)
+            onConfirm()
+          }}
+          style={{ padding: '4px 10px', borderRadius: '4px', border: 'none', background: '#de350b', color: '#fff', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}
+        >
+          Oui, confirmer
+        </button>
+      </div>
+    </div>
+  ), { duration: 6000 })
+}
 
 function TicketForm() {
   const { t } = useTranslation()
@@ -33,7 +60,6 @@ function TicketForm() {
   const [isEditing, setIsEditing] = useState(false) 
   const [canEdit, setCanEdit] = useState(false)
   
-  // ✅ ÉTAT POUR L'ANTI-SPAM
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [title, setTitle] = useState('')
@@ -56,31 +82,15 @@ function TicketForm() {
   const [lightboxMedia, setLightboxMedia] = useState<{url: string, type: string} | null>(null)
   
   const [userInfo, setUserInfo] = useState({
-    user_name: '',
-    full_name: '', 
-    user_email: '',
-    created_on: '',
-    current_role: '', 
-    lab: '',
-    location: ''
+    user_name: '', full_name: '', user_email: '', created_on: '', current_role: '', lab: '', location: ''
   })
 
   const [currentContext, setCurrentContext] = useState({
-    current_project: '',
-    current_batch: '',
-    current_sample: '',
-    current_analysis: '',
-    current_analysis_variation: '',
-    current_customer: '',
-    citrix_session: ''
+    current_project: '', current_batch: '', current_sample: '', current_analysis: '', current_analysis_variation: '', current_customer: '', citrix_session: ''
   })
 
   const [networkInfo, setNetworkInfo] = useState({
-    ip_adress: '',
-    ip_config: '',
-    workstation: '',
-    current_pc: '',
-    ping: '',
+    ip_adress: '', ip_config: '', workstation: '', current_pc: '', ping: '',
   })
 
   const workingDirUrl = `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/download/working_dir`
@@ -94,14 +104,9 @@ function TicketForm() {
       })
       if (response.ok) {
         const data = await response.json()
-        
-        if (Array.isArray(data)) {
-          setComments(data)
-        } else if (data && Array.isArray(data.comments)) {
-          setComments(data.comments)
-        } else {
-          setComments([]) 
-        }
+        if (Array.isArray(data)) setComments(data)
+        else if (data && Array.isArray(data.comments)) setComments(data.comments)
+        else setComments([]) 
       }
     } catch (error) {
       console.error("Error loading comments:", error)
@@ -110,9 +115,7 @@ function TicketForm() {
   }
 
   useEffect(() => {
-    if (ticketId && !isNewTicket) {
-      fetchComments()
-    }
+    if (ticketId && !isNewTicket) fetchComments()
   }, [ticketId, isNewTicket])
 
   useEffect(() => {
@@ -168,14 +171,12 @@ function TicketForm() {
 
       try {
         const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`
-          }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
         })
         
         if (!response.ok) {
           if (response.status === 404 || response.status === 403) {
-            alert(t('ticket.not_found', 'Ticket not found or access denied.'))
+            toast.error(t('ticket.not_found', 'Ticket not found or access denied.'))
             navigate('/dashboard', { replace: true })
             return
           }
@@ -194,9 +195,7 @@ function TicketForm() {
         setBlockingIssue(data.blocking_issue || 'F')
         setDescription(data.description || '')
 
-        if (data.attachments) {
-          setExistingFiles(data.attachments)
-        }
+        if (data.attachments) setExistingFiles(data.attachments)
 
         const fromWeb = !data.workstation && !data.ip_adress
         setIsCreatedFromWeb(fromWeb)
@@ -264,9 +263,7 @@ function TicketForm() {
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
       })
-      if (!response.ok) {
-        throw new Error('Changement ou lecture du fichier impossible')
-      }
+      if (!response.ok) throw new Error('Changement ou lecture du fichier impossible')
 
       const disposition = response.headers.get('content-disposition')
       let filename = defaultFilename
@@ -287,7 +284,7 @@ function TicketForm() {
       window.URL.revokeObjectURL(blobUrl)
     } catch (error) {
       console.error("Download error:", error)
-      alert(t('ticket.download_error', 'Failed to download file. Please check if backend is running.'))
+      toast.error(t('ticket.download_error', 'Failed to download file.')) // ✅ Remplacé
     }
   }
 
@@ -300,18 +297,10 @@ function TicketForm() {
     setIsSubmitting(true)
 
     const payloadData = {
-      title: title,
-      issue_type: issueType,
-      criticity: criticity,
-      frequency: frequency,
-      blocking_issue: blockingIssue,
-      description: description,
-      sspticket: sspTicket,
-      current_project: currentContext.current_project,
-      current_batch: currentContext.current_batch,
+      title, issue_type: issueType, criticity, frequency, blocking_issue: blockingIssue, description, sspticket: sspTicket,
+      current_project: currentContext.current_project, current_batch: currentContext.current_batch,
       current_sample: currentContext.current_sample ? Number(currentContext.current_sample) : null,
-      current_analysis: currentContext.current_analysis,
-      current_analysis_variation: currentContext.current_analysis_variation,
+      current_analysis: currentContext.current_analysis, current_analysis_variation: currentContext.current_analysis_variation,
       current_customer: currentContext.current_customer
     }
 
@@ -324,10 +313,7 @@ function TicketForm() {
 
       const response = await fetch(url, {
         method: httpMethod,
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`,
-          'Content-Type': 'application/json' 
-        },
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payloadData)
       })
 
@@ -337,21 +323,17 @@ function TicketForm() {
 
         if (attachments.length > 0 && targetTicketId) {
           const formData = new FormData()
-          attachments.forEach((file) => {
-            formData.append('file', file)
-          })
+          attachments.forEach((file) => formData.append('file', file))
 
           const attachmentsResponse = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${targetTicketId}/attachments`, {
             method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`
-            },
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` },
             body: formData
           })
 
           if (!attachmentsResponse.ok) {
-            console.error("Failed to upload attachments onto server storage.")
-            alert("Text saved, but files could not be uploaded.")
+            console.error("Failed to upload attachments.")
+            toast.error("Text saved, but files could not be uploaded.") // ✅ Remplacé
           }
         }
 
@@ -362,29 +344,25 @@ function TicketForm() {
         const successMsg = isNewTicket 
           ? t('ticket.success_msg_create', 'Ticket successfully created!') 
           : t('ticket.success_msg_update', 'Ticket successfully updated!')
-        alert(successMsg)
         
-        if (isNewTicket) {
-          navigate('/dashboard')
-        } else {
-          window.location.reload()
-        }
+        toast.success(successMsg) // ✅ Remplacé
+        
+        if (isNewTicket) navigate('/dashboard')
+        else window.location.reload()
       } else {
         const errorData = await response.json()
-        alert(`Error : ${errorData.detail}`)
+        toast.error(`Error : ${errorData.detail}`) // ✅ Remplacé
       }
     } catch (error) {
       console.error("Error updating ticket or uploading files:", error)
+      toast.error("Une erreur s'est produite lors de l'envoi.")
     } finally {
       setIsSubmitting(false) 
     }
   }
 
-  const handleCancelTicket = async () => {
-    if (!window.confirm(t('ticket.confirm_cancel', 'Are you sure you want to cancel this ticket? This action cannot be undone.'))) {
-      return;
-    }
-
+  // ✅ Logique extraite pour être appelée par le toast
+  const executeCancelTicket = async () => {
     try {
       const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/cancel`, {
         method: 'PUT',
@@ -395,32 +373,27 @@ function TicketForm() {
         setStatus('CANCELED')
         setIsEditing(false)
         setCanEdit(false) 
-        alert(t('ticket.cancel_success', 'Ticket successfully canceled.'))
+        toast.success(t('ticket.cancel_success', 'Ticket successfully canceled.')) // ✅ Remplacé
       } else {
         const errorData = await response.json()
-        alert(`Error : ${errorData.detail}`)
+        toast.error(`Error : ${errorData.detail}`) // ✅ Remplacé
       }
     } catch (error) {
       console.error("Error canceling ticket:", error)
+      toast.error("Network error while canceling ticket.")
     }
   }
 
-  const handleCloseTicket = async (targetStatus: 'RESOLVED' | 'CLOSED') => {
-    const confirmMessage = targetStatus === 'RESOLVED' 
-      ? t('ticket.confirm_resolve', 'Are you sure you want to resolve this ticket?')
-      : t('ticket.confirm_close', 'Are you sure you want to close this ticket?');
-    
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
+  const handleCancelTicket = () => {
+    showConfirmToast(t('ticket.confirm_cancel', 'Are you sure you want to cancel this ticket? This action cannot be undone.'), executeCancelTicket)
+  }
 
+  // ✅ Logique extraite pour être appelée par le toast
+  const executeCloseTicket = async (targetStatus: 'RESOLVED' | 'CLOSED') => {
     try {
       const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/close`, {
         method: 'PUT',
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ new_status: targetStatus })
       });
 
@@ -432,42 +405,53 @@ function TicketForm() {
         const successMessage = targetStatus === 'RESOLVED'
           ? t('ticket.resolve_success', 'Ticket successfully resolved.')
           : t('ticket.close_success', 'Ticket successfully closed.')
-        alert(successMessage)
+        toast.success(successMessage) // ✅ Remplacé
       } else {
         const errorData = await response.json()
-        alert(`Error : ${errorData.detail}`)
+        toast.error(`Error : ${errorData.detail}`) // ✅ Remplacé
       }
     } catch (error) {
       console.error(`Error changing ticket to ${targetStatus}:`, error)
+      toast.error(`Network error while changing status to ${targetStatus}.`)
     }
   }
 
-  const handleDeleteAttachment = async (filename: string) => {
-    if (!window.confirm("Are you sure you want to delete this file?")) return;
+  const handleCloseTicket = (targetStatus: 'RESOLVED' | 'CLOSED') => {
+    const confirmMessage = targetStatus === 'RESOLVED' 
+      ? t('ticket.confirm_resolve', 'Are you sure you want to resolve this ticket?')
+      : t('ticket.confirm_close', 'Are you sure you want to close this ticket?');
+    
+    showConfirmToast(confirmMessage, () => executeCloseTicket(targetStatus))
+  }
 
+  // ✅ Logique extraite pour être appelée par le toast
+  const executeDeleteAttachment = async (filename: string) => {
     try {
       const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/attachments/${filename}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`
-        }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
       });
 
       if (response.ok) {
         setExistingFiles(prev => prev.filter(f => f.attachment_name !== filename));
+        toast.success("File deleted successfully."); // ✅ Petit bonus d'expérience utilisateur
       } else {
         const err = await response.json();
-        alert(`Error: ${err.detail}`);
+        toast.error(`Error: ${err.detail}`); // ✅ Remplacé
       }
     } catch (error) {
       console.error("Error deleting file:", error);
+      toast.error("Network error while deleting file.");
     }
+  }
+
+  const handleDeleteAttachment = (filename: string) => {
+    showConfirmToast("Are you sure you want to delete this file?", () => executeDeleteAttachment(filename))
   };
 
   const handleCancelEdit = () => {
-    if (isNewTicket) {
-      navigate('/dashboard');
-    } else {
+    if (isNewTicket) navigate('/dashboard');
+    else {
       setIsEditing(false);
       window.location.reload();
     }
@@ -507,10 +491,11 @@ function TicketForm() {
         fetchComments()   
       } else {
         const err = await response.json()
-        alert(`Error: ${err.detail}`)
+        toast.error(`Error: ${err.detail}`) // ✅ Remplacé
       }
     } catch (error) {
       console.error("Error posting comment:", error)
+      toast.error("Network error while posting comment.")
     } finally {
       setIsPostingComment(false)
     }

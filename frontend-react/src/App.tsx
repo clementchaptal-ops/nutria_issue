@@ -9,7 +9,9 @@ import { Toaster } from 'react-hot-toast';
 
 function App() {
   return (
+    
     <BrowserRouter>
+      <Toaster position="top-right" reverseOrder={false} />
       <Routes>
         
         {/* Route publique pour la connexion (sans menu ni layout global) */}
