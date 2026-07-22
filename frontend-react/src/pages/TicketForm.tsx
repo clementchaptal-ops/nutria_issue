@@ -497,6 +497,11 @@ function TicketForm() {
       setComments([]) // Sécurité en cas d'erreur réseau
     }
   }
+  useEffect(() => {
+    if (ticketId && !isNewTicket) {
+      fetchComments()
+    }
+  }, [ticketId, isNewTicket])
 
   // 📤 Fonction pour envoyer un commentaire
   const handlePostComment = async () => {
