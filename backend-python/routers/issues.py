@@ -185,7 +185,7 @@ def get_issue(issue_id, current_user):
         attachments_qry = """
             SELECT id_attachment, attachment_name, attachment_type, url_path
             FROM c_issue_attachment
-            WHERE id_issue = %s AND REMOVED = 'F' AND id_comment IS NULL
+            WHERE id_issue = %s AND REMOVED = 'false' AND id_comment IS NULL
         """
         cursor.execute(attachments_qry, (issue_id,))
         attach_cols = [col[0].lower() for col in cursor.description]
@@ -244,7 +244,7 @@ def get_issue_comments(issue_id, current_user):
             attach_qry = """
                 SELECT id_comment, attachment_name, attachment_type, url_path
                 FROM c_issue_attachment
-                WHERE id_issue = %s AND id_comment IS NOT NULL AND removed = 'F'
+                WHERE id_issue = %s AND id_comment IS NOT NULL AND removed = 'false'
             """
             cursor.execute(attach_qry, (issue_id,))
             for att_row in cursor.fetchall():
@@ -486,7 +486,7 @@ def download_file_path(ticket_id, file_type, current_user, client_ip):
     log_user_action(user_name=current_user.get("sub", "UNKNOWN"), action_type=action_type, target_id=ticket_id, details=details, ip_address=client_ip)
     
     # We return a redirect URL for the frontend instead of a local path
-    return {"public_url": public_url, "file_name": file_name}, 200
+    return {"file_path": public_url, "file_name": file_name}, 200
 
 
 def close_ticket(issue_id, request_json, current_user, client_ip):
