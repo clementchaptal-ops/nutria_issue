@@ -483,10 +483,18 @@ function TicketForm() {
       })
       if (response.ok) {
         const data = await response.json()
-        setComments(data)
+        
+        if (Array.isArray(data)) {
+          setComments(data)
+        } else if (data && Array.isArray(data.comments)) {
+          setComments(data.comments)
+        } else {
+          setComments([]) // Si c'est un format inattendu, on met un tableau vide
+        }
       }
     } catch (error) {
       console.error("Error loading comments:", error)
+      setComments([]) // Sécurité en cas d'erreur réseau
     }
   }
 
