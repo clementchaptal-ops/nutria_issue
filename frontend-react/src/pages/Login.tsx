@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useState, useEffect } from 'react'
-import ErrorMessage from '../components/ErrorMessage'
+import toast from 'react-hot-toast' // ✅ IMPORT DE TOAST
 import styles from './Login.module.css'
 
 interface LimsProfile {
@@ -14,7 +14,6 @@ function Login() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation() 
-  const [authError, setAuthError] = useState<string | null>(null)
 
   const [profiles, setProfiles] = useState<LimsProfile[]>([])
   const [googleToken, setGoogleToken] = useState<string | null>(null)
@@ -64,29 +63,30 @@ function Login() {
         location: data.location  
       }))
       
+      // ✅ Petit message de bienvenue optionnel (tu peux l'enlever si tu veux que ce soit transparent)
+      toast.success(t('login.success', `Bienvenue ${data.full_name || data.user_name} !`))
+      
       navigate(from, { replace: true })
       
     } catch (err: any) {
       if (selectedProfile) {
         loginToServer(token, undefined)
       } else {
-        setAuthError(err.message || t('login.error.server_fail', 'Unable to connect to the Nutria server.'))
+        // ✅ ON UTILISE TOAST ICI AU LIEU DE SETAUTHERROR
+        toast.error(err.message || t('login.error.server_fail', 'Unable to connect to the Nutria server.'))
       }
     }
   }
 
   // --- LE COEUR DE LA SOLUTION : RÉCUPÉRATION DU JETON SANS POP-UP ---
   useEffect(() => {
-    // On regarde si Google nous a renvoyé sur le site avec le jeton dans l'URL
     const hash = window.location.hash;
     if (hash.includes('id_token=')) {
       const params = new URLSearchParams(hash.replace('#', '?'));
       const idToken = params.get('id_token');
       
       if (idToken) {
-        // On efface immédiatement le jeton de l'URL pour que ce soit propre
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
-        // On envoie le jeton au backend Python (exactement le format attendu)
         loginToServer(idToken, preselectedProfile);
       }
     }
@@ -94,8 +94,7 @@ function Login() {
 
   // --- REDIRECTION VERS GOOGLE ---
   const handleGoogleRedirect = () => {
-    const REDIRECT_URI = window.location.origin + window.location.pathname; // ex: https://nutria.../login
-    // On force une redirection classique de toute la page
+    const REDIRECT_URI = window.location.origin + window.location.pathname;
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=id_token&scope=email profile openid&nonce=nutria123&prompt=select_account`;
     window.location.href = authUrl;
   }
@@ -120,7 +119,8 @@ function Login() {
             <span className={styles.subtitle}>{t('login.subtitle', 'NUTRIA ISSUE REPORT')}</span>
           </div>
           <div className={styles.divider}></div>
-          <ErrorMessage message={authError} />
+          
+          {/* ❌ L'ANCIEN <ErrorMessage message={authError} /> A ÉTÉ SUPPRIMÉ ! */}
 
           {requireSelection ? (
             <div className={styles.profileSelectionContainer}>

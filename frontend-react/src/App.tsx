@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import ProtectedRoute from './components/ProtectedRoute' 
 import AuditLogs from './pages/AuditLogs'
+import { Toaster } from 'react-hot-toast';
 
 function App() {
   return (

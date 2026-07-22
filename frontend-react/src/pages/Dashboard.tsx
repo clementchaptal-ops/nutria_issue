@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import ErrorMessage from '../components/ErrorMessage'
+import toast from 'react-hot-toast' // ✅ IMPORT DE TOAST
 import { fetchAllIssues } from '../api/issues'
 import styles from './Dashboard.module.css'
 
@@ -18,7 +18,6 @@ function Dashboard() {
 
   const [tickets, setTickets] = useState<any[]>([])
   const [loading, setLoading] = useState<boolean>(true)
-  const [error, setError] = useState<string | null>(null)
 
   const searchQuery = searchParams.get('search') || ''
   const searchColumn = searchParams.get('column') || 'ALL'
@@ -58,13 +57,12 @@ function Dashboard() {
   useEffect(() => {
     fetchAllIssues()
       .then((response) => {
-        // ✅ CORRECTION ICI : On extrait la clé 'data' renvoyée par GCP
         const listeTickets = response.data || [];
         setTickets(listeTickets);
         setLoading(false);
       })
       .catch((err) => {
-        setError(err.message);
+        toast.error(`Erreur réseau : ${err.message}`); // ✅ TOAST D'ERREUR ICI AU LIEU DE <ErrorMessage />
         setLoading(false);
       })
   }, [])
@@ -124,7 +122,6 @@ function Dashboard() {
     return 0
   })
 
-  // 🚨 CORRECTION URL ICI
   const handleRowClick = (id: number) => {
     navigate(`/?id=${id}`) 
   }
@@ -238,7 +235,6 @@ function Dashboard() {
           </label>
         </div>
 
-        {/* 🚨 CORRECTION URL ICI */}
         <button 
           className={styles.createBtn}
           onClick={() => navigate('/?new=true')}
@@ -247,9 +243,9 @@ function Dashboard() {
         </button>
       </div>
 
-      <ErrorMessage message={error} />
+      {/* ✅ PLUS BESOIN DE <ErrorMessage message={error} /> grâce aux toasts */}
 
-      {filteredTickets.length === 0 && !error ? (
+      {filteredTickets.length === 0 ? (
         <div className={styles.emptyState}>
           <h3>{t('dashboard.empty_state', 'No matching tickets found')}</h3>
         </div>

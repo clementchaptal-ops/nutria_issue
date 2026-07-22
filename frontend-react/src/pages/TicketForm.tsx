@@ -454,10 +454,7 @@ function TicketForm() {
       });
 
       if (response.ok) {
-        setExistingFiles(prev => prev.filter(f => {
-          const fName = f.url_path ? f.url_path.split(/[/\\]/).pop() : f.attachment_name;
-          return fName !== filename;
-        }));
+        setExistingFiles(prev => prev.filter(f => f.attachment_name !== filename));
       } else {
         const err = await response.json();
         alert(`Error: ${err.detail}`);
