@@ -11,7 +11,6 @@ from pydantic import ValidationError
 # Local file imports
 from .schemas import TicketCreate, TicketUpdate, StatusUpdate
 from .audit import log_user_action
-from .reports import generate_ai_analysis
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 
 def make_signed_url(public_url: str) -> str:
@@ -585,6 +584,7 @@ def trigger_ai_analysis(issue_id, current_user, client_ip):
     Triggers the AI analysis for a specific ticket.
     Generates JSON and PDF reports and returns the download links.
     """
+    from .reports import generate_ai_analysis
     # Call the logic isolated in reports.py
     result, status_code = generate_ai_analysis(issue_id, current_user, client_ip)
     
