@@ -35,6 +35,31 @@
     "subtitle": "Twoje zgłoszenie zostało przekazane do pomocy technicznej.",
     "close": "Możesz teraz zamknąć to okno."
   },
+  "common": {
+    "na": "Nie dotyczy",
+    "unknown": "Nieznany",
+    "select": "Wybierać",
+    "no": "NIE",
+    "yes": "Tak",
+    "loading": "Ładowanie danych biletu..."
+  },
+  "layout": {
+    "default_user": "Użytkownik",
+    "go_to_dashboard": "Przejdź do Panelu",
+    "dashboard_btn": "Panel",
+    "logout_btn": "Wyloguj się"
+  },
+  "login": {
+    "subtitle": "RAPORT NR NUTRIA",
+    "choose_profile": "Wykryto wiele profili LIMS. Proszę wybrać jeden:",
+    "back": "Z powrotem",
+    "instructions": "Aby uzyskać dostęp do platformy, zaloguj się na swoje konto Mérieux NutriSciences.",
+    "error": {
+      "auth_denied": "Odmowa uwierzytelnienia",
+      "server_fail": "Nie można połączyć się z serwerem Nutria.",
+      "google_fail": "Uwierzytelnienie Google nie powiodło się."
+    }
+  },
   "dashboard": {
     "loading": "Ładowanie danych panelu...",
     "title": "Panel biletów",
@@ -70,25 +95,6 @@
       "date": "Data"
     }
   },
-  "login": {
-    "subtitle": "RAPORT NR NUTRIA",
-    "choose_profile": "Wykryto wiele profili LIMS. Proszę wybrać jeden:",
-    "back": "Z powrotem",
-    "instructions": "Aby uzyskać dostęp do platformy, zaloguj się na swoje konto Mérieux NutriSciences.",
-    "error": {
-      "auth_denied": "Odmowa uwierzytelnienia",
-      "server_fail": "Nie można połączyć się z serwerem Nutria.",
-      "google_fail": "Uwierzytelnienie Google nie powiodło się."
-    }
-  },
-  "common": {
-    "na": "Nie dotyczy",
-    "unknown": "Nieznany",
-    "select": "Wybierać",
-    "no": "NIE",
-    "yes": "Tak",
-    "loading": "Ładowanie danych biletu..."
-  },
   "ticket": {
     "not_found": "Nie znaleziono biletu lub odmowa dostępu.",
     "download_error": "Nie udało się pobrać pliku. Sprawdź, czy backend działa.",
@@ -119,7 +125,8 @@
     "download_workdir": "Katalog roboczy",
     "download_logs": "Dzienniki systemowe",
     "submit_create": "Utwórz bilet",
-    "submit_update": "Prześlij i zaktualizuj bilet"
+    "submit_update": "Prześlij i zaktualizuj bilet",
+    "download_video": "Kliknij tutaj, aby pobrać wideo"
   },
   "sidebar": {
     "user_title": "Informacje o użytkowniku",
@@ -151,10 +158,16 @@
       "show_ping": "Pokaż wyniki testu Ping 8.8.8.8"
     }
   },
-  "layout": {
-    "default_user": "Użytkownik",
-    "go_to_dashboard": "Przejdź do Panelu",
-    "dashboard_btn": "Panel",
-    "logout_btn": "Wyloguj się"
+  "audit": {
+    "title": "🛡️ Ścieżka audytu (administrator)",
+    "table": {
+      "date": "Data",
+      "user": "Użytkownik",
+      "action": "Działanie",
+      "ticket_id": "Identyfikator biletu",
+      "details": "Bliższe dane",
+      "ip": "Adres IP"
+    },
+    "empty": "Nie znaleziono logów."
   }
 }

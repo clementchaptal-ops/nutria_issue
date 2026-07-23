@@ -35,6 +35,31 @@
     "subtitle": "Seu ticket foi encaminhado ao suporte técnico.",
     "close": "Agora você pode fechar esta janela."
   },
+  "common": {
+    "na": "N / D",
+    "unknown": "Desconhecido",
+    "select": "Selecione",
+    "no": "Não",
+    "yes": "Sim",
+    "loading": "Carregando dados do ticket..."
+  },
+  "layout": {
+    "default_user": "Usuário",
+    "go_to_dashboard": "Vá para o painel",
+    "dashboard_btn": "Painel",
+    "logout_btn": "Sair"
+  },
+  "login": {
+    "subtitle": "RELATÓRIO DE EDIÇÃO DA NUTRIA",
+    "choose_profile": "Vários perfis LIMS detectados. Por favor escolha um:",
+    "back": "Voltar",
+    "instructions": "Faça login com sua conta Mérieux NutriSciences para acessar a plataforma.",
+    "error": {
+      "auth_denied": "Autenticação negada",
+      "server_fail": "Não foi possível conectar-se ao servidor Nutria.",
+      "google_fail": "A autenticação do Google falhou."
+    }
+  },
   "dashboard": {
     "loading": "Carregando dados do painel...",
     "title": "Painel de ingressos",
@@ -70,25 +95,6 @@
       "date": "Data"
     }
   },
-  "login": {
-    "subtitle": "RELATÓRIO DE EDIÇÃO DA NUTRIA",
-    "choose_profile": "Vários perfis LIMS detectados. Por favor escolha um:",
-    "back": "Voltar",
-    "instructions": "Faça login com sua conta Mérieux NutriSciences para acessar a plataforma.",
-    "error": {
-      "auth_denied": "Autenticação negada",
-      "server_fail": "Não foi possível conectar-se ao servidor Nutria.",
-      "google_fail": "A autenticação do Google falhou."
-    }
-  },
-  "common": {
-    "na": "N / D",
-    "unknown": "Desconhecido",
-    "select": "Selecione",
-    "no": "Não",
-    "yes": "Sim",
-    "loading": "Carregando dados do ticket..."
-  },
   "ticket": {
     "not_found": "Ticket não encontrado ou acesso negado.",
     "download_error": "Falha ao baixar o arquivo. Verifique se o back-end está em execução.",
@@ -119,7 +125,8 @@
     "download_workdir": "Diretório de trabalho",
     "download_logs": "Registros do sistema",
     "submit_create": "Criar ingresso",
-    "submit_update": "Enviar e atualizar ticket"
+    "submit_update": "Enviar e atualizar ticket",
+    "download_video": "Clique aqui para baixar o vídeo"
   },
   "sidebar": {
     "user_title": "Informações do usuário",
@@ -151,10 +158,16 @@
       "show_ping": "Mostrar resultados do Ping 8.8.8.8"
     }
   },
-  "layout": {
-    "default_user": "Usuário",
-    "go_to_dashboard": "Vá para o painel",
-    "dashboard_btn": "Painel",
-    "logout_btn": "Sair"
+  "audit": {
+    "title": "🛡️ Trilha de auditoria (Administrador)",
+    "table": {
+      "date": "Data",
+      "user": "Usuário",
+      "action": "Ação",
+      "ticket_id": "ID do bilhete",
+      "details": "Detalhes",
+      "ip": "Endereço IP"
+    },
+    "empty": "Nenhum registro encontrado."
   }
 }

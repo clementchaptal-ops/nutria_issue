@@ -9,28 +9,27 @@ import { Toaster } from 'react-hot-toast';
 
 function App() {
   return (
-    
     <BrowserRouter>
       <Toaster position="top-right" reverseOrder={false} />
       <Routes>
         
-        {/* Route publique pour la connexion (sans menu ni layout global) */}
+        {/* Public route for login (without menu or global layout) */}
         <Route path="/login" element={<Login />} />
 
-        {/* LE MUR DE SÉCURITÉ : TOUT CE QUI EST EN DESSOUS EST PROTÉGÉ */}
+        {/* SECURITY WALL: EVERYTHING BELOW IS PROTECTED */}
         <Route element={<ProtectedRoute />}>
           
-          {/* L'interface principale (MainLayout) enveloppe nos pages protégées */}
+          {/* Main interface (MainLayout) wraps our protected pages */}
           <Route path="/" element={<MainLayout />}>
             
-            {/* Les pages intérieures de l'application */}
+            {/* Inner application pages */}
             <Route index element={<TicketForm />} />
             <Route path="dashboard" element={<Dashboard />} />
             
-            {/* 🚨 LA NOUVELLE ROUTE AUDIT EST ICI 🚨 */}
+            {/* Audit logs route */}
             <Route path="audit" element={<AuditLogs />} />
             
-            {/* Redirection de secours : si l'URL tapée n'existe pas, on renvoie à l'accueil */}
+            {/* Fallback redirection: if the URL doesn't exist, redirect to home */}
             <Route path="*" element={<Navigate to="/" replace />} />
             
           </Route>

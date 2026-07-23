@@ -35,6 +35,31 @@
     "subtitle": "Su ticket ha sido enviado al soporte técnico.",
     "close": "Ahora puedes cerrar esta ventana."
   },
+  "common": {
+    "na": "N / A",
+    "unknown": "Desconocido",
+    "select": "Seleccionar",
+    "no": "No",
+    "yes": "Sí",
+    "loading": "Cargando datos del billete..."
+  },
+  "layout": {
+    "default_user": "Usuario",
+    "go_to_dashboard": "Ir al panel",
+    "dashboard_btn": "Panel",
+    "logout_btn": "Cerrar sesión"
+  },
+  "login": {
+    "subtitle": "INFORME DE EDICIÓN DE NUTRIA",
+    "choose_profile": "Se detectaron múltiples perfiles LIMS. Por favor elige uno:",
+    "back": "Atrás",
+    "instructions": "Inicie sesión con su cuenta de Mérieux NutriSciences para acceder a la plataforma.",
+    "error": {
+      "auth_denied": "Autenticación denegada",
+      "server_fail": "No se puede conectar con el servidor Nutria.",
+      "google_fail": "La autenticación de Google falló."
+    }
+  },
   "dashboard": {
     "loading": "Cargando datos del panel...",
     "title": "Panel de Entradas",
@@ -70,25 +95,6 @@
       "date": "Fecha"
     }
   },
-  "login": {
-    "subtitle": "INFORME DE EDICIÓN DE NUTRIA",
-    "choose_profile": "Se detectaron múltiples perfiles LIMS. Por favor elige uno:",
-    "back": "Atrás",
-    "instructions": "Inicie sesión con su cuenta de Mérieux NutriSciences para acceder a la plataforma.",
-    "error": {
-      "auth_denied": "Autenticación denegada",
-      "server_fail": "No se puede conectar con el servidor Nutria.",
-      "google_fail": "La autenticación de Google falló."
-    }
-  },
-  "common": {
-    "na": "N / A",
-    "unknown": "Desconocido",
-    "select": "Seleccionar",
-    "no": "No",
-    "yes": "Sí",
-    "loading": "Cargando datos del billete..."
-  },
   "ticket": {
     "not_found": "Boleto no encontrado o acceso denegado.",
     "download_error": "No se pudo descargar el archivo. Verifique si el backend se está ejecutando.",
@@ -119,7 +125,8 @@
     "download_workdir": "Directorio de trabajo",
     "download_logs": "Registros del sistema",
     "submit_create": "Crear billete",
-    "submit_update": "Enviar y actualizar ticket"
+    "submit_update": "Enviar y actualizar ticket",
+    "download_video": "Haga clic aquí para descargar el vídeo"
   },
   "sidebar": {
     "user_title": "Información del usuario",
@@ -151,10 +158,16 @@
       "show_ping": "Mostrar resultados de Ping 8.8.8.8"
     }
   },
-  "layout": {
-    "default_user": "Usuario",
-    "go_to_dashboard": "Ir al panel",
-    "dashboard_btn": "Panel",
-    "logout_btn": "Cerrar sesión"
+  "audit": {
+    "title": "🛡️ Pista de auditoría (administrador)",
+    "table": {
+      "date": "Fecha",
+      "user": "Usuario",
+      "action": "Acción",
+      "ticket_id": "ID del billete",
+      "details": "Detalles",
+      "ip": "Dirección IP"
+    },
+    "empty": "No se encontraron registros."
   }
 }

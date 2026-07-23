@@ -169,5 +169,15 @@
       "ip": "IP Address"
     },
     "empty": "No logs found."
+  },
+  "ai": {
+    "title": "AI Analysis",
+    "generate_btn": "Generate Analysis",
+    "download_pdf": "Download PDF Report",
+    "category": "Category:",
+    "confidence": "Confidence:",
+    "summary": "Summary",
+    "similar_tickets": "Similar Tickets:",
+    "no_analysis": "No AI analysis available yet for this ticket."
   }
 }
