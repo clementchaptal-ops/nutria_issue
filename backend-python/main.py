@@ -163,7 +163,12 @@ def nutria_api(request):
                 from routers.issues import download_file_path
                 data, http_code = download_file_path(int(parts[1]), parts[3], current_user, client_ip)
                 return jsonify(data), http_code, headers
-
+            
+            # POST /issues/cleanup 
+            elif path == "issues/cleanup" and request.method == "POST":
+                from routers.issues import cleanup_pretickets
+                data, http_code = cleanup_pretickets()
+                return jsonify(data), http_code, headers
             else:
                 return jsonify({"error": f"Unhandled sub-route: {path}"}), 404, headers
 

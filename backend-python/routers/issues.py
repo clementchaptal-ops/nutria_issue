@@ -602,3 +602,38 @@ def trigger_ai_analysis(issue_id, current_user, client_ip):
         )
     
     return result, status_code
+
+def cleanup_pretickets():
+    """
+    Deletes tickets with 'PRETICKET' status that are older than 1 hour.
+    Intended to be triggered automatically by Google Cloud Scheduler.
+    """
+    connection = get_db_connection()
+    if not connection:
+        return {"error": "error.database_connection"}, 500
+        
+    try:
+        cursor = connection.cursor()
+        
+        # PostgreSQL syntax: CURRENT_TIMESTAMP - INTERVAL '1 hour'
+        qry = """
+            DELETE FROM c_issue 
+            WHERE status = 'PRETICKET' 
+            AND created_on < CURRENT_TIMESTAMP - INTERVAL '1 hour'
+        """
+        cursor.execute(qry)
+        deleted_count = cursor.rowcount
+        
+        connection.commit()
+        
+        return {
+            "message": "success.cleanup_completed", 
+            "deleted_tickets": deleted_count
+        }, 200
+        
+    except Exception as e:
+        connection.rollback()
+        return {"error": "error.database_query", "details": str(e)}, 500
+    finally:
+        cursor.close()
+        connection.close()
