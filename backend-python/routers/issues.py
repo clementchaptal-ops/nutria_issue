@@ -12,6 +12,8 @@ from pydantic import ValidationError
 from .schemas import TicketCreate, TicketUpdate, StatusUpdate
 from .audit import log_user_action
 
+from fastapi import APIRouter, HTTPException, Depends, Request
+from .reports import generate_ai_analysis
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 
 def make_signed_url(public_url: str) -> str:
@@ -578,3 +580,25 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
     finally:
         cursor.close()
         connection.close()
+
+
+def trigger_ai_analysis(issue_id, current_user, client_ip):
+    """
+    Triggers the AI analysis for a specific ticket.
+    Generates JSON and PDF reports and returns the download links.
+    """
+    # Call the logic isolated in reports.py
+    result, status_code = generate_ai_analysis(issue_id, current_user, client_ip)
+    
+    # Log the action if successful
+    username = current_user.get("sub", "UNKNOWN")
+    if status_code == 200:
+        log_user_action(
+            user_name=username, 
+            action_type="GENERATE_AI_ANALYSIS", 
+            target_id=str(issue_id), 
+            details="Generated AI Analysis report (JSON & PDF).", 
+            ip_address=client_ip
+        )
+    
+    return result, status_code

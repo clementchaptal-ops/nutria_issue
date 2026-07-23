@@ -1,126 +1,128 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
-from pydantic import BaseModel
 import os
 import json
-from google import genai
-from google.genai import types
+import tempfile
+import vertexai
+from vertexai.generative_models import GenerativeModel
+from fpdf import FPDF
+from google.cloud import storage
+
 from config.database import get_db_connection
-from .security import get_current_user
+# Adjust the import path below based on where you place this file
+from routers.issues import BUCKET_NAME, make_signed_url
 
-router = APIRouter(
-    prefix="/api/reports",
-    tags=["AI & Reports"]
-)
-
-# Schéma Pydantic pour la sauvegarde
-class ReportSave(BaseModel):
-    report_data: dict
-
-# =====================================================================
-# ✨ 1. GÉNÉRATION DU RAPPORT VIA GEMINI (À LA VOLÉE)
-# =====================================================================
-@router.get("/{issue_id}/generate")
-def generate_ai_report(issue_id: int, current_user: dict = Depends(get_current_user)):
-    """Interroge Gemini pour créer un pré-remplissage structuré en JSON basé sur le ticket."""
-    GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "TA_CLE_API_GEMINI_ICI")
-    
-    if not GEMINI_API_KEY or GEMINI_API_KEY == "TA_CLE_API_GEMINI_ICI":
-        raise HTTPException(status_code=500, detail="Gemini API Key is missing.")
-
+def generate_ai_analysis(issue_id: int, current_user: dict, client_ip: str) -> tuple:
+    """
+    Analyzes ticket logs and database context via Google Gemini (Vertex AI),
+    generates a JSON and a PDF report, and stores them securely in GCS.
+    """
     connection = get_db_connection()
     if not connection:
-        raise HTTPException(status_code=500, detail="Database connection error.")
-        
+        return {"error": "error.database_connection"}, 500
+
     try:
         cursor = connection.cursor()
         
-        # Collecte des données du ticket et du contexte LIMS
-        ticket_qry = """
-            SELECT title, issue_type, description, criticity, frequency,
-                   current_project, current_batch, current_sample, 
-                   current_analysis, current_analysis_variation, current_customer
+        # Fetch contextual data from Oracle
+        qry = """
+            SELECT title, issue_type, description, network_info, citrix_session, working_dir 
             FROM c_issue 
-            WHERE id_issue = :1
+            WHERE id_issue = %s
         """
-        cursor.execute(ticket_qry, [issue_id])
-        t_row = cursor.fetchone()
-        if not t_row:
-            raise HTTPException(status_code=404, detail="Ticket not found.")
-            
-        # Collecte de l'historique des commentaires
-        cursor.execute("""
-            SELECT user_name, comment_text 
-            FROM c_issue_comments 
-            WHERE id_issue = :1 
-            ORDER BY created_on ASC
-        """, [issue_id])
-        discussion = "\n".join([f"{r[0]}: {r[1]}" for r in cursor.fetchall()])
-            
-        # Injection des variables dans le prompt
-        context = f"""
-        TICKET DETAILS:
-        Title: {t_row[0]} | Type: {t_row[1]} | Criticity: {t_row[3]} | Frequency: {t_row[4]}
-        Description: {t_row[2]}
+        cursor.execute(qry, (issue_id,))
+        row = cursor.fetchone()
         
-        LIMS CONTEXT:
-        Project: {t_row[5]} | Batch: {t_row[6]} | Sample: {t_row[7]}
-        Analysis: {t_row[8]} | Variation: {t_row[9]} | Customer: {t_row[10]}
+        if not row:
+            return {"error": "error.issue_not_found"}, 404
+            
+        title, issue_type, description, network_info, citrix_session, working_dir = row
+
+        # Initialize Vertex AI
+        project_id = os.environ.get("GCP_PROJECT_ID", "your-gcp-project-id")
+        vertexai.init(project=project_id, location="europe-west1")
         
-        DISCUSSION HISTORY:
-        {discussion if discussion else 'Aucun message échangé.'}
+        # Using Gemini 1.5 Flash for fast and cost-effective text analysis
+        model = GenerativeModel("gemini-1.5-flash")
+
+        # The prompt forces Gemini to act as an IT expert and return a pure JSON string
+        prompt = f"""
+        You are an expert IT Support AI for a LIMS application called LabWare.
+        Analyze the following ticket data and provide a strict JSON response.
+        
+        Ticket Title: {title}
+        Reported Type: {issue_type}
+        Description: {description}
+        Citrix Session: {citrix_session}
+        Network Diagnostics: {network_info}
+        
+        Respond STRICTLY in valid JSON format with the following keys:
+        - "category": A short technical category (e.g., "NETWORK_TIMEOUT", "DB_LOCK", "CITRIX_CRASH").
+        - "confidence": A percentage (e.g., "95%").
+        - "summary": A clear, professional summary explaining the probable root cause.
+        - "similar_tickets": An array of random integer IDs (mock data for now, e.g., [102, 108]).
         """
 
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        system_instruction = """
-        Tu es un ingénieur support informatique expert de l'application LabWare LIMS. Ton rôle est d'analyser les données du ticket industriel fourni et de rédiger un rapport de diagnostic clair et concis.
-        Tu dois répondre UNIQUEMENT avec un objet JSON valide, sans aucun bloc de code Markdown autour (pas de ```json ... ```), en utilisant très exactement ces trois clés et rédigé en français :
-        {
-          "synthesis": "Résumé clair et pro du problème rencontré par l'utilisateur.",
-          "technical_analysis": "Analyse technique de la cause probable (liée au contexte LIMS ou à l'infrastructure s'il y a des indices).",
-          "action_plan": "Plan d'action précis avec les prochaines étapes de résolution."
-        }
-        """
+        response = model.generate_content(prompt)
         
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=context,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=0.2,
-                response_mime_type="application/json"
-            )
-        )
-        
-        # Nettoyage de sécurité
-        clean_json = response.text.replace("```json", "").replace("```", "").strip()
-        return json.loads(clean_json)
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Generation failed: {str(e)}")
-    finally:
-        cursor.close()
-        connection.close()
+        # Clean the response to ensure it is valid JSON 
+        raw_json = response.text.replace("```json", "").replace("```", "").strip()
+        ai_result = json.loads(raw_json)
 
-# =====================================================================
-# 💾 2. SAUVEGARDE DU RAPPORT MODIFIÉ EN BASE
-# =====================================================================
-@router.put("/{issue_id}")
-def save_diagnostic_report(issue_id: int, payload: ReportSave, current_user: dict = Depends(get_current_user)):
-    """Enregistre le JSON du rapport modifié par l'utilisateur dans le CLOB de la table c_issue."""
-    connection = get_db_connection()
-    if not connection:
-        raise HTTPException(status_code=500, detail="Database connection error.")
+        # Generate the PDF Report
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Helvetica", style="B", size=16)
+        pdf.cell(0, 10, txt=f"NUTRIA AI Analysis Report - Ticket #{issue_id}", ln=True, align='C')
         
-    try:
-        cursor = connection.cursor()
-        json_string = json.dumps(payload.report_data)
+        pdf.set_font("Helvetica", size=12)
+        pdf.ln(10)
+        pdf.cell(0, 10, txt=f"Category: {ai_result.get('category')} (Confidence: {ai_result.get('confidence')})", ln=True)
+        pdf.ln(5)
         
-        cursor.execute("UPDATE c_issue SET diagnostic_report = :1 WHERE id_issue = :2", [json_string, issue_id])
-        connection.commit()
-        return {"message": "Report successfully saved."}
+        pdf.set_font("Helvetica", style="B", size=12)
+        pdf.cell(0, 10, txt="Root Cause Summary:", ln=True)
+        pdf.set_font("Helvetica", size=11)
+        pdf.multi_cell(0, 8, txt=ai_result.get('summary'))
+        
+        # Use a temporary file to save the PDF before uploading to GCS
+        temp_pdf_fd, temp_pdf_path = tempfile.mkstemp(suffix=".pdf")
+        os.close(temp_pdf_fd)
+        pdf.output(temp_pdf_path)
+
+        # Upload JSON and PDF to Google Cloud Storage
+        client = storage.Client()
+        bucket = client.bucket(BUCKET_NAME)
+
+        # Upload JSON
+        json_blob_path = f"tickets/ticket_{issue_id}/ai/ai_analysis.json"
+        json_blob = bucket.blob(json_blob_path)
+        json_blob.upload_from_string(json.dumps(ai_result), content_type="application/json")
+
+        # Upload PDF
+        pdf_blob_path = f"tickets/ticket_{issue_id}/ai/ai_analysis.pdf"
+        pdf_blob = bucket.blob(pdf_blob_path)
+        pdf_blob.upload_from_filename(temp_pdf_path, content_type="application/pdf")
+
+        # Cleanup local temp file
+        os.remove(temp_pdf_path)
+
+        # Generate a signed URL for the newly created PDF
+        public_pdf_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{pdf_blob_path}"
+        signed_pdf_url = make_signed_url(public_pdf_url)
+        
+        # Add the signed URL into the response payload
+        ai_result["pdf_download_url"] = signed_pdf_url
+
+        return {
+            "message": "success.ai_analysis_generated",
+            "data": ai_result
+        }, 200
+
+    except json.JSONDecodeError:
+        return {"error": "error.invalid_json_format_from_ai"}, 500
     except Exception as e:
-        connection.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": "error.ai_generation_failed", "details": str(e)}, 500
     finally:
-        cursor.close()
-        connection.close()
+        if 'cursor' in locals():
+            cursor.close()
+        if 'connection' in locals():
+            connection.close()
