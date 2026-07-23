@@ -11,8 +11,6 @@ from pydantic import ValidationError
 # Local file imports
 from .schemas import TicketCreate, TicketUpdate, StatusUpdate
 from .audit import log_user_action
-
-from fastapi import APIRouter, HTTPException, Depends, Request
 from .reports import generate_ai_analysis
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 
