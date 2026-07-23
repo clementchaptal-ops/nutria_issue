@@ -16,7 +16,7 @@ def get_db_connection():
     try:
         # 1. Si on est déployé sur GCP (Cloud Run / Cloud Functions)
         if INSTANCE_CONNECTION_NAME or os.environ.get("K_SERVICE"):
-            conn_name = INSTANCE_CONNECTION_NAME or "nutria-issue:europe-west1:nutria-db" # Remplace si besoin
+            conn_name = INSTANCE_CONNECTION_NAME or "nutria-issue:europe-west1:nutria-issue-db"
             unix_socket = f"/cloudsql/{conn_name}"
             
             connection = psycopg2.connect(
