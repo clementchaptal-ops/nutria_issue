@@ -512,21 +512,36 @@ function TicketForm() {
     }
   }
 
-  // AI Mock Fetch Function
+  // Real AI Fetch Function
   const fetchAiAnalysis = async () => {
     setIsAiLoading(true)
     
-    // Simulate network delay for fetching the JSON from GCS Bucket
-    setTimeout(() => {
-      // Mocked JSON structure that Python will eventually generate
-      setAiAnalysis({
-        category: "NETWORK_TIMEOUT",
-        confidence: "95%",
-        summary: "The logs indicate a recurring timeout when trying to reach the Oracle database from this specific Citrix node. The IP config shows standard parameters, but the ping dropped 2 packets.",
-        similar_tickets: [102, 108, 145]
+    try {
+      const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/ai-analysis`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`,
+          'Content-Type': 'application/json'
+        }
       })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || t('ai.error.fetch_failed', 'Failed to generate AI analysis.'))
+      }
+
+      const result = await response.json()
+      
+      // result.data contains { category, confidence, summary, similar_tickets, pdf_download_url }
+      setAiAnalysis(result.data) 
+      
+      toast.success(t('ai.success', 'AI Analysis generated successfully!'))
+
+    } catch (error: any) {
+      toast.error(error.message)
+    } finally {
       setIsAiLoading(false)
-    }, 1500)
+    }
   }
   
   return (
@@ -871,7 +886,13 @@ function TicketForm() {
 
                     <button 
                       type="button"
-                      onClick={() => toast.success("PDF Download simulation")} 
+                      onClick={() => {
+                        if (aiAnalysis.pdf_download_url) {
+                          window.open(aiAnalysis.pdf_download_url, '_blank')
+                        } else {
+                          toast.error("PDF URL not found.")
+                        }
+                      }} 
                       style={{ width: '100%', background: '#ffffff', color: '#403294', border: '1px solid #6554c0', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                     >
                       📄 {t('ai.download_pdf', 'Download PDF Report')}
