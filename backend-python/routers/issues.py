@@ -632,6 +632,42 @@ def create_preticket(request_json, current_user, client_ip):
         cursor.close()
         connection.close()
 
+def update_issue_environment(issue_id, request_json):
+    """Updates only the contextual environment data of a preticket/ticket."""
+    connection = get_db_connection()
+    if not connection:
+        return {"error": "error.database_connection"}, 500
+        
+    try:
+        cursor = connection.cursor()
+        
+        project = request_json.get("current_project", "")
+        batch = request_json.get("current_batch", "")
+        analysis = request_json.get("current_analysis", "")
+        variation = request_json.get("current_analysis_variation", "")
+        customer = request_json.get("current_customer", "")
+        
+        # Sécurisation du champ Sample (PostgreSQL attend un numérique ou NULL)
+        sample_str = request_json.get("current_sample", "").strip()
+        sample = int(sample_str) if sample_str else None
+        
+        update_qry = """
+            UPDATE c_issue 
+            SET current_project = %s, current_batch = %s, current_sample = %s, 
+                current_analysis = %s, current_analysis_variation = %s, current_customer = %s
+            WHERE id_issue = %s
+        """
+        cursor.execute(update_qry, (project, batch, sample, analysis, variation, customer, issue_id))
+        connection.commit()
+        
+        return {"message": "success.environment_updated"}, 200
+    except Exception as e:
+        connection.rollback()
+        return {"error": "error.database_query", "details": str(e)}, 500
+    finally:
+        cursor.close()
+        connection.close()
+
 def trigger_ai_analysis(issue_id, current_user, client_ip):
     """
     Triggers the AI analysis for a specific ticket.

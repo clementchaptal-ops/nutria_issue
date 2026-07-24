@@ -199,8 +199,17 @@ def nutria_api(request):
                 from routers.issues import cleanup_pretickets
                 data, http_code = cleanup_pretickets()
                 return jsonify(data), http_code, headers
+            
+            # PUT /issues/{id}/environment
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "environment" and request.method == "PUT":
+                from routers.issues import update_issue_environment
+                request_json = request.get_json(silent=True) or {}
+                data, http_code = update_issue_environment(int(parts[1]), request_json)
+                return jsonify(data), http_code, headers
+            
             else:
                 return jsonify({"error": f"Unhandled sub-route: {path}"}), 404, headers
+            
             
             
 
