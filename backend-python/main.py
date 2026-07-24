@@ -1,3 +1,4 @@
+import os
 import functions_framework
 from flask import jsonify
 
@@ -45,15 +46,24 @@ def nutria_api(request):
         elif path.startswith("issues"):
             
             auth_header = request.headers.get("Authorization")
-            current_user, error_msg = verify_token(auth_header)
+            expected_labware_token = os.environ.get("LABWARE_API_TOKEN")
 
-            if error_msg:
+            # 1. Vérification si la requête vient de LabWare (Système à Système)
+            if expected_labware_token and auth_header == f"Bearer {expected_labware_token}":
                 current_user = {
-                    "role": "IT_TEAM", 
-                    "location": "GLOBAL", 
-                    "sub": "dev_admin", 
-                    "email": "dev.admin@mxns.com"
+                    "role": "SYSTEM",
+                    "location": "GLOBAL",
+                    "sub": "LABWARE_LIMS",
+                    "email": "system@lims"
                 }
+                error_msg = None
+            else:
+                # 2. Sinon, vérification du token Google pour un utilisateur web
+                current_user, error_msg = verify_token(auth_header)
+
+            # 3. Sécurité : On bloque l'accès si aucun token n'est valide
+            if error_msg:
+                return jsonify({"error": "Unauthorized Access", "details": error_msg}), 401
             
             client_ip = request.remote_addr or "Unknown"
             parts = path.split("/")
@@ -67,6 +77,13 @@ def nutria_api(request):
             elif path == "issues/audit/logs" and request.method == "GET":
                 from routers.audit import get_audit_logs
                 data, http_code = get_audit_logs(current_user)
+                return jsonify(data), http_code, headers
+                
+            # POST /issues/audit/logs
+            elif path == "issues/audit/logs" and request.method == "POST":
+                from routers.audit import add_audit_log
+                request_json = request.get_json(silent=True) or {}
+                data, http_code = add_audit_log(request_json)
                 return jsonify(data), http_code, headers
                 
             # GET /issues/users/me
@@ -164,6 +181,19 @@ def nutria_api(request):
                 data, http_code = download_file_path(int(parts[1]), parts[3], current_user, client_ip)
                 return jsonify(data), http_code, headers
             
+            # POST /issues/{id}/ai-analysis (ANALYSE IA)
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "ai-analysis" and request.method == "POST":
+                from routers.issues import trigger_ai_analysis
+                data, http_code = trigger_ai_analysis(int(parts[1]), current_user, client_ip)
+                return jsonify(data), http_code, headers
+            
+            # POST /issues/preticket (Pour LabWare)
+            elif path == "issues/preticket" and request.method == "POST":
+                from routers.issues import create_preticket
+                request_json = request.get_json(silent=True) or {}
+                data, http_code = create_preticket(request_json, current_user, client_ip)
+                return jsonify(data), http_code, headers
+            
             # POST /issues/cleanup 
             elif path == "issues/cleanup" and request.method == "POST":
                 from routers.issues import cleanup_pretickets
@@ -171,6 +201,8 @@ def nutria_api(request):
                 return jsonify(data), http_code, headers
             else:
                 return jsonify({"error": f"Unhandled sub-route: {path}"}), 404, headers
+            
+            
 
         else:
             return jsonify({"error": "Route not found"}), 404, headers

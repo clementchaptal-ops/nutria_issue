@@ -577,7 +577,60 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
     finally:
         cursor.close()
         connection.close()
+def create_preticket(request_json, current_user, client_ip):
+    """
+    Receives automated capture data from LabWare LIMS scripts.
+    Inserts a technical PRETICKET into the database.
+    """
+    connection = get_db_connection()
+    if not connection:
+        return {"error": "error.database_connection"}, 500
+        
+    try:
+        cursor = connection.cursor()
+        
+        # Extraction des valeurs poussées par LabWare
+        title = request_json.get("title", "Automated Preticket")
+        description = request_json.get("description", "")
+        user_name = request_json.get("user_name", "UNKNOWN")
+        workstation = request_json.get("workstation", "")
+        ip_adress = request_json.get("ip_address", "")
+        ip_config = request_json.get("ip_config", "")
+        ping = request_json.get("ping", "")
+        citrix = request_json.get("citrix_session", "")
+        current_pc = request_json.get("current_pc", "")
+        working_dir = request_json.get("working_dir", "")
+        role = request_json.get("current_role", "")
 
+        insert_qry = """
+            INSERT INTO c_issue (
+                title, description, user_name, workstation, ip_adress, 
+                ip_config, ping, citrix_session, current_pc, working_dir, 
+                current_active_role, status, created_on, changed_on
+            ) 
+            VALUES (
+                %s, %s, %s, %s, %s, 
+                %s, %s, %s, %s, %s, 
+                %s, 'PRETICKET', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            ) 
+            RETURNING id_issue
+        """
+        cursor.execute(insert_qry, (
+            title, description, user_name, workstation, ip_adress, 
+            ip_config, ping, citrix, current_pc, working_dir, role
+        ))
+        
+        next_id = cursor.fetchone()[0]
+        connection.commit()
+        
+        return {"id_issue": next_id, "message": "success.preticket_created"}, 201
+        
+    except Exception as e:
+        connection.rollback()
+        return {"error": "error.database_query", "details": str(e)}, 500
+    finally:
+        cursor.close()
+        connection.close()
 
 def trigger_ai_analysis(issue_id, current_user, client_ip):
     """

@@ -64,3 +64,34 @@ def get_audit_logs(current_user):
     finally:
         cursor.close()
         connection.close()
+
+def add_audit_log(payload):
+    """
+    Called via API POST request (e.g., from LabWare LIMS).
+    Receives a JSON payload and inserts it into the audit trail.
+    """
+    user_name = payload.get("user_name", "UNKNOWN")
+    action_type = payload.get("action_type", "UNKNOWN")
+    target_id = payload.get("target_id", "")
+    details = payload.get("details", "")
+    ip_address = payload.get("ip_address", "Unknown")
+
+    connection = get_db_connection()
+    if not connection:
+        return {"error": "Database connection error."}, 500
+
+    try:
+        cursor = connection.cursor()
+        query = """
+            INSERT INTO c_issue_audit_logs (user_name, action_type, target_id, details, ip_address)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, (user_name, action_type, target_id, details, ip_address))
+        connection.commit()
+        return {"message": "success.audit_log_inserted"}, 201
+    except Exception as e:
+        connection.rollback()
+        return {"error": f"PostgreSQL Error: {str(e)}"}, 500
+    finally:
+        cursor.close()
+        connection.close()
