@@ -577,10 +577,13 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
     finally:
         cursor.close()
         connection.close()
+
+
 def create_preticket(request_json, current_user, client_ip):
     """
     Receives automated capture data from LabWare LIMS scripts.
-    Inserts a technical PRETICKET into the database.
+    1. Synchronizes the user in lims_users.
+    2. Inserts a technical PRETICKET into the database.
     """
     connection = get_db_connection()
     if not connection:
@@ -589,7 +592,29 @@ def create_preticket(request_json, current_user, client_ip):
     try:
         cursor = connection.cursor()
         
-        # Extraction des valeurs poussées par LabWare
+        # --- 1. SYNCHRONISATION DU LIMS_USER ---
+        user_snapshot = request_json.get("user_snapshot")
+        if user_snapshot and user_snapshot.get("user_name"):
+            upsert_qry = """
+                INSERT INTO lims_users (user_name, full_name, email_addr, user_role, lab, location)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (user_name) DO UPDATE 
+                SET full_name = EXCLUDED.full_name,
+                    email_addr = EXCLUDED.email_addr,
+                    user_role = EXCLUDED.user_role,
+                    lab = EXCLUDED.lab,
+                    location = EXCLUDED.location;
+            """
+            cursor.execute(upsert_qry, (
+                user_snapshot.get("user_name"),
+                user_snapshot.get("full_name", ""),
+                user_snapshot.get("email_addr", ""),
+                user_snapshot.get("user_role", "USER"),
+                user_snapshot.get("lab", ""),
+                user_snapshot.get("location", "")
+            ))
+        
+        # --- 2. CREATION DU PRETICKET ---
         title = request_json.get("title", "Automated Preticket")
         description = request_json.get("description", "")
         user_name = request_json.get("user_name", "UNKNOWN")
@@ -623,7 +648,7 @@ def create_preticket(request_json, current_user, client_ip):
         next_id = cursor.fetchone()[0]
         connection.commit()
         
-        return {"id_issue": next_id, "message": "success.preticket_created"}, 201
+        return {"id_issue": next_id, "message": "success.preticket_created_and_synced"}, 201
         
     except Exception as e:
         connection.rollback()
@@ -689,6 +714,55 @@ def trigger_ai_analysis(issue_id, current_user, client_ip):
         )
     
     return result, status_code
+
+def sync_lims_user(request_json):
+    """
+    Reçoit les informations d'un utilisateur depuis LabWare LIMS.
+    Crée l'utilisateur s'il n'existe pas, ou met à jour ses infos s'il existe déjà.
+    """
+    connection = get_db_connection()
+    if not connection:
+        return {"error": "error.database_connection"}, 500
+        
+    try:
+        cursor = connection.cursor()
+        
+        # Récupération des données envoyées par le JSON LabWare
+        user_name = request_json.get("user_name")
+        
+        if not user_name:
+            return {"error": "error.missing_user_name"}, 400
+            
+        full_name = request_json.get("full_name", "")
+        email_addr = request_json.get("email_addr", "")
+        user_role = request_json.get("user_role", "USER")
+        lab = request_json.get("lab", "")
+        location = request_json.get("location", "")
+        
+        # Requête UPSERT (Insert or Update) spécifique à PostgreSQL
+        # Nécessite que la colonne user_name soit une clé primaire (PRIMARY KEY) ou UNIQUE
+        upsert_qry = """
+            INSERT INTO lims_users (user_name, full_name, email_addr, user_role, lab, location)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (user_name) DO UPDATE 
+            SET full_name = EXCLUDED.full_name,
+                email_addr = EXCLUDED.email_addr,
+                user_role = EXCLUDED.user_role,
+                lab = EXCLUDED.lab,
+                location = EXCLUDED.location;
+        """
+        
+        cursor.execute(upsert_qry, (user_name, full_name, email_addr, user_role, lab, location))
+        connection.commit()
+        
+        return {"message": f"success.user_synced", "user": user_name}, 200
+        
+    except Exception as e:
+        connection.rollback()
+        return {"error": "error.database_query", "details": str(e)}, 500
+    finally:
+        cursor.close()
+        connection.close()
 
 def cleanup_pretickets():
     """
