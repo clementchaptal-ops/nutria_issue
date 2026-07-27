@@ -626,7 +626,6 @@ def create_preticket(request_json, current_user, client_ip):
                 connection.commit()
             except Exception as user_err:
                 connection.rollback()
-                # On trace l'erreur en console Google Cloud mais on NE BLOQUE PAS le ticket !
                 print(f"[USER SYNC ERROR] {str(user_err)}")
 
         # --- 2. CREATION DU PRETICKET ---
@@ -642,18 +641,17 @@ def create_preticket(request_json, current_user, client_ip):
         working_dir = request_json.get("working_dir", "")
         role = request_json.get("current_role", "")
 
+        # Retrait des colonnes problematiques (criticity, etc.) pour utiliser les valeurs par défaut
         insert_ticket_qry = """
             INSERT INTO c_issue (
                 title, description, user_name, workstation, ip_adress, 
                 ip_config, ping, citrix_session, current_pc, working_dir, 
-                current_active_role, status, created_on, changed_on,
-                issue_type, criticity, frequency
+                current_active_role, status, created_on, changed_on
             ) 
             VALUES (
                 %s, %s, %s, %s, %s, 
                 %s, %s, %s, %s, %s, 
-                %s, 'PRETICKET', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
-                'N/A', 'N/A', 'N/A'
+                %s, 'PRETICKET', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             ) 
             RETURNING id_issue
         """
@@ -671,7 +669,6 @@ def create_preticket(request_json, current_user, client_ip):
     except Exception as e:
         if connection:
             connection.rollback()
-        # C'est ici que l'erreur exacte s'imprimera dans tes logs Cloud Run si ça plante encore !
         print(f"[PRETICKET ERROR] {str(e)}")
         return {"error": "error.database_query", "details": str(e)}, 500
     finally:
@@ -679,7 +676,7 @@ def create_preticket(request_json, current_user, client_ip):
             cursor.close()
         if connection:
             connection.close()
-            
+
 def update_issue_environment(issue_id, request_json):
     """Updates only the contextual environment data of a preticket/ticket."""
     connection = get_db_connection()
