@@ -583,8 +583,9 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
 def create_preticket(request_json, current_user, client_ip):
     """
     Receives automated capture data from LabWare LIMS scripts.
-    1. Synchronizes the user in lims_users (Universal safe method).
-    2. Inserts a technical PRETICKET into the database.
+    1. Extracts real LIMS username from payload/snapshot.
+    2. Synchronizes/Ensures user exists in lims_users.
+    3. Inserts a technical PRETICKET into c_issue.
     """
     connection = get_db_connection()
     if not connection:
@@ -594,44 +595,49 @@ def create_preticket(request_json, current_user, client_ip):
     try:
         cursor = connection.cursor()
         
-        # --- 1. SYNCHRONISATION SECURISEE DU LIMS_USER ---
-        user_snapshot = request_json.get("user_snapshot")
-        if user_snapshot and isinstance(user_snapshot, dict) and user_snapshot.get("user_name"):
-            try:
-                username = user_snapshot.get("user_name")
-                fullname = user_snapshot.get("full_name", "")
-                email = user_snapshot.get("email_addr", "")
-                user_role = user_snapshot.get("user_role", "")
-                lab = user_snapshot.get("lab", "")
-                location = user_snapshot.get("location", "")
+        # --- 1. EXTRACTION DU VRAI USERNAME LIMS ---
+        user_snapshot = request_json.get("user_snapshot") or {}
+        
+        # Priorité : user_name du snapshot > user_name du JSON principal > Fallback
+        lims_username = (
+            user_snapshot.get("user_name") or 
+            request_json.get("user_name") or 
+            "UNKNOWN"
+        )
 
-                # Approche universelle (sans ON CONFLICT)
-                cursor.execute("SELECT user_name FROM lims_users WHERE user_name = %s", (username,))
-                if cursor.fetchone():
-                    # L'utilisateur existe, on le met à jour
-                    update_qry = """
-                        UPDATE lims_users 
-                        SET full_name = %s, email_addr = %s, user_role = %s, lab = %s, location = %s
-                        WHERE user_name = %s
-                    """
-                    cursor.execute(update_qry, (fullname, email, user_role, lab, location, username))
-                else:
-                    # L'utilisateur n'existe pas, on l'insère
-                    insert_user_qry = """
-                        INSERT INTO lims_users (user_name, full_name, email_addr, user_role, lab, location)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                    """
-                    cursor.execute(insert_user_qry, (username, fullname, email, user_role, lab, location))
-                    
-                connection.commit()
-            except Exception as user_err:
-                connection.rollback()
-                print(f"[USER SYNC ERROR] {str(user_err)}")
+        # --- 2. SYNCHRONISATION / CREATION DANS LIMS_USERS ---
+        fullname = user_snapshot.get("full_name", "")
+        email = user_snapshot.get("email_addr", "")
+        user_role = user_snapshot.get("user_role", "")
+        lab = user_snapshot.get("lab", "")
+        location = user_snapshot.get("location", "")
 
-        # --- 2. CREATION DU PRETICKET ---
+        # Vérification si l'utilisateur existe dans lims_users
+        cursor.execute("SELECT user_name FROM lims_users WHERE TRIM(UPPER(user_name)) = TRIM(UPPER(%s))", (lims_username,))
+        existing_user = cursor.fetchone()
+
+        if existing_user:
+            # Mise à jour si snapshot présent
+            if user_snapshot:
+                update_user_qry = """
+                    UPDATE lims_users 
+                    SET full_name = %s, email_addr = %s, user_role = %s, lab = %s, location = %s
+                    WHERE TRIM(UPPER(user_name)) = TRIM(UPPER(%s))
+                """
+                cursor.execute(update_user_qry, (fullname, email, user_role, lab, location, lims_username))
+        else:
+            # Création automatique pour garantir la Clé Étrangère (fk_c_issue_user)
+            insert_user_qry = """
+                INSERT INTO lims_users (user_name, full_name, email_addr, user_role, lab, location)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(insert_user_qry, (lims_username, fullname, email, user_role, lab, location))
+        
+        connection.commit()
+
+        # --- 3. CREATION DU PRETICKET ---
         title = request_json.get("title") or "Automated Preticket"
         description = request_json.get("description", "")
-        creator_name = request_json.get("user_name", "UNKNOWN")
         workstation = request_json.get("workstation", "")
         ip_adress = request_json.get("ip_address", "")
         ip_config = request_json.get("ip_config", "")
@@ -641,7 +647,6 @@ def create_preticket(request_json, current_user, client_ip):
         working_dir = request_json.get("working_dir", "")
         role = request_json.get("current_role", "")
 
-        # Retrait des colonnes problematiques (criticity, etc.) pour utiliser les valeurs par défaut
         insert_ticket_qry = """
             INSERT INTO c_issue (
                 title, description, user_name, workstation, ip_adress, 
@@ -656,7 +661,7 @@ def create_preticket(request_json, current_user, client_ip):
             RETURNING id_issue
         """
         cursor.execute(insert_ticket_qry, (
-            title, description, creator_name, workstation, ip_adress, 
+            title, description, lims_username, workstation, ip_adress, 
             ip_config, ping, citrix, current_pc, working_dir, role
         ))
         
