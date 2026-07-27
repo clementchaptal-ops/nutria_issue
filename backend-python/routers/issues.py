@@ -583,52 +583,56 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
 def create_preticket(request_json, current_user, client_ip):
     """
     Receives automated capture data from LabWare LIMS scripts.
-    1. Synchronizes the user in lims_users (preserves exact LIMS role).
+    1. Synchronizes the user in lims_users (Universal safe method).
     2. Inserts a technical PRETICKET into the database.
     """
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
         
+    cursor = None
     try:
         cursor = connection.cursor()
         
-        # --- 1. SYNCHRONISATION DU LIMS_USER ---
+        # --- 1. SYNCHRONISATION SECURISEE DU LIMS_USER ---
         user_snapshot = request_json.get("user_snapshot")
         if user_snapshot and isinstance(user_snapshot, dict) and user_snapshot.get("user_name"):
             try:
-                # Récupération exacte sans aucun filtre/mapping
-                lims_username = user_snapshot.get("user_name")
-                lims_fullname = user_snapshot.get("full_name", "")
-                lims_email = user_snapshot.get("email_addr", "")
-                lims_role = user_snapshot.get("user_role", "")
-                lims_lab = user_snapshot.get("lab", "")
-                lims_location = user_snapshot.get("location", "")
+                username = user_snapshot.get("user_name")
+                fullname = user_snapshot.get("full_name", "")
+                email = user_snapshot.get("email_addr", "")
+                user_role = user_snapshot.get("user_role", "")
+                lab = user_snapshot.get("lab", "")
+                location = user_snapshot.get("location", "")
 
-                upsert_user_qry = """
-                    INSERT INTO lims_users (user_name, full_name, email_addr, user_role, lab, location)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (user_name) DO UPDATE 
-                    SET full_name = EXCLUDED.full_name,
-                        email_addr = EXCLUDED.email_addr,
-                        user_role = EXCLUDED.user_role,
-                        lab = EXCLUDED.lab,
-                        location = EXCLUDED.location;
-                """
-                cursor.execute(upsert_user_qry, (
-                    lims_username, lims_fullname, lims_email, 
-                    lims_role, lims_lab, lims_location
-                ))
+                # Approche universelle (sans ON CONFLICT)
+                cursor.execute("SELECT user_name FROM lims_users WHERE user_name = %s", (username,))
+                if cursor.fetchone():
+                    # L'utilisateur existe, on le met à jour
+                    update_qry = """
+                        UPDATE lims_users 
+                        SET full_name = %s, email_addr = %s, user_role = %s, lab = %s, location = %s
+                        WHERE user_name = %s
+                    """
+                    cursor.execute(update_qry, (fullname, email, user_role, lab, location, username))
+                else:
+                    # L'utilisateur n'existe pas, on l'insère
+                    insert_user_qry = """
+                        INSERT INTO lims_users (user_name, full_name, email_addr, user_role, lab, location)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """
+                    cursor.execute(insert_user_qry, (username, fullname, email, user_role, lab, location))
+                    
                 connection.commit()
             except Exception as user_err:
                 connection.rollback()
-                # Affiche l'erreur exacte dans les logs Google Cloud Run
+                # On trace l'erreur en console Google Cloud mais on NE BLOQUE PAS le ticket !
                 print(f"[USER SYNC ERROR] {str(user_err)}")
 
         # --- 2. CREATION DU PRETICKET ---
         title = request_json.get("title") or "Automated Preticket"
         description = request_json.get("description", "")
-        user_name = request_json.get("user_name", "UNKNOWN")
+        creator_name = request_json.get("user_name", "UNKNOWN")
         workstation = request_json.get("workstation", "")
         ip_adress = request_json.get("ip_address", "")
         ip_config = request_json.get("ip_config", "")
@@ -642,33 +646,40 @@ def create_preticket(request_json, current_user, client_ip):
             INSERT INTO c_issue (
                 title, description, user_name, workstation, ip_adress, 
                 ip_config, ping, citrix_session, current_pc, working_dir, 
-                current_active_role, status, created_on, changed_on
+                current_active_role, status, created_on, changed_on,
+                issue_type, criticity, frequency
             ) 
             VALUES (
                 %s, %s, %s, %s, %s, 
                 %s, %s, %s, %s, %s, 
-                %s, 'PRETICKET', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                %s, 'PRETICKET', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+                'N/A', 'N/A', 'N/A'
             ) 
             RETURNING id_issue
         """
         cursor.execute(insert_ticket_qry, (
-            title, description, user_name, workstation, ip_adress, 
+            title, description, creator_name, workstation, ip_adress, 
             ip_config, ping, citrix, current_pc, working_dir, role
         ))
         
-        next_id = cursor.fetchone()[0]
+        row = cursor.fetchone()
+        next_id = row[0] if row else 0
         connection.commit()
         
         return {"id_issue": next_id, "message": "success.preticket_created"}, 201
         
     except Exception as e:
-        connection.rollback()
+        if connection:
+            connection.rollback()
+        # C'est ici que l'erreur exacte s'imprimera dans tes logs Cloud Run si ça plante encore !
         print(f"[PRETICKET ERROR] {str(e)}")
         return {"error": "error.database_query", "details": str(e)}, 500
     finally:
-        cursor.close()
-        connection.close()
-
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+            
 def update_issue_environment(issue_id, request_json):
     """Updates only the contextual environment data of a preticket/ticket."""
     connection = get_db_connection()
