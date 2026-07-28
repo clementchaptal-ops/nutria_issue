@@ -514,28 +514,56 @@ def cancel_issue(issue_id, current_user, client_ip):
 def download_file_path(ticket_id, file_type, current_user, client_ip):
     """
     On GCP, files are in Cloud Storage, not on the local disk.
-    This route redirects to the GCS URL using the Storage API.
+    We MUST retrieve the exact URL (with the UUID hash) from the database!
     """
     if file_type == "working_dir":
-        file_name = f"Issue_{ticket_id}_WorkingDir.zip"
+        search_pattern = "%WorkingDir.zip"
         action_type = "DOWNLOAD_WORKING_DIR"
         details = "Downloaded contextual Working Directory."
     elif file_type == "logs":
-        file_name = f"Issue_{ticket_id}_Logs.zip"
+        search_pattern = "%Logs.zip"
         action_type = "DOWNLOAD_LOGS"
         details = "Downloaded system Logs files."
     else:
         return {"error": "error.invalid_file_type"}, 400
 
-    public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/tickets/ticket_{ticket_id}/{file_name}"
-    
-    # Sign this URL to allow secure downloading
-    signed_url = make_signed_url(public_url)
-    
-    log_user_action(user_name=current_user.get("sub", "UNKNOWN"), action_type=action_type, target_id=ticket_id, details=details, ip_address=client_ip)
-    
-    return {"file_path": signed_url, "file_name": file_name}, 200
+    connection = get_db_connection()
+    if not connection:
+        return {"error": "error.database_connection"}, 500
 
+    try:
+        cursor = connection.cursor()
+        
+        # Récupération de l'URL exacte générée lors de l'upload (avec le hash)
+        qry = """
+            SELECT url_path, attachment_name 
+            FROM c_issue_attachment 
+            WHERE id_issue = %s 
+              AND attachment_name LIKE %s 
+              AND (removed != 'T' OR removed IS NULL)
+            LIMIT 1
+        """
+        cursor.execute(qry, (ticket_id, search_pattern))
+        row = cursor.fetchone()
+
+        if not row:
+            return {"error": "error.file_not_found_in_db"}, 404
+
+        public_url = row[0]
+        file_name = row[1]
+        
+        # Sign this URL to allow secure downloading
+        signed_url = make_signed_url(public_url)
+        
+        log_user_action(user_name=current_user.get("sub", "UNKNOWN"), action_type=action_type, target_id=str(ticket_id), details=details, ip_address=client_ip)
+        
+        return {"file_path": signed_url, "file_name": file_name}, 200
+
+    except Exception as e:
+        return {"error": "error.database_query", "details": str(e)}, 500
+    finally:
+        cursor.close()
+        connection.close()
 
 def close_ticket(issue_id, request_json, current_user, client_ip):
     """Transitions the resolution status lifecycle parameters to 'RESOLVED' or 'CLOSED'."""
