@@ -268,23 +268,24 @@ function TicketForm() {
       })
       if (!response.ok) throw new Error('Download impossible')
 
-      const disposition = response.headers.get('content-disposition')
-      let filename = defaultFilename
-      if (disposition && disposition.includes('filename=')) {
-        filename = disposition.split('filename=')[1].replace(/"/g, '').trim()
+      // 1. On lit la réponse en JSON (car l'API renvoie { file_path: "..." })
+      const data = await response.json()
+
+      if (data.file_path) {
+        // 2. On crée un lien invisible qui pointe vers le VRAI fichier sur Google Cloud
+        const link = document.createElement('a')
+        link.href = data.file_path
+        link.setAttribute('download', data.file_name || defaultFilename)
+        link.target = '_blank' // Ouvre dans un nouvel onglet par sécurité
+        
+        // 3. On clique virtuellement dessus pour lancer le téléchargement
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+      } else {
+        toast.error(t('ticket.download_error', 'File link not found.'))
       }
 
-      const blob = await response.blob()
-      const blobUrl = window.URL.createObjectURL(blob)
-      
-      const link = document.createElement('a')
-      link.href = blobUrl
-      link.setAttribute('download', filename) 
-      document.body.appendChild(link)
-      link.click()
-      
-      link.remove()
-      window.URL.revokeObjectURL(blobUrl)
     } catch (error) {
       toast.error(t('ticket.download_error', 'Failed to download file.'))
     }
