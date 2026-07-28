@@ -665,7 +665,12 @@ def create_preticket(request_json, current_user, client_ip):
 
         # --- 3. CREATION DU PRETICKET ---
         title = request_json.get("title") or "Automated Preticket"
-        description = request_json.get("description", "")
+        
+        # Formatage de la description avec l'heure client exacte
+        client_time = request_json.get("client_time", "Unknown Time")
+        raw_description = request_json.get("description", "")
+        description = f"[LIMS Local Time: {client_time}]\n{raw_description}"
+        
         workstation = request_json.get("workstation", "")
         ip_adress = request_json.get("ip_address", "")
         ip_config = request_json.get("ip_config", "")
@@ -674,23 +679,25 @@ def create_preticket(request_json, current_user, client_ip):
         current_pc = request_json.get("current_pc", "")
         working_dir = request_json.get("working_dir", "")
         role = request_json.get("current_role", "")
+        environment = request_json.get("environment", "UNKNOWN")
 
         insert_ticket_qry = """
             INSERT INTO c_issue (
                 title, description, user_name, workstation, ip_adress, 
                 ip_config, ping, citrix_session, current_pc, working_dir, 
-                current_active_role, status, created_on, changed_on
+                current_active_role, environment, status, created_on, changed_on
             ) 
             VALUES (
                 %s, %s, %s, %s, %s, 
                 %s, %s, %s, %s, %s, 
-                %s, 'PRETICKET', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                %s, %s, 'PRETICKET', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             ) 
             RETURNING id_issue
         """
         cursor.execute(insert_ticket_qry, (
             title, description, lims_username, workstation, ip_adress, 
-            ip_config, ping, citrix, current_pc, working_dir, role
+            ip_config, ping, citrix, current_pc, working_dir, 
+            role, environment
         ))
         
         row = cursor.fetchone()
@@ -709,7 +716,7 @@ def create_preticket(request_json, current_user, client_ip):
             cursor.close()
         if connection:
             connection.close()
-
+            
 def update_issue_environment(issue_id, request_json):
     """Updates only the contextual environment data of a preticket/ticket."""
     connection = get_db_connection()
