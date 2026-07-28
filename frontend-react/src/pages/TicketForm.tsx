@@ -208,7 +208,7 @@ function TicketForm() {
           full_name: data.full_name || '', 
           user_email: data.user_email || '',
           created_on: data.created_on ? new Date(data.created_on).toLocaleString() : '',
-          current_role: data.current_role || '',
+          current_role: data.current_active_role || data.current_role || '',
           lab: data.creator_lab || '',
           location: data.creator_location || ''
         })
