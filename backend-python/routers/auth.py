@@ -151,5 +151,6 @@ def google_auth(request_json):
             "location": db_location
         }, 200
 
-    except Exception:
+    except Exception as e:
+        print(f"[AUTH ERROR - google_auth]: {str(e)}")
         return {"error": "Internal server error during authentication."}, 500

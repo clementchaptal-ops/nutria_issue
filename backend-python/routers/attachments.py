@@ -49,6 +49,7 @@ def upload_to_gcs(file_bytes: bytes, filename: str, issue_id) -> dict:
             "public_url": public_url
         }
     except Exception as e:
+        print(f"[STORAGE ERROR - upload_to_gcs]: {str(e)}")
         raise e
 
 
@@ -77,7 +78,7 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
             uploaded_files_info.append({
                 "original_name": filename,
                 "type": attach_type,
-                "url_path": gcs_info["public_url"],  # We save the GCS URL, not a local path
+                "url_path": gcs_info["public_url"], 
                 "gs_uri": gcs_info["gs_uri"] 
             })
 
@@ -98,7 +99,7 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
         else:
             connection = get_db_connection()
             if not connection:
-                return {"error": "Database connection error."}, 500
+                return {"error": "error.database_connection"}, 500
                 
             cursor = connection.cursor()
 
@@ -130,7 +131,8 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
                 connection.close()
 
     except Exception as e:
-        return {"error": f"Upload process error: {str(e)}"}, 500
+        print(f"[DATABASE/STORAGE ERROR - upload_attachments]: {str(e)}")
+        return {"error": "error.storage_upload", "details": "An internal error occurred during the upload process."}, 500
 
 
 def get_attachment_file(issue_id, filename):
@@ -148,7 +150,7 @@ def delete_attachment(issue_id, filename, current_user, client_ip):
     else:
         connection = get_db_connection()
         if not connection:
-            return {"error": "Database connection error."}, 500
+            return {"error": "error.database_connection"}, 500
 
         try:
             cursor = connection.cursor()
@@ -164,7 +166,8 @@ def delete_attachment(issue_id, filename, current_user, client_ip):
             return {"message": "Attachment flagged as removed in PostgreSQL."}, 200
         except Exception as e:
             connection.rollback()
-            return {"error": str(e)}, 500
+            print(f"[DATABASE ERROR - delete_attachment]: {str(e)}")
+            return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
         finally:
             cursor.close()
             connection.close()

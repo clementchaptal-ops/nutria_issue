@@ -44,8 +44,9 @@ def make_signed_url(public_url: str) -> str:
             service_account_email=credentials.service_account_email,
             access_token=credentials.token
         )
-    except Exception:
+    except Exception as e:
         # Exception caught silently to avoid log pollution, returning fallback URL
+        print(f"[STORAGE ERROR - make_signed_url]: {str(e)}")
         return public_url
 
 # =====================================================================
@@ -109,7 +110,8 @@ def get_all_issues(current_user):
             })
         return tickets, 200
     except Exception as e:
-        return {"error": "error.database_query", "details": str(e)}, 500
+        print(f"[DATABASE ERROR - get_all_issues]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
         cursor.close()
         connection.close()
@@ -140,6 +142,9 @@ def get_my_profile(current_user):
             "user_name": row[0], "full_name": row[1], "user_email": row[2],
             "current_role": row[3], "lab": row[4], "location": row[5]
         }, 200
+    except Exception as e:
+        print(f"[DATABASE ERROR - get_my_profile]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
         cursor.close()
         connection.close()
@@ -176,7 +181,8 @@ def create_issue(request_json, current_user, client_ip):
         return {"id_issue": next_id, "message": "success.ticket_created"}, 201
     except Exception as e:
         connection.rollback()
-        return {"error": "error.database_query", "details": str(e)}, 500
+        print(f"[DATABASE ERROR - create_issue]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
         cursor.close()
         connection.close()
@@ -244,7 +250,8 @@ def get_issue(issue_id, current_user):
         return issue_data, 200
         
     except Exception as e:
-        return {"error": "error.database_query", "details": str(e)}, 500
+        print(f"[DATABASE ERROR - get_issue]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
         cursor.close()
         connection.close()
@@ -305,7 +312,8 @@ def get_issue_comments(issue_id, current_user):
                     
         return comments_list, 200
     except Exception as e:
-        return {"error": "error.database_query", "details": str(e)}, 500
+        print(f"[DATABASE ERROR - get_issue_comments]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
         cursor.close()
         connection.close()
@@ -342,7 +350,8 @@ def add_issue_comment(issue_id, payload_data, current_user, client_ip):
         
     except Exception as e:
         connection.rollback()
-        return {"error": "error.database_query", "details": str(e)}, 500
+        print(f"[DATABASE ERROR - add_issue_comment]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
         cursor.close()
         connection.close()
@@ -394,7 +403,8 @@ def upload_comment_attachments(issue_id, comment_id, files_data, current_user):
         return {"message": "success.attachments_uploaded"}, 200
     except Exception as e:
         connection.rollback()
-        return {"error": "error.storage_upload", "details": str(e)}, 500
+        print(f"[STORAGE/DB ERROR - upload_comment_attachments]: {str(e)}")
+        return {"error": "error.storage_upload", "details": "An internal error occurred during file upload."}, 500
     finally:
         cursor.close()
         connection.close()
@@ -463,7 +473,8 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
         return {"message": "success.issue_validated"}, 200
     except Exception as e:
         connection.rollback()
-        return {"error": "error.database_query", "details": str(e)}, 500
+        print(f"[DATABASE ERROR - validate_issue]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
         cursor.close()
         connection.close()
@@ -506,7 +517,8 @@ def cancel_issue(issue_id, current_user, client_ip):
         return {"message": "success.ticket_canceled"}, 200
     except Exception as e:
         connection.rollback()
-        return {"error": "error.database_query", "details": str(e)}, 500
+        print(f"[DATABASE ERROR - cancel_issue]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
         cursor.close()
         connection.close()
@@ -561,7 +573,8 @@ def download_file_path(ticket_id, file_type, current_user, client_ip):
         return {"file_path": signed_url, "file_name": file_name}, 200
 
     except Exception as e:
-        return {"error": "error.database_query", "details": str(e)}, 500
+        print(f"[DATABASE ERROR - download_file_path]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
         cursor.close()
         connection.close()
@@ -604,7 +617,8 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
         return {"message": "success.ticket_status_updated", "new_status": payload.new_status}, 200
     except Exception as e:
         connection.rollback()
-        return {"error": "error.database_query", "details": str(e)}, 500
+        print(f"[DATABASE ERROR - close_ticket]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
         cursor.close()
         connection.close()
@@ -710,8 +724,8 @@ def create_preticket(request_json, current_user, client_ip):
     except Exception as e:
         if connection:
             connection.rollback()
-        print(f"[PRETICKET ERROR] {str(e)}")
-        return {"error": "error.database_query", "details": str(e)}, 500
+        print(f"[DATABASE ERROR - create_preticket]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
         if cursor:
             cursor.close()
@@ -749,7 +763,8 @@ def update_issue_environment(issue_id, request_json):
         return {"message": "success.environment_updated"}, 200
     except Exception as e:
         connection.rollback()
-        return {"error": "error.database_query", "details": str(e)}, 500
+        print(f"[DATABASE ERROR - update_issue_environment]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
         cursor.close()
         connection.close()
@@ -820,7 +835,8 @@ def sync_lims_user(request_json):
         
     except Exception as e:
         connection.rollback()
-        return {"error": "error.database_query", "details": str(e)}, 500
+        print(f"[DATABASE ERROR - sync_lims_user]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
         cursor.close()
         connection.close()
@@ -855,7 +871,8 @@ def cleanup_pretickets():
         
     except Exception as e:
         connection.rollback()
-        return {"error": "error.database_query", "details": str(e)}, 500
+        print(f"[DATABASE ERROR - cleanup_pretickets]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
         cursor.close()
         connection.close()

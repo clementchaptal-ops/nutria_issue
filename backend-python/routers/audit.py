@@ -16,10 +16,14 @@ def log_user_action(user_name: str, action_type: str, target_id: str = None, det
         """
         cursor.execute(query, (user_name, action_type, target_id, details, ip_address))
         connection.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        # On logge l'erreur en console GCP pour ne pas planter silencieusement
+        print(f"[AUDIT ERROR - log_user_action]: {str(e)}")
     finally:
-        cursor.close()
+        if 'cursor' in locals() and cursor:
+            cursor.close()
         connection.close()
 
 
@@ -27,11 +31,11 @@ def get_audit_logs(current_user):
     user_role = current_user.get("role")
 
     if user_role not in ["IT_TEAM", "LOCAL_ADMIN"]:
-        return {"error": "Access denied. Restricted to administrators."}, 403
+        return {"error": "error.forbidden_access", "details": "Access denied. Restricted to administrators."}, 403
 
     connection = get_db_connection()
     if not connection:
-        return {"error": "Database connection error."}, 500
+        return {"error": "error.database_connection"}, 500
 
     try:
         cursor = connection.cursor()
@@ -60,9 +64,11 @@ def get_audit_logs(current_user):
         return logs, 200
         
     except Exception as e:
-        return {"error": f"PostgreSQL Error: {str(e)}"}, 500
+        print(f"[DATABASE ERROR - get_audit_logs]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
-        cursor.close()
+        if 'cursor' in locals() and cursor:
+            cursor.close()
         connection.close()
 
 def add_audit_log(payload):
@@ -78,7 +84,7 @@ def add_audit_log(payload):
 
     connection = get_db_connection()
     if not connection:
-        return {"error": "Database connection error."}, 500
+        return {"error": "error.database_connection"}, 500
 
     try:
         cursor = connection.cursor()
@@ -91,7 +97,9 @@ def add_audit_log(payload):
         return {"message": "success.audit_log_inserted"}, 201
     except Exception as e:
         connection.rollback()
-        return {"error": f"PostgreSQL Error: {str(e)}"}, 500
+        print(f"[DATABASE ERROR - add_audit_log]: {str(e)}")
+        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
     finally:
-        cursor.close()
+        if 'cursor' in locals() and cursor:
+            cursor.close()
         connection.close()

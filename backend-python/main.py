@@ -63,10 +63,26 @@ def nutria_api(request):
 
             # 3. Sécurité : On bloque l'accès si aucun token n'est valide
             if error_msg:
-                return jsonify({"error": "Unauthorized Access", "details": error_msg}), 401
+                return jsonify({"error": "Unauthorized Access", "details": error_msg}), 401, headers
             
             client_ip = request.remote_addr or "Unknown"
             parts = path.split("/")
+
+
+
+            if current_user.get("sub") == "LABWARE_LIMS":
+                is_preticket = (path == "issues/preticket" and request.method == "POST")
+                is_attachment = (len(parts) == 3 and parts[1].isdigit() and parts[2] == "attachments" and request.method == "POST")
+                is_environment = (len(parts) == 3 and parts[1].isdigit() and parts[2] == "environment" and request.method == "PUT")
+                
+                # Bloque immédiatement si le token essaie de faire autre chose (ex: GET /issues, PUT /close...)
+                if not (is_preticket or is_attachment or is_environment):
+                    print(f"[SECURITY ALERT] Attempt to use LIMS token for unauthorized route: {request.method} {path} from IP {client_ip}")
+                    return jsonify({
+                        "error": "Forbidden", 
+                        "details": "LabWare System Token is strictly restricted to preticket operations."
+                    }), 403, headers
+            # =========================================================================
             
             # GET /issues
             if path == "issues" and request.method == "GET":
@@ -209,12 +225,14 @@ def nutria_api(request):
             
             else:
                 return jsonify({"error": f"Unhandled sub-route: {path}"}), 404, headers
-            
-            
-            
 
         else:
             return jsonify({"error": "Route not found"}), 404, headers
 
     except Exception as e:
-        return jsonify({"error": f"Server error: {str(e)}"}), 500, headers
+        # 🛡️ ANTI-FUITE D'INFORMATION : On logge l'erreur en console pour nous, on masque pour l'utilisateur
+        print(f"[FATAL SERVER ERROR] Route: {path} | Error: {str(e)}")
+        return jsonify({
+            "error": "Internal Server Error", 
+            "details": "An unexpected error occurred. Please contact the administrator."
+        }), 500, headers
