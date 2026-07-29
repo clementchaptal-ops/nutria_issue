@@ -70,7 +70,7 @@ def get_all_issues(current_user):
             SELECT DISTINCT ON (i.id_issue) 
                    i.id_issue, i.title, i.issue_type, i.status, i.user_name,
                    u.full_name, u.location, TO_CHAR(i.created_on, 'YYYY-MM-DD HH24:MI') as c_date,
-                   i.criticity
+                   i.criticity, i.environment
             FROM c_issue i
             LEFT JOIN lims_users u ON TRIM(UPPER(i.user_name)) = TRIM(UPPER(u.user_name))
         """
@@ -104,7 +104,8 @@ def get_all_issues(current_user):
                 "full_name": row[5] if row[5] else (row[4] if row[4] else "Unknown"),
                 "country": row[6] if row[6] else "Global", 
                 "creation_date": row[7] if row[7] else "",
-                "criticity": row[8] if row[8] else "N/A"
+                "criticity": row[8] if row[8] else "N/A",
+                "environment": row[9] if row[9] else "UNKNOWN"
             })
         return tickets, 200
     except Exception as e:
@@ -200,7 +201,7 @@ def get_issue(issue_id, current_user):
                    i.ip_config, i.ping, i.status, i.citrix_session, i.current_pc, i.frequency,
                    i.blocking_issue, i.criticity, i.sspticket, i.workstation, i.working_dir,
                    i.current_active_role, i.current_project, i.current_batch, i.current_sample,
-                   i.current_analysis, i.current_analysis_variation, i.current_customer,
+                   i.environment, i.current_analysis, i.current_analysis_variation, i.current_customer,
                    u.location as creator_location, u.full_name, u.lab as creator_lab, u.email_addr as user_email,
                    TO_CHAR(i.created_on, 'YYYY-MM-DD HH24:MI:SS') as created_on
             FROM c_issue i
@@ -572,7 +573,7 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
     except ValidationError as e:
         return {"error": "error.invalid_data_format", "details": e.errors()}, 400
 
-    valid_statuses = ["CLOSED", "RESOLVED"]
+    valid_statuses = ["CLOSED", "ACT KNOWLEDGE"]
     if payload.new_status not in valid_statuses:
         return {"error": "error.invalid_status_option"}, 400
 
@@ -597,7 +598,7 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
         cursor.execute("UPDATE c_issue SET status = %s, changed_on = CURRENT_TIMESTAMP WHERE id_issue = %s", (payload.new_status, issue_id))
         connection.commit()
 
-        action_type = "RESOLVE_TICKET" if payload.new_status == "RESOLVED" else "CLOSE_TICKET"
+        action_type = "RESOLVE_TICKET" if payload.new_status == "ACT KNOWLEDGE" else "CLOSE_TICKET"
         log_user_action(user_name=current_user.get("sub", "UNKNOWN"), action_type=action_type, target_id=str(issue_id), details=f"Status modification validated: {payload.new_status}", ip_address=client_ip)
 
         return {"message": "success.ticket_status_updated", "new_status": payload.new_status}, 200
