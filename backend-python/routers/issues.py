@@ -878,7 +878,7 @@ def system_cleanup():
             
             for i_id in issue_ids:
                 # Liste tous les fichiers commençant par "tickets/ticket_{id}/"
-                blobs_to_delete = bucket.list_blobs(prefix=f"tickets/ticket_{i_id}/")
+                blobs_to_delete = bucket.list_blobs(prefix=f"tickets/ticket_{i_id}")
                 for blob in blobs_to_delete:
                     blob.delete()
             
