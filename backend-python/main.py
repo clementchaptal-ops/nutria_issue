@@ -68,19 +68,21 @@ def nutria_api(request):
             client_ip = request.remote_addr or "Unknown"
             parts = path.split("/")
 
-
-
+            # =========================================================================
+            # 🔒 VERROU DE SÉCURITÉ : RESTRICTION DU TOKEN LABWARE
+            # =========================================================================
             if current_user.get("sub") == "LABWARE_LIMS":
                 is_preticket = (path == "issues/preticket" and request.method == "POST")
                 is_attachment = (len(parts) == 3 and parts[1].isdigit() and parts[2] == "attachments" and request.method == "POST")
                 is_environment = (len(parts) == 3 and parts[1].isdigit() and parts[2] == "environment" and request.method == "PUT")
+                is_cleanup = (path == "issues/cleanup" and request.method == "POST")  # Autorisé pour Cloud Scheduler
                 
                 # Bloque immédiatement si le token essaie de faire autre chose (ex: GET /issues, PUT /close...)
-                if not (is_preticket or is_attachment or is_environment):
+                if not (is_preticket or is_attachment or is_environment or is_cleanup):
                     print(f"[SECURITY ALERT] Attempt to use LIMS token for unauthorized route: {request.method} {path} from IP {client_ip}")
                     return jsonify({
                         "error": "Forbidden", 
-                        "details": "LabWare System Token is strictly restricted to preticket operations."
+                        "details": "LabWare System Token is strictly restricted to preticket operations and system cleanup."
                     }), 403, headers
             # =========================================================================
             
@@ -210,10 +212,10 @@ def nutria_api(request):
                 data, http_code = create_preticket(request_json, current_user, client_ip)
                 return jsonify(data), http_code, headers
             
-            # POST /issues/cleanup 
+            # POST /issues/cleanup (Nettoyage automatique)
             elif path == "issues/cleanup" and request.method == "POST":
-                from routers.issues import cleanup_pretickets
-                data, http_code = cleanup_pretickets()
+                from routers.issues import system_cleanup
+                data, http_code = system_cleanup()
                 return jsonify(data), http_code, headers
             
             # PUT /issues/{id}/environment
@@ -230,7 +232,6 @@ def nutria_api(request):
             return jsonify({"error": "Route not found"}), 404, headers
 
     except Exception as e:
-        # 🛡️ ANTI-FUITE D'INFORMATION : On logge l'erreur en console pour nous, on masque pour l'utilisateur
         print(f"[FATAL SERVER ERROR] Route: {path} | Error: {str(e)}")
         return jsonify({
             "error": "Internal Server Error", 
