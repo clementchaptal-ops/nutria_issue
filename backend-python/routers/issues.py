@@ -843,10 +843,10 @@ def sync_lims_user(request_json):
 
 def system_cleanup():
     """
-    Tâche de maintenance globale (à appeler via Cloud Scheduler par exemple) :
-    1. Supprime les PRETICKETS de plus de 1 heure.
-    2. Supprime les logs d'audit de plus de 2 ans.
-    3. Supprime les tickets CLOSED de plus de 6 mois, ET vide leurs dossiers sur Cloud Storage.
+    Tâche de maintenance globale :
+    1. Supprime les PRETICKETS (> 1h) ET leurs fichiers sur Cloud Storage.
+    2. Supprime les logs d'audit (> 2 ans).
+    3. Supprime les tickets CLOSED (> 6 mois) ET leurs fichiers sur Cloud Storage.
     """
     connection = get_db_connection()
     if not connection:
@@ -854,65 +854,60 @@ def system_cleanup():
         
     try:
         cursor = connection.cursor()
-        
+        client = storage.Client()
+        bucket = client.bucket(BUCKET_NAME)
+
         # --- 1. NETTOYAGE DES PRETICKETS (> 1 heure) ---
-        cursor.execute("DELETE FROM c_issue WHERE status = 'PRETICKET' AND created_on < CURRENT_TIMESTAMP - INTERVAL '1 hour'")
-        deleted_pretickets = cursor.rowcount
-        
+        cursor.execute("SELECT id_issue FROM c_issue WHERE status = 'PRETICKET' AND created_on < CURRENT_TIMESTAMP - INTERVAL '1 hour'")
+        expired_pretickets = [row[0] for row in cursor.fetchall()]
+        deleted_pretickets_count = len(expired_pretickets)
+
+        if deleted_pretickets_count > 0:
+            # A. Suppression des fichiers des PRETICKETS sur GCS
+            for p_id in expired_pretickets:
+                blobs = bucket.list_blobs(prefix=f"tickets/ticket_{p_id}/")
+                for blob in blobs:
+                    blob.delete()
+
+            # B. Suppression dans PostgreSQL
+            p_format = ','.join(['%s'] * deleted_pretickets_count)
+            p_tuple = tuple(expired_pretickets)
+            
+            cursor.execute(f"DELETE FROM c_issue_attachment WHERE id_issue IN ({p_format})", p_tuple)
+            cursor.execute(f"DELETE FROM c_issue_comments WHERE id_issue IN ({p_format})", p_tuple)
+            cursor.execute(f"DELETE FROM c_issue WHERE id_issue IN ({p_format})", p_tuple)
+
         # --- 2. NETTOYAGE DES LOGS D'AUDIT (> 2 ans) ---
         cursor.execute("DELETE FROM c_issue_audit_logs WHERE created_at < CURRENT_TIMESTAMP - INTERVAL '2 years'")
         deleted_logs = cursor.rowcount
 
-        # --- 3. NETTOYAGE DES TICKETS FERMÉS (> 6 mois) ET DE L'ESPACE DE STOCKAGE ---
-        # On récupère d'abord les IDs pour aller supprimer les fichiers sur Google Cloud Storage
+        # --- 3. NETTOYAGE DES TICKETS FERMÉS (> 6 mois) ---
         cursor.execute("SELECT id_issue FROM c_issue WHERE status = 'CLOSED' AND changed_on < CURRENT_TIMESTAMP - INTERVAL '6 months'")
-        closed_issues = cursor.fetchall()
+        closed_issues = [row[0] for row in cursor.fetchall()]
         deleted_closed_count = len(closed_issues)
 
         if deleted_closed_count > 0:
-            issue_ids = [row[0] for row in closed_issues]
-            
-            # A. Suppression sur Google Cloud Storage (Bucket)
-            client = storage.Client()
-            bucket = client.bucket(BUCKET_NAME)
-            
-            for i_id in issue_ids:
-                folder_prefix = f"tickets/ticket_{i_id}/"
-                
-                # 1. Supprime tous les fichiers contenus dans le dossier
-                blobs_to_delete = bucket.list_blobs(prefix=folder_prefix)
-                for blob in blobs_to_delete:
+            # A. Suppression des fichiers des TICKETS FERMÉS sur GCS
+            for c_id in closed_issues:
+                blobs = bucket.list_blobs(prefix=f"tickets/ticket_{c_id}/")
+                for blob in blobs:
                     blob.delete()
-                
-                # 2. Force la suppression des objets marqueurs de dossier (avec et sans slash)
-                possible_folder_blobs = [
-                    f"tickets/ticket_{i_id}/",
-                    f"tickets/ticket_{i_id}"
-                ]
-                
-                for folder_path in possible_folder_blobs:
-                    folder_blob = bucket.blob(folder_path)
-                    if folder_blob.exists():
-                        folder_blob.delete()
-            
-            # B. Suppression dans PostgreSQL
-            # On génère les placeholders %s dynamiquement selon le nombre d'IDs
-            format_strings = ','.join(['%s'] * deleted_closed_count)
-            issue_ids_tuple = tuple(issue_ids)
-            
-            # On supprime d'abord les enfants pour éviter les erreurs de clés étrangères (Foreign Keys)
-            cursor.execute(f"DELETE FROM c_issue_attachment WHERE id_issue IN ({format_strings})", issue_ids_tuple)
-            cursor.execute(f"DELETE FROM c_issue_comments WHERE id_issue IN ({format_strings})", issue_ids_tuple)
-            # Enfin on supprime les tickets parents
-            cursor.execute(f"DELETE FROM c_issue WHERE id_issue IN ({format_strings})", issue_ids_tuple)
 
-        # Validation de toutes les suppressions en base
+            # B. Suppression dans PostgreSQL
+            c_format = ','.join(['%s'] * deleted_closed_count)
+            c_tuple = tuple(closed_issues)
+            
+            cursor.execute(f"DELETE FROM c_issue_attachment WHERE id_issue IN ({c_format})", c_tuple)
+            cursor.execute(f"DELETE FROM c_issue_comments WHERE id_issue IN ({c_format})", c_tuple)
+            cursor.execute(f"DELETE FROM c_issue WHERE id_issue IN ({c_format})", c_tuple)
+
+        # Validation globale
         connection.commit()
         
         return {
             "message": "success.system_cleanup_completed", 
             "details": {
-                "deleted_pretickets": deleted_pretickets,
+                "deleted_pretickets": deleted_pretickets_count,
                 "deleted_audit_logs": deleted_logs,
                 "deleted_closed_issues": deleted_closed_count
             }
