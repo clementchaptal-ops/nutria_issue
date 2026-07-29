@@ -877,10 +877,23 @@ def system_cleanup():
             bucket = client.bucket(BUCKET_NAME)
             
             for i_id in issue_ids:
-                # Liste tous les fichiers commençant par "tickets/ticket_{id}/"
-                blobs_to_delete = bucket.list_blobs(prefix=f"tickets/ticket_{i_id}")
+                folder_prefix = f"tickets/ticket_{i_id}/"
+                
+                # 1. Supprime tous les fichiers contenus dans le dossier
+                blobs_to_delete = bucket.list_blobs(prefix=folder_prefix)
                 for blob in blobs_to_delete:
                     blob.delete()
+                
+                # 2. Force la suppression des objets marqueurs de dossier (avec et sans slash)
+                possible_folder_blobs = [
+                    f"tickets/ticket_{i_id}/",
+                    f"tickets/ticket_{i_id}"
+                ]
+                
+                for folder_path in possible_folder_blobs:
+                    folder_blob = bucket.blob(folder_path)
+                    if folder_blob.exists():
+                        folder_blob.delete()
             
             # B. Suppression dans PostgreSQL
             # On génère les placeholders %s dynamiquement selon le nombre d'IDs
