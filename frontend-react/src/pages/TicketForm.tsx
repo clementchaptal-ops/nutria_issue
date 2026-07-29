@@ -15,7 +15,6 @@ const getDecodedToken = () => {
   }
 };
 
-// Utility function for elegant confirmations (accepts translated button texts)
 const showConfirmToast = (message: string, confirmText: string, cancelText: string, onConfirm: () => void) => {
   toast((t) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -63,7 +62,6 @@ function TicketForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [title, setTitle] = useState('')
-  const [sspTicket, setSspTicket] = useState('')
   const [issueType, setIssueType] = useState('')      
   const [criticity, setCriticity] = useState('')      
   const [frequency, setFrequency] = useState('')      
@@ -82,7 +80,7 @@ function TicketForm() {
   const [lightboxMedia, setLightboxMedia] = useState<{url: string, type: string} | null>(null)
   
   const [userInfo, setUserInfo] = useState({
-    user_name: '', full_name: '', user_email: '', created_on: '', current_role: '', lab: '', location: ''
+    user_name: '', full_name: '', user_email: '', created_on: '', current_role: '', lab: '', location: '', env: ''
   })
 
   const [currentContext, setCurrentContext] = useState({
@@ -93,7 +91,6 @@ function TicketForm() {
     ip_adress: '', ip_config: '', workstation: '', current_pc: '', ping: '',
   })
 
-  // AI Analysis States
   const [aiAnalysis, setAiAnalysis] = useState<any>(null)
   const [isAiLoading, setIsAiLoading] = useState(false)
 
@@ -137,7 +134,8 @@ function TicketForm() {
           created_on: t('common.na', 'N/A'),
           current_role: currentUser?.role || 'USER',
           lab: t('common.na', 'N/A'), 
-          location: currentUser?.location || t('common.na', 'N/A')
+          location: currentUser?.location || t('common.na', 'N/A'),
+          env: currentUser?.env || currentUser?.environment || t('common.na', 'N/A')
         }
         
         setUserInfo(backupUser)
@@ -156,11 +154,12 @@ function TicketForm() {
               created_on: t('common.na', 'N/A'),
               current_role: profile.current_role || backupUser.current_role, 
               lab: profile.lab || backupUser.lab,
-              location: profile.location || backupUser.location
+              location: profile.location || backupUser.location,
+              env: profile.env || profile.environment || backupUser.env
             })
           }
         } catch (error) {
-          // Silent fallback in case of error
+          // Silent fallback
         } finally {
           setIsLoading(false)
         }
@@ -191,7 +190,6 @@ function TicketForm() {
         setStatus(currentStatus)
         
         setTitle(data.title || '')
-        setSspTicket(data.sspticket || '')
         setIssueType(data.issue_type || '')
         setCriticity(data.criticity || '')
         setFrequency(data.frequency || '')
@@ -210,7 +208,8 @@ function TicketForm() {
           created_on: data.created_on ? new Date(data.created_on).toLocaleString() : '',
           current_role: data.current_active_role || data.current_role || '',
           lab: data.creator_lab || '',
-          location: data.creator_location || ''
+          location: data.creator_location || '',
+          env: data.env || data.environment || 'N/A'
         })
 
         setCurrentContext({
@@ -232,7 +231,7 @@ function TicketForm() {
         })
 
         const currentUser = getDecodedToken()
-        if (currentUser && currentStatus !== 'CANCELED' && currentStatus !== 'CLOSED' && currentStatus !== 'RESOLVED') {
+        if (currentUser && currentStatus !== 'CANCELED' && currentStatus !== 'CLOSED' && currentStatus !== 'ACT KNOWLEDGE') {
           const userRole = currentUser.role
           const userLoc = currentUser.location
           const userEmail = currentUser.email?.toLowerCase()
@@ -268,24 +267,20 @@ function TicketForm() {
       })
       if (!response.ok) throw new Error('Download impossible')
 
-      // 1. On lit la réponse en JSON (car l'API renvoie { file_path: "..." })
       const data = await response.json()
 
       if (data.file_path) {
-        // 2. On crée un lien invisible qui pointe vers le VRAI fichier sur Google Cloud
         const link = document.createElement('a')
         link.href = data.file_path
         link.setAttribute('download', data.file_name || defaultFilename)
-        link.target = '_blank' // Ouvre dans un nouvel onglet par sécurité
+        link.target = '_blank'
         
-        // 3. On clique virtuellement dessus pour lancer le téléchargement
         document.body.appendChild(link)
         link.click()
         link.remove()
       } else {
         toast.error(t('ticket.download_error', 'File link not found.'))
       }
-
     } catch (error) {
       toast.error(t('ticket.download_error', 'Failed to download file.'))
     }
@@ -300,7 +295,7 @@ function TicketForm() {
     setIsSubmitting(true)
 
     const payloadData = {
-      title, issue_type: issueType, criticity, frequency, blocking_issue: blockingIssue, description, sspticket: sspTicket,
+      title, issue_type: issueType, criticity, frequency, blocking_issue: blockingIssue, description,
       current_project: currentContext.current_project, current_batch: currentContext.current_batch,
       current_sample: currentContext.current_sample ? Number(currentContext.current_sample) : null,
       current_analysis: currentContext.current_analysis, current_analysis_variation: currentContext.current_analysis_variation,
@@ -362,7 +357,6 @@ function TicketForm() {
     }
   }
 
-  // Logic extracted to be called by the toast
   const executeCancelTicket = async () => {
     try {
       const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/cancel`, {
@@ -393,8 +387,7 @@ function TicketForm() {
     )
   }
 
-  // Logic extracted to be called by the toast
-  const executeCloseTicket = async (targetStatus: 'RESOLVED' | 'CLOSED') => {
+  const executeCloseTicket = async (targetStatus: 'ACT KNOWLEDGE' | 'CLOSED') => {
     try {
       const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/close`, {
         method: 'PUT',
@@ -407,8 +400,8 @@ function TicketForm() {
         setIsEditing(false)
         setCanEdit(false)
         
-        const successMessage = targetStatus === 'RESOLVED'
-          ? t('ticket.resolve_success', 'Ticket successfully resolved.')
+        const successMessage = targetStatus === 'ACT KNOWLEDGE'
+          ? t('ticket.resolve_success', 'Ticket successfully acknowledged.')
           : t('ticket.close_success', 'Ticket successfully closed.')
         toast.success(successMessage)
       } else {
@@ -420,9 +413,9 @@ function TicketForm() {
     }
   }
 
-  const handleCloseTicket = (targetStatus: 'RESOLVED' | 'CLOSED') => {
-    const confirmMessage = targetStatus === 'RESOLVED' 
-      ? t('ticket.confirm_resolve', 'Are you sure you want to resolve this ticket?')
+  const handleCloseTicket = (targetStatus: 'ACT KNOWLEDGE' | 'CLOSED') => {
+    const confirmMessage = targetStatus === 'ACT KNOWLEDGE' 
+      ? t('ticket.confirm_resolve', 'Are you sure you want to acknowledge this ticket?')
       : t('ticket.confirm_close', 'Are you sure you want to close this ticket?');
     
     showConfirmToast(
@@ -433,7 +426,6 @@ function TicketForm() {
     )
   }
 
-  // Logic extracted to be called by the toast
   const executeDeleteAttachment = async (filename: string) => {
     try {
       const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/attachments/${filename}`, {
@@ -513,7 +505,6 @@ function TicketForm() {
     }
   }
 
-  // Real AI Fetch Function
   const fetchAiAnalysis = async () => {
     setIsAiLoading(true)
     
@@ -532,10 +523,7 @@ function TicketForm() {
       }
 
       const result = await response.json()
-      
-      // result.data contains { category, confidence, summary, similar_tickets, pdf_download_url }
       setAiAnalysis(result.data) 
-      
       toast.success(t('ai.success', 'AI Analysis generated successfully!'))
 
     } catch (error: any) {
@@ -560,10 +548,10 @@ function TicketForm() {
         
         {canEdit && (
           <div style={{ display: 'flex', gap: '10px' }}>
-            {!isEditing && status !== 'CLOSED' && status !== 'RESOLVED' && status !== 'CANCELED' && (
+            {!isEditing && status !== 'CLOSED' && status !== 'ACT KNOWLEDGE' && status !== 'CANCELED' && (
               <>
-                <button type="button" onClick={() => handleCloseTicket('RESOLVED')} style={{ padding: '6px 16px', borderRadius: '4px', border: '1px solid #36b37e', background: '#e3fcef', color: '#006644', cursor: 'pointer', fontWeight: 'bold' }}>
-                  ✅ {t('ticket.resolve', 'Resolve')}
+                <button type="button" onClick={() => handleCloseTicket('ACT KNOWLEDGE')} style={{ padding: '6px 16px', borderRadius: '4px', border: '1px solid #36b37e', background: '#e3fcef', color: '#006644', cursor: 'pointer', fontWeight: 'bold' }}>
+                  ✅ {t('ticket.act_knowledge', 'Act Knowledge')}
                 </button>
                 <button type="button" onClick={() => handleCloseTicket('CLOSED')} style={{ padding: '6px 16px', borderRadius: '4px', border: '1px solid #42526e', background: '#ebecf0', color: '#42526e', cursor: 'pointer', fontWeight: 'bold' }}>
                   🔒 {t('ticket.close', 'Close')}
@@ -602,11 +590,6 @@ function TicketForm() {
               <div className={styles.formGroup}>
                 <label className={styles.label}>{t('ticket.title', 'Issue Title')} <span className={styles.required}>*</span></label>
                 <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className={styles.input} required />
-              </div>
-
-              <div className={styles.formGroup}>
-                <label className={styles.label}>{t('ticket.ssp_ticket', 'SSP Ticket Link (Optional)')}</label>
-                <input type="text" value={sspTicket} onChange={(e) => setSspTicket(e.target.value)} placeholder="SSP-12345" className={styles.input} />
               </div>
 
               <div className={styles.row2}>
@@ -778,6 +761,7 @@ function TicketForm() {
               <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.role', 'Role:')}</span><span className={styles.infoValue}>{userInfo.current_role || 'N/A'}</span></div>
               <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.lab', 'Lab:')}</span><span className={styles.infoValue}>{userInfo.lab || 'N/A'}</span></div>
               <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.location', 'Location:')}</span><span className={styles.infoValue}>{userInfo.location || 'N/A'}</span></div>
+              <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.env', 'Environment:')}</span><span className={styles.infoValue}>{userInfo.env || 'N/A'}</span></div>
               <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.email', 'Email:')}</span><span className={styles.infoValue}>{userInfo.user_email}</span></div>
               <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.created_on', 'Created On:')}</span><span className={styles.infoValue}>{userInfo.created_on || t('common.na', 'N/A')}</span></div>
             </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import toast from 'react-hot-toast' // Toast import
+import toast from 'react-hot-toast'
 import { fetchAllIssues } from '../api/issues'
 import styles from './Dashboard.module.css'
 
@@ -29,7 +29,7 @@ function Dashboard() {
 
   const showPreticket = activeStatuses.includes('PRETICKET')
   const showInProgress = activeStatuses.includes('IN PROGRESS') 
-  const showResolved = activeStatuses.includes('RESOLVED')
+  const showActKnowledge = activeStatuses.includes('ACT KNOWLEDGE')
   const showClosed = activeStatuses.includes('CLOSED')
 
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'id_issue', direction: 'desc' })
@@ -62,7 +62,6 @@ function Dashboard() {
         setLoading(false);
       })
       .catch((err) => {
-        // Error toast used here instead of ErrorMessage component
         toast.error(t('dashboard.error.network', 'Network error: {{message}}', { message: err.message }));
         setLoading(false);
       })
@@ -83,7 +82,7 @@ function Dashboard() {
 
   const preticketCount = tickets.filter(t => t.status === 'PRETICKET').length
   const inProgressCount = tickets.filter(t => t.status === 'IN PROGRESS').length
-  const resolvedCount = tickets.filter(t => t.status === 'RESOLVED').length
+  const actKnowledgeCount = tickets.filter(t => t.status === 'ACT KNOWLEDGE').length
   const closedCount = tickets.filter(t => t.status === 'CLOSED').length
 
   let filteredTickets = tickets.filter((ticket) => {
@@ -152,9 +151,9 @@ function Dashboard() {
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#0052cc' }}>{inProgressCount}</div>
         </div>
 
-        <div onClick={() => toggleStatusFilter('RESOLVED', !showResolved)} style={{ flex: 1, padding: '15px', background: '#fff', borderRadius: '8px', border: '1px solid #dfe1e6', cursor: 'pointer', textAlign: 'center', boxShadow: showResolved ? '0 0 0 2px #36b37e' : 'none' }}>
-          <div style={{ fontSize: '12px', color: '#7a869a' }}>{t('dashboard.status.resolved', 'Resolved')}</div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#36b37e' }}>{resolvedCount}</div>
+        <div onClick={() => toggleStatusFilter('ACT KNOWLEDGE', !showActKnowledge)} style={{ flex: 1, padding: '15px', background: '#fff', borderRadius: '8px', border: '1px solid #dfe1e6', cursor: 'pointer', textAlign: 'center', boxShadow: showActKnowledge ? '0 0 0 2px #36b37e' : 'none' }}>
+          <div style={{ fontSize: '12px', color: '#7a869a' }}>{t('dashboard.status.act_knowledge', 'Act Knowledge')}</div>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#36b37e' }}>{actKnowledgeCount}</div>
         </div>
 
         <div onClick={() => toggleStatusFilter('CLOSED', !showClosed)} style={{ flex: 1, padding: '15px', background: '#fff', borderRadius: '8px', border: '1px solid #dfe1e6', cursor: 'pointer', textAlign: 'center', boxShadow: showClosed ? '0 0 0 2px #42526e' : 'none' }}>
@@ -178,6 +177,7 @@ function Dashboard() {
           <option value="user_name">{t('dashboard.search.username', 'User Name')}</option>
           <option value="full_name">{t('dashboard.search.fullname', 'Full Name')}</option>
           <option value="criticity">{t('dashboard.search.criticity', 'Criticity')}</option>
+          <option value="env">{t('dashboard.search.env', 'Environment')}</option>
           <option value="country">{t('dashboard.search.location', 'Location')}</option>
           <option value="creation_date">{t('dashboard.search.date', 'Date')}</option>
         </select>
@@ -218,11 +218,11 @@ function Dashboard() {
           <label className={styles.checkboxPill}>
             <input 
               type="checkbox" 
-              checked={showResolved} 
-              onChange={(e) => toggleStatusFilter('RESOLVED', e.target.checked)} 
+              checked={showActKnowledge} 
+              onChange={(e) => toggleStatusFilter('ACT KNOWLEDGE', e.target.checked)} 
               className={styles.checkboxInput}
             />
-            ✅ {t('dashboard.filters.resolved', 'RESOLVED')}
+            ✅ {t('dashboard.filters.act_knowledge', 'ACT KNOWLEDGE')}
           </label>
 
           <label className={styles.checkboxPill}>
@@ -243,8 +243,6 @@ function Dashboard() {
           ➕ {t('dashboard.create_button', 'Create a Ticket')}
         </button>
       </div>
-
-      {/* ErrorMessage component removed in favor of hot-toast */}
 
       {filteredTickets.length === 0 ? (
         <div className={styles.emptyState}>
@@ -275,6 +273,9 @@ function Dashboard() {
                 </th>
                 <th onClick={() => requestSort('criticity')}>
                   {t('dashboard.table.criticity', 'Criticity')} {getSortIcon('criticity')}
+                </th>
+                <th onClick={() => requestSort('env')}>
+                  {t('dashboard.table.env', 'Environment')} {getSortIcon('env')}
                 </th>
                 <th onClick={() => requestSort('country')}>
                   {t('dashboard.table.location', 'Location')} {getSortIcon('country')}
@@ -310,6 +311,7 @@ function Dashboard() {
                   {ticket.criticity}
                   </span>
                   </td>
+                  <td>{ticket.env || ticket.environment}</td>
                   <td className={styles.tdLocation}>{ticket.country}</td>
                   <td className={styles.tdDate}>{ticket.creation_date}</td>
                 </tr>
