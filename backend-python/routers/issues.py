@@ -9,7 +9,7 @@ from config.database import get_db_connection
 from pydantic import ValidationError
 
 # Local file imports
-from .schemas import TicketCreate, TicketUpdate, StatusUpdate
+from .schemas import IssueCreate, IssueUpdate, StatusUpdate
 from .audit import log_user_action
 
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
