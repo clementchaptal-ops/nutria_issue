@@ -268,6 +268,19 @@ def nutria_api(request):
                 request_json = request.get_json(silent=True) or {}
                 data, http_code = link_issue_to_regroupement(int(parts[1]), request_json, current_user, client_ip)
                 return jsonify(data), http_code, headers
+            
+            # PUT /regroupements/{id}/close
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "close" and request.method == "PUT":
+                from routers.regroupement import close_regroupement
+                data, http_code = close_regroupement(int(parts[1]), current_user, client_ip)
+                return jsonify(data), http_code, headers
+
+            # POST /regroupements/{id}/attachments
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "attachments" and request.method == "POST":
+                from routers.regroupement import upload_regroupement_attachments
+                files_data = [{"filename": f.filename, "content_type": f.content_type, "bytes": f.read()} for k in request.files for f in request.files.getlist(k)]
+                data, http_code = upload_regroupement_attachments(int(parts[1]), files_data, current_user)
+                return jsonify(data), http_code, headers
                 
             else:
                 return jsonify({"error": f"Unhandled sub-route: {path}"}), 404, headers

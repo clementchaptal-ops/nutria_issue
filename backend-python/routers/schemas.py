@@ -43,6 +43,7 @@ class RegroupementCreate(BaseModel):
     title: str
     description: str
     ssp_ticket: Optional[str] = None
+    issue_ids: Optional[list[int]] = [] 
 
 class RegroupementUpdate(BaseModel):
     title: str

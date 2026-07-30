@@ -5,7 +5,6 @@ import toast from 'react-hot-toast'
 import { fetchAllRegroupements } from '../api/regroupements'
 import styles from './RegroupementList.module.css'
 
-// Import de nos composants génériques
 import StatCard from '../components/StatCard'
 import SearchBar from '../components/SearchBar'
 import GenericTable, { TableColumn } from '../components/GenericTable'
@@ -26,6 +25,10 @@ function RegroupementList() {
   const searchQuery = searchParams.get('search') || ''
   const searchColumn = searchParams.get('column') || 'ALL'
   
+  // 🚨 Ajout du filtre de statuts
+  const statusParam = searchParams.get('status')
+  const activeStatuses = statusParam !== null ? (statusParam ? statusParam.split(',') : []) : ['OPEN']
+  
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'id_regroupment', direction: 'desc' })
 
   const updateUrlParam = (key: string, value: string) => {
@@ -36,6 +39,16 @@ function RegroupementList() {
       newParams.delete(key)
     }
     setSearchParams(newParams)
+  }
+
+  const toggleStatusFilter = (targetStatus: string) => {
+    let newStatuses = [...activeStatuses]
+    if (activeStatuses.includes(targetStatus)) {
+      newStatuses = newStatuses.filter(s => s !== targetStatus)
+    } else {
+      newStatuses.push(targetStatus)
+    }
+    updateUrlParam('status', newStatuses.join(','))
   }
 
   useEffect(() => {
@@ -58,11 +71,16 @@ function RegroupementList() {
     setSortConfig({ key, direction })
   }
 
+  // 🚨 Compteurs pour les StatCards
+  const openCount = regroupements.filter(r => r.status === 'OPEN').length
+  const closedCount = regroupements.filter(r => r.status === 'CLOSED').length
+
   // Filtrage
   let filteredList = regroupements.filter((grp) => {
+    if (!activeStatuses.includes(grp.status)) return false // Filtre par statut
     if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
     
+    const query = searchQuery.toLowerCase()
     if (searchColumn === 'ALL') {
       return Object.values(grp).some(val => String(val).toLowerCase().includes(query))
     } else {
@@ -75,11 +93,9 @@ function RegroupementList() {
     const key = sortConfig.key
     let valA = a[key]
     let valB = b[key]
-
     if (key === 'id_regroupment' || key === 'ticket_count') {
       return sortConfig.direction === 'asc' ? (valA || 0) - (valB || 0) : (valB || 0) - (valA || 0)
     }
-
     valA = String(valA || '').toLowerCase()
     valB = String(valB || '').toLowerCase()
     if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
@@ -87,7 +103,6 @@ function RegroupementList() {
     return 0
   })
 
-  // Configuration de la barre de recherche
   const searchColumns = [
     { value: 'ALL', label: t('dashboard.search.all_columns', 'All Columns') },
     { value: 'id_regroupment', label: t('regroupements.table.id', 'ID') },
@@ -96,7 +111,6 @@ function RegroupementList() {
     { value: 'created_by', label: t('regroupements.table.creator', 'Creator') }
   ]
 
-  // Configuration de la table (réutilisation de GenericTable)
   const tableColumns: TableColumn<any>[] = [
     { 
       key: 'id_regroupment', 
@@ -104,6 +118,19 @@ function RegroupementList() {
       render: (item) => <span style={{ fontWeight: 'bold', color: '#0052cc' }}>#{item.id_regroupment}</span>
     },
     { key: 'title', label: t('dashboard.search.title', 'Title'), render: (item) => <strong>{item.title}</strong> },
+    { 
+      key: 'status', 
+      label: 'Status',
+      render: (item) => (
+        <span style={{ 
+          background: item.status === 'CLOSED' ? '#dfe1e6' : '#deebff', 
+          color: item.status === 'CLOSED' ? '#42526e' : '#0052cc', 
+          padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' 
+        }}>
+          {item.status}
+        </span>
+      )
+    },
     { 
       key: 'ssp_ticket', 
       label: t('regroupements.table.ssp', 'SSP Ticket'),
@@ -114,12 +141,11 @@ function RegroupementList() {
       ) : <span style={{ color: '#a5adba' }}>-</span>
     },
     { key: 'created_by', label: t('regroupements.table.creator', 'Created By') },
-    { key: 'created_on', label: t('dashboard.table.date', 'Date') }
+    { key: 'created_on', label: t('dashboard.table.date', 'Date') },
+    { key: 'ticket_count', label: 'Issues' }
   ]
 
-  if (loading) {
-    return <p style={{ padding: '40px', textAlign: 'center' }}>{t('dashboard.loading', 'Loading data...')}</p>
-  }
+  if (loading) return <p style={{ padding: '40px', textAlign: 'center' }}>{t('dashboard.loading', 'Loading data...')}</p>
 
   return (
     <div className={styles.container}>
@@ -131,14 +157,8 @@ function RegroupementList() {
       </div>
 
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-        <StatCard 
-          label={t('regroupements.stats.total', 'Total Regroupements')} 
-          count={regroupements.length} 
-          color="#0052cc" 
-          isActive={false} 
-          onClick={() => {}} 
-        />
-        {/* Tu peux ajouter d'autres cartes ici (ex: Créés cette semaine, etc.) si besoin */}
+        <StatCard label="Open" count={openCount} color="#0052cc" isActive={activeStatuses.includes('OPEN')} onClick={() => toggleStatusFilter('OPEN')} />
+        <StatCard label="Closed" count={closedCount} color="#42526e" isActive={activeStatuses.includes('CLOSED')} onClick={() => toggleStatusFilter('CLOSED')} />
       </div>
 
       <div className={styles.actionBar}>
