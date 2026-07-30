@@ -1,187 +1,371 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
-import { fetchRegroupement, closeRegroupement, uploadRegroupementAttachments } from '../api/regroupements'
-import styles from './IssueForm.module.css' 
+import FileUploader from '../components/FileUploader'
+import { 
+  fetchRegroupement, 
+  closeRegroupement, 
+  fetchRegroupementComments, 
+  addRegroupementComment, 
+  uploadRegroupementCommentAttachments, 
+  uploadRegroupementAttachments, 
+  deleteRegroupementAttachment 
+} from '../api/regroupements'
+import styles from './IssueForm.module.css'
 
 function RegroupementDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { t } = useTranslation()
 
-  const [regroupement, setRegroupement] = useState<any>(null)
-  const [loading, setLoading] = useState<boolean>(true)
-  const [uploading, setUploading] = useState<boolean>(false)
-
   const regroupementId = Number(id)
 
-  const loadData = () => {
+  const [regroupement, setRegroupement] = useState<any>(null)
+  const [loading, setLoading] = useState<boolean>(true)
+  
+  // Attachments & Comments states
+  const [attachments, setAttachments] = useState<File[]>([])
+  const [comments, setComments] = useState<any[]>([])
+  const [newComment, setNewComment] = useState('')
+  const [commentFiles, setCommentFiles] = useState<File[]>([])
+  const [isPostingComment, setIsPostingComment] = useState(false)
+  const [lightboxMedia, setLightboxMedia] = useState<{url: string, type: string} | null>(null)
+
+  const loadData = async () => {
     if (!regroupementId) return
-    setLoading(true)
-    fetchRegroupement(regroupementId)
-      .then((res) => {
-        setRegroupement(res.data)
-        setLoading(false)
-      })
-      .catch((err) => {
-        toast.error(t('regroupements.error.load_failed', 'Failed to load regroupement details.'))
-        setLoading(false)
-      })
+    setIsLoadingData(true)
+    try {
+      const res = await fetchRegroupement(regroupementId)
+      setRegroupement(res.data)
+      await fetchComments()
+    } catch (err) {
+      toast.error(t('regroupements.error.load_failed', 'Failed to load regroupement details.'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const [isLoadingData, setIsLoadingData] = useState(false)
+
+  const fetchComments = async () => {
+    if (!regroupementId) return
+    try {
+      const res = await fetchRegroupementComments(regroupementId)
+      if (Array.isArray(res.data)) setComments(res.data)
+      else setComments([])
+    } catch (err) {
+      setComments([])
+    }
   }
 
   useEffect(() => {
     loadData()
   }, [regroupementId])
 
-  // 🚨 Action : Clôturer le regroupement
   const handleClose = async () => {
-    if (!window.confirm(t('regroupements.confirm_close', 'Are you sure you want to close this regroupement?'))) {
-      return
-    }
+    if (!window.confirm(t('regroupements.confirm_close', 'Are you sure you want to close this regroupement?'))) return
     try {
       await closeRegroupement(regroupementId)
       toast.success(t('regroupements.closed_success', 'Regroupement closed successfully!'))
-      loadData() // Recharge les données pour mettre à jour le statut visuel
-    } catch (err: any) {
+      loadData()
+    } catch (err) {
       toast.error(t('regroupements.error.close_failed', 'Failed to close regroupement.'))
     }
   }
 
-  // 🚨 Action : Ajouter des pièces jointes
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return
-
+  const handleUploadMainAttachments = async () => {
+    if (attachments.length === 0) return
     const formData = new FormData()
-    Array.from(e.target.files).forEach((file) => {
-      formData.append('files', file)
-    })
-
-    setUploading(true)
+    attachments.forEach((file) => formData.append('files', file))
     try {
       await uploadRegroupementAttachments(regroupementId, formData)
-      toast.success(t('regroupements.attachments_success', 'Files uploaded successfully!'))
+      toast.success(t('ticket.success_msg_update', 'Attachments uploaded!'))
+      setAttachments([])
       loadData()
     } catch (err) {
-      toast.error(t('regroupements.error.upload_failed', 'Failed to upload files.'))
+      toast.error(t('ticket.error.upload_attachments', 'Could not upload files.'))
+    }
+  }
+
+  const handleDeleteAttachment = async (filename: string) => {
+    if (!window.confirm(t('ticket.confirm_delete_file', 'Are you sure you want to delete this file?'))) return
+    try {
+      await deleteRegroupementAttachment(regroupementId, filename)
+      toast.success(t('ticket.success.file_deleted', 'File deleted successfully.'))
+      loadData()
+    } catch (err) {
+      toast.error(t('ticket.error.network_delete', 'Error deleting file.'))
+    }
+  }
+
+  const handlePostComment = async () => {
+    if (!newComment.trim() || isPostingComment) return
+    setIsPostingComment(true)
+    try {
+      const res = await addRegroupementComment(regroupementId, newComment)
+      const commentId = res.data.id_comment
+
+      if (commentFiles.length > 0 && commentId) {
+        const formData = new FormData()
+        commentFiles.forEach((f) => formData.append('files', f))
+        await uploadRegroupementCommentAttachments(regroupementId, commentId, formData)
+      }
+
+      setNewComment('')
+      setCommentFiles([])
+      fetchComments()
+    } catch (err) {
+      toast.error(t('ticket.error.network_comment', 'Error posting comment.'))
     } finally {
-      setUploading(false)
+      setIsPostingComment(false)
     }
   }
 
   if (loading) {
-    return <p style={{ padding: '40px', textAlign: 'center' }}>{t('common.loading', 'Loading...')}</p>
+    return <div className={styles.loading}>{t('common.loading', 'Loading regroupement data...')}</div>
   }
 
   if (!regroupement) {
-    return <p style={{ padding: '40px', textAlign: 'center' }}>{t('regroupements.not_found', 'Regroupement not found.')}</p>
+    return <div className={styles.pageContainer}><p>{t('regroupements.not_found', 'Regroupement not found.')}</p></div>
   }
 
+  // 🎯 URL SSP CORRIGÉE
+  const sspUrl = regroupement.ssp_ticket ? `https://it-ssp.mxns.com/a/tickets/${regroupement.ssp_ticket}` : null
+
   return (
-    <div style={{ maxWidth: '1000px', margin: '30px auto', padding: '20px', background: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-      {/* En-tête */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #dfe1e6', paddingBottom: '15px' }}>
-        <div>
-          <button onClick={() => navigate('/regroupements')} style={{ background: 'none', border: 'none', color: '#0052cc', cursor: 'pointer', padding: 0, marginBottom: '10px' }}>
-            ← {t('common.back', 'Back to list')}
+    <div className={styles.pageContainer}>
+      {/* BANNIÈRE DE STATUT */}
+      <div className={`${styles.statusBanner} ${regroupement.status === 'CLOSED' ? styles.closed : styles.in_progress}`} style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <button onClick={() => navigate('/regroupements')} style={{ background: 'none', border: 'none', color: '#0052cc', cursor: 'pointer', fontWeight: 'bold' }}>
+            ← {t('common.back', 'Back')}
           </button>
-          <h1 style={{ margin: 0 }}>📁 #{regroupement.id_regroupment} - {regroupement.title}</h1>
-          <p style={{ color: '#7a869a', margin: '5px 0 0 0', fontSize: '14px' }}>
-            Created by <strong>{regroupement.created_by}</strong> on {regroupement.created_on}
-          </p>
+          <div className={styles.statusInfo}>
+            <span className={styles.statusLabel}>{t('ticket.current_status', 'Current Status:')}</span>
+            <span className={styles.statusBadge}>{regroupement.status}</span>
+          </div>
+          <span className={styles.ticketIdText}>REGROUPEMENT #{regroupement.id_regroupment}</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <span style={{
-            background: regroupement.status === 'CLOSED' ? '#dfe1e6' : '#deebff',
-            color: regroupement.status === 'CLOSED' ? '#42526e' : '#0052cc',
-            padding: '6px 12px', borderRadius: '16px', fontWeight: 'bold', fontSize: '14px'
-          }}>
-            {regroupement.status}
-          </span>
+        {regroupement.status !== 'CLOSED' && (
+          <button type="button" onClick={handleClose} style={{ padding: '6px 16px', borderRadius: '4px', border: 'none', background: '#de350b', color: '#fff', cursor: 'pointer', fontWeight: 'bold' }}>
+            🔒 {t('regroupements.close_button', 'Close Regroupement')}
+          </button>
+        )}
+      </div>
 
-          {regroupement.status !== 'CLOSED' && (
-            <button 
-              onClick={handleClose} 
-              style={{ background: '#de350b', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-            >
-              🔒 {t('regroupements.close_button', 'Close Regroupement')}
-            </button>
+      <div className={styles.gridContainer}>
+        {/* COLONNE GAUCHE: INFOS & PIÈCES JOINTES */}
+        <div className={styles.leftColumn}>
+          <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <h2 className={styles.sectionTitle}>📁 {regroupement.title}</h2>
+            <p style={{ color: '#7a869a', fontSize: '13px', marginBottom: '15px' }}>
+              Created by <strong>{regroupement.created_by}</strong> on {regroupement.created_on}
+            </p>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>{t('form.description', 'Description')}</label>
+              <div style={{ background: '#f4f5f7', padding: '12px', borderRadius: '4px', whiteSpace: 'pre-wrap', color: '#172b4d' }}>
+                {regroupement.description}
+              </div>
+            </div>
+
+            {/* 🎯 CORRECTION SSP LINK */}
+            {sspUrl && (
+              <div className={styles.formGroup} style={{ marginTop: '15px' }}>
+                <label className={styles.label}>{t('form.ssp_ticket', 'SSP Ticket')}</label>
+                <a href={sspUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#0052cc', fontWeight: 'bold', fontSize: '15px' }}>
+                  #{regroupement.ssp_ticket} 🔗
+                </a>
+              </div>
+            )}
+          </div>
+
+          {/* GALERIE DES PIÈCES JOINTES (AVEC LIGHTBOX) */}
+          <div className={styles.attachmentsContainer} style={{ marginTop: '20px' }}>
+            <h3 className={styles.attachmentsTitle}>📁 {t('ticket.existing_files', 'Regroupement Attachments')}</h3>
+
+            {regroupement.attachments && regroupement.attachments.length > 0 ? (
+              <div className={styles.attachmentsList}>
+                {regroupement.attachments.map((file: any, index: number) => {
+                  const displayName = file.attachment_name;
+                  const fileUrl = file.url_path;
+                  const fileType = file.attachment_type;
+                  const isImg = fileType === 'IMAGE' || fileType?.includes('IMAGE');
+
+                  return (
+                    <div key={index} className={styles.attachmentItem}>
+                      {isImg && (
+                        <div className={styles.imagePreviewContainer}>
+                          <img 
+                            src={fileUrl} 
+                            alt={displayName} 
+                            className={styles.imagePreview} 
+                            onClick={() => setLightboxMedia({ url: fileUrl, type: 'IMAGE' })} 
+                          />
+                          <span className={styles.fileName}>{displayName}</span>
+                        </div>
+                      )}
+
+                      {fileType === 'VIDEO' && (
+                        <div className={styles.fileItemContainer}>
+                          <div className={styles.videoPreviewBox} onClick={() => setLightboxMedia({ url: fileUrl, type: 'VIDEO' })}>▶️</div>
+                          <span onClick={() => setLightboxMedia({ url: fileUrl, type: 'VIDEO' })} className={styles.downloadLink}>📺 {displayName}</span>
+                        </div>
+                      )}
+
+                      {!isImg && fileType !== 'VIDEO' && (
+                        <div className={styles.fileItemContainer}>
+                          <div className={styles.filePreviewBox}>📄</div>
+                          <a href={fileUrl} target="_blank" rel="noopener noreferrer" className={styles.downloadLink}>{displayName}</a>
+                        </div>
+                      )}
+
+                      {regroupement.status !== 'CLOSED' && (
+                        <button type="button" onClick={() => handleDeleteAttachment(file.attachment_name)} className={styles.deleteBtn}>🗑️</button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p style={{ color: '#7a869a', fontSize: '13px' }}>{t('regroupements.no_attachments', 'No attachments uploaded.')}</p>
+            )}
+
+            {/* AJOUTER DE NOUVELLES PJ */}
+            {regroupement.status !== 'CLOSED' && (
+              <div style={{ marginTop: '20px' }}>
+                <label className={styles.label}>{t('ticket.attachments', 'Add Attachments')}</label>
+                <FileUploader files={attachments} onFilesChange={(files: File[]) => setAttachments(files)} />
+                {attachments.length > 0 && (
+                  <button type="button" onClick={handleUploadMainAttachments} className={styles.commentBtn} style={{ marginTop: '10px' }}>
+                    ⬆️ Upload {attachments.length} file(s)
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* COLONNE DROITE: ISSUES LIÉES */}
+        <div className={styles.rightColumn}>
+          <div className={`${styles.sidebarCard} ${styles.readOnlyCard}`}>
+            <h3 className={styles.cardTitle}>📋 {t('regroupements.linked_issues', 'Linked Issues')} ({regroupement.linked_issues?.length || 0})</h3>
+            <div className={styles.cardContent}>
+              {(!regroupement.linked_issues || regroupement.linked_issues.length === 0) ? (
+                <p style={{ color: '#7a869a', fontSize: '13px' }}>{t('regroupements.no_issues_linked', 'No issues linked yet.')}</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {regroupement.linked_issues.map((issue: any) => (
+                    <div 
+                      key={issue.id_issue} 
+                      onClick={() => navigate(`/dashboard?id=${issue.id_issue}`)}
+                      style={{ padding: '10px', border: '1px solid #dfe1e6', borderRadius: '4px', cursor: 'pointer', background: '#fafbfc' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ color: '#0052cc' }}>#{issue.id_issue}</strong>
+                        <span style={{ background: '#e3fcef', color: '#006644', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+                          {issue.status}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '13px', marginTop: '4px', color: '#172b4d' }}>{issue.title}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION DISCUSSION / COMMENTAIRES */}
+      <div className={styles.commentsSection} style={{ width: '100%', marginTop: '30px' }}>
+        <h3 className={styles.commentsTitle}>💬 {t('ticket.discussion', 'Discussion')}</h3>
+
+        <div className={styles.commentsList}>
+          {comments.length === 0 ? (
+            <p className={styles.noComments}>{t('ticket.no_comments', 'No comment for the moment')}</p>
+          ) : (
+            comments.map((comment) => (
+              <div key={comment.id_comment} className={styles.commentBubble}>
+                <div className={styles.commentHeader}>
+                  <strong>{comment.full_name}</strong>
+                  <span className={styles.commentDate}>{comment.created_on}</span>
+                </div>
+                <div className={styles.commentBody}>
+                  {comment.comment_text.split('\n').map((line: string, i: number) => (
+                    <React.Fragment key={i}>
+                      {line}<br />
+                    </React.Fragment>
+                  ))}
+                </div>
+
+                {comment.attachments && comment.attachments.length > 0 && (
+                  <div className={styles.commentAttachmentsRow}>
+                    {comment.attachments.map((file: any, i: number) => {
+                      const fileUrl = file.url_path
+                      const isImg = file.attachment_type === 'IMAGE' || file.attachment_type?.includes('IMAGE')
+                      return (
+                        <div key={i} className={styles.commentAttachmentPill} onClick={() => {
+                          if (isImg || file.attachment_type === 'VIDEO') {
+                            setLightboxMedia({ url: fileUrl, type: isImg ? 'IMAGE' : 'VIDEO' })
+                          } else {
+                            window.open(fileUrl, '_blank')
+                          }
+                        }}>
+                          {isImg ? '🖼️' : file.attachment_type === 'VIDEO' ? '🎥' : '📄'} 
+                          <span className={styles.pillText}>{file.attachment_name}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            ))
           )}
         </div>
-      </div>
 
-      {/* Détails du regroupement */}
-      <div style={{ marginTop: '20px' }}>
-        <h3>{t('form.description', 'Description')}</h3>
-        <p style={{ background: '#f4f5f7', padding: '15px', borderRadius: '4px', whiteSpace: 'pre-wrap' }}>{regroupement.description}</p>
-        
-        {regroupement.ssp_ticket && (
-          <p>
-            <strong>SSP Ticket: </strong> 
-            <a href={`https://ssp.example.com/${regroupement.ssp_ticket}`} target="_blank" rel="noreferrer" style={{ color: '#0052cc', fontWeight: 'bold' }}>
-              #{regroupement.ssp_ticket} 🔗
-            </a>
-          </p>
-        )}
-      </div>
-
-      {/* Section Issues liées */}
-      <div style={{ marginTop: '30px' }}>
-        <h3>📋 {t('regroupements.linked_issues', 'Linked Issues')} ({regroupement.linked_issues?.length || 0})</h3>
-        {(!regroupement.linked_issues || regroupement.linked_issues.length === 0) ? (
-          <p style={{ color: '#7a869a' }}>{t('regroupements.no_issues_linked', 'No issues linked to this regroupement yet.')}</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {regroupement.linked_issues.map((issue: any) => (
-              <div 
-                key={issue.id_issue} 
-                onClick={() => navigate(`/dashboard?id=${issue.id_issue}`)}
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', border: '1px solid #dfe1e6', borderRadius: '4px', cursor: 'pointer', background: '#fafbfc' }}
-              >
-                <div>
-                  <strong style={{ color: '#0052cc' }}>#{issue.id_issue}</strong> - {issue.title}
-                  <span style={{ color: '#7a869a', fontSize: '12px', marginLeft: '10px' }}>({issue.issue_type})</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '12px', color: '#7a869a' }}>{issue.user_name}</span>
-                  <span style={{ background: '#e3fcef', color: '#006644', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
-                    {issue.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Section Pièces jointes */}
-      <div style={{ marginTop: '30px', borderTop: '1px solid #dfe1e6', paddingTop: '20px' }}>
-        <h3>📎 {t('regroupements.attachments', 'Attachments')}</h3>
-        
         {regroupement.status !== 'CLOSED' && (
-          <div style={{ marginBottom: '15px' }}>
-            <label style={{ display: 'inline-block', padding: '8px 16px', background: '#f4f5f7', border: '1px dashed #42526e', borderRadius: '4px', cursor: 'pointer' }}>
-              {uploading ? t('common.uploading', 'Uploading...') : t('regroupements.add_attachments', '+ Add files')}
-              <input type="file" multiple onChange={handleFileUpload} disabled={uploading} style={{ display: 'none' }} />
-            </label>
+          <div className={styles.commentInputArea}>
+            <textarea 
+              value={newComment} 
+              onChange={(e) => setNewComment(e.target.value)} 
+              placeholder={t('ticket.type_comment', 'Type your comment here...')} 
+              className={styles.commentTextarea}
+              rows={3}
+            />
+            
+            <div style={{ marginTop: '10px' }}>
+              <FileUploader files={commentFiles} onFilesChange={(files: File[]) => setCommentFiles(files)} />
+            </div>
+
+            <button 
+              type="button" 
+              onClick={handlePostComment} 
+              disabled={!newComment.trim() || isPostingComment}
+              className={styles.commentBtn}
+              style={{ marginTop: '10px' }}
+            >
+              {isPostingComment ? '⏳...' : t('ticket.button_send', '✉️ Send')}
+            </button>
           </div>
         )}
-
-        {regroupement.attachments && regroupement.attachments.length > 0 ? (
-          <ul style={{ paddingLeft: '20px' }}>
-            {regroupement.attachments.map((file: any, index: number) => (
-              <li key={index}>
-                <a href={file.url_path} target="_blank" rel="noreferrer" style={{ color: '#0052cc' }}>
-                  {file.attachment_name}
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p style={{ color: '#7a869a', fontSize: '14px' }}>{t('regroupements.no_attachments', 'No attachments uploaded.')}</p>
-        )}
       </div>
+
+      {/* OVERLAY LIGHTBOX POUR IMAGES ET VIDÉOS */}
+      {lightboxMedia && (
+        <div className={styles.lightboxOverlay} onClick={() => setLightboxMedia(null)}>
+          <span className={styles.lightboxClose}>&times;</span>
+          <div onClick={(e) => e.stopPropagation()}>
+            {lightboxMedia.type === 'IMAGE' ? (
+              <img src={lightboxMedia.url} alt="Enlarged preview" className={styles.lightboxMedia} />
+            ) : (
+              <video src={lightboxMedia.url} controls autoPlay className={styles.lightboxMedia} />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

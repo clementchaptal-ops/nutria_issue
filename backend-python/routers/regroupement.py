@@ -10,11 +10,10 @@ from .audit import log_user_action
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 
 # =====================================================================
-# REGROUPEMENTS ROUTES
+# REGROUPEMENTS MODULE
 # =====================================================================
 
 def get_all_regroupements(current_user):
-    """Fetches all regroupements with the count of linked tickets."""
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -23,7 +22,6 @@ def get_all_regroupements(current_user):
     regroupements = []
     
     try:
-        # Ajout de r.status dans la requête
         qry = """
             SELECT r.id_regroupment, r.title, r.ssp_ticket, r.description,
                    u.full_name, r.created_by,
@@ -52,14 +50,13 @@ def get_all_regroupements(current_user):
         return regroupements, 200
     except Exception as e:
         print(f"[DATABASE ERROR - get_all_regroupements]: {str(e)}")
-        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
+        return {"error": "error.database_query", "details": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
 
 
 def get_regroupement(regroupement_id, current_user):
-    """Fetches a specific regroupement and all its linked issues."""
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -67,7 +64,7 @@ def get_regroupement(regroupement_id, current_user):
     try:
         cursor = connection.cursor()
         
-        # 1. Infos du regroupement (ajout de status)
+        # 1. Groupe details
         qry_group = """
             SELECT r.id_regroupment, r.title, r.description, r.ssp_ticket,
                    u.full_name, TO_CHAR(r.created_on, 'YYYY-MM-DD HH24:MI') as created_on, r.status
@@ -89,10 +86,11 @@ def get_regroupement(regroupement_id, current_user):
             "created_by": row[4],
             "created_on": row[5],
             "status": row[6] if row[6] else "OPEN",
-            "linked_issues": []
+            "linked_issues": [],
+            "attachments": []
         }
         
-        # 2. Récupérer les tickets liés
+        # 2. Tickets liés
         qry_issues = """
             SELECT i.id_issue, i.title, i.status, i.issue_type, 
                    u.full_name, TO_CHAR(i.created_on, 'YYYY-MM-DD HH24:MI') as created_on
@@ -103,9 +101,7 @@ def get_regroupement(regroupement_id, current_user):
             ORDER BY i.id_issue DESC
         """
         cursor.execute(qry_issues, (regroupement_id,))
-        issue_rows = cursor.fetchall()
-        
-        for i_row in issue_rows:
+        for i_row in cursor.fetchall():
             group_data["linked_issues"].append({
                 "id_issue": i_row[0],
                 "title": i_row[1],
@@ -114,19 +110,32 @@ def get_regroupement(regroupement_id, current_user):
                 "user_name": i_row[4],
                 "created_on": i_row[5]
             })
+
+        # 3. Pièces jointes du regroupement
+        qry_attachments = """
+            SELECT id_attachment, attachment_name, attachment_type, url_path
+            FROM c_issue_attachment
+            WHERE id_regroupment = %s AND id_comment IS NULL
+        """
+        cursor.execute(qry_attachments, (regroupement_id,))
+        for att in cursor.fetchall():
+            group_data["attachments"].append({
+                "id_attachment": att[0],
+                "attachment_name": att[1],
+                "attachment_type": att[2],
+                "url_path": att[3]
+            })
             
         return group_data, 200
-        
     except Exception as e:
         print(f"[DATABASE ERROR - get_regroupement]: {str(e)}")
-        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
+        return {"error": "error.database_query", "details": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
 
 
 def create_regroupement(request_json, current_user, client_ip):
-    """Creates a new regroupement and links selected issues."""
     try:
         data = RegroupementCreate(**request_json)
     except ValidationError as e:
@@ -148,7 +157,6 @@ def create_regroupement(request_json, current_user, client_ip):
         cursor.execute(insert_qry, (data.title, data.description, data.ssp_ticket, username))
         next_id = cursor.fetchone()[0]
         
-        # Liaison automatique des issues cochées
         if hasattr(data, 'issue_ids') and data.issue_ids:
             for issue_id in data.issue_ids:
                 cursor.execute(
@@ -166,54 +174,16 @@ def create_regroupement(request_json, current_user, client_ip):
         return {"id_regroupment": next_id, "message": "success.regroupement_created"}, 201
     except Exception as e:
         connection.rollback()
-        print(f"[DATABASE ERROR - create_regroupement]: {str(e)}")
-        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
-    finally:
-        cursor.close()
-        connection.close()
-
-
-def link_issue_to_regroupement(regroupement_id, request_json, current_user, client_ip):
-    """Links an existing issue to a regroupement."""
-    issue_id = request_json.get("id_issue")
-    if not issue_id:
-        return {"error": "error.missing_issue_id"}, 400
-
-    username = current_user.get("sub", "UNKNOWN")
-    connection = get_db_connection()
-    if not connection:
-        return {"error": "error.database_connection"}, 500
-        
-    try:
-        cursor = connection.cursor()
-        insert_qry = """
-            INSERT INTO c_link_issue_regroupment (id_regroupment, id_issue) 
-            VALUES (%s, %s)
-            ON CONFLICT ON CONSTRAINT pk_c_link_issue_regroupment DO NOTHING
-        """
-        cursor.execute(insert_qry, (regroupement_id, issue_id))
-        connection.commit()
-
-        log_user_action(
-            user_name=username, action_type="LINK_ISSUE", target_id=str(regroupement_id), 
-            details=f"Linked issue #{issue_id} to regroupement #{regroupement_id}", ip_address=client_ip
-        )
-        return {"message": "success.issue_linked"}, 200
-    except Exception as e:
-        connection.rollback()
-        print(f"[DATABASE ERROR - link_issue]: {str(e)}")
-        return {"error": "error.database_query", "details": "An internal database error occurred."}, 500
+        return {"error": "error.database_query", "details": str(e)}, 500
     finally:
         cursor.close()
         connection.close()
 
 
 def close_regroupement(regroupement_id, current_user, client_ip):
-    """Passe le statut d'un regroupement à CLOSED."""
     username = current_user.get("sub", "UNKNOWN")
     connection = get_db_connection()
-    if not connection:
-        return {"error": "error.database_connection"}, 500
+    if not connection: return {"error": "error.database_connection"}, 500
     try:
         cursor = connection.cursor()
         cursor.execute("""
@@ -235,8 +205,64 @@ def close_regroupement(regroupement_id, current_user, client_ip):
         connection.close()
 
 
+def get_regroupement_comments(regroupement_id, current_user):
+    connection = get_db_connection()
+    if not connection: return {"error": "error.database_connection"}, 500
+    try:
+        cursor = connection.cursor()
+        qry = """
+            SELECT c.id_comment, c.comment_text, u.full_name, c.created_by,
+                   TO_CHAR(c.created_on, 'YYYY-MM-DD HH24:MI') as created_on
+            FROM c_issue_comment c
+            LEFT JOIN lims_users u ON TRIM(UPPER(c.created_by)) = TRIM(UPPER(u.user_name))
+            WHERE c.id_regroupment = %s
+            ORDER BY c.id_comment ASC
+        """
+        cursor.execute(qry, (regroupement_id,))
+        comments = []
+        rows = cursor.fetchall()
+        for r in rows:
+            comment_id = r[0]
+            # Attachments per comment
+            cursor.execute("SELECT attachment_name, attachment_type, url_path FROM c_issue_attachment WHERE id_comment = %s", (comment_id,))
+            atts = [{"attachment_name": a[0], "attachment_type": a[1], "url_path": a[2]} for a in cursor.fetchall()]
+            comments.append({
+                "id_comment": comment_id,
+                "comment_text": r[1],
+                "full_name": r[2] if r[2] else r[3],
+                "created_on": r[4],
+                "attachments": atts
+            })
+        return comments, 200
+    except Exception as e:
+        return {"error": "error.database", "details": str(e)}, 500
+    finally:
+        connection.close()
+
+
+def add_regroupement_comment(regroupement_id, request_json, current_user, client_ip):
+    comment_text = request_json.get("comment_text")
+    if not comment_text: return {"error": "error.missing_text"}, 400
+    username = current_user.get("sub", "UNKNOWN")
+    connection = get_db_connection()
+    if not connection: return {"error": "error.database_connection"}, 500
+    try:
+        cursor = connection.cursor()
+        cursor.execute("""
+            INSERT INTO c_issue_comment (id_regroupment, comment_text, created_by)
+            VALUES (%s, %s, %s) RETURNING id_comment
+        """, (regroupement_id, comment_text, username))
+        new_comment_id = cursor.fetchone()[0]
+        connection.commit()
+        return {"id_comment": new_comment_id, "message": "success.comment_added"}, 201
+    except Exception as e:
+        connection.rollback()
+        return {"error": "error.database", "details": str(e)}, 500
+    finally:
+        connection.close()
+
+
 def upload_regroupement_attachments(regroupement_id, files_data, current_user):
-    """Ajoute des pièces jointes au regroupement."""
     connection = get_db_connection()
     if not connection: return {"error": "error.database_connection"}, 500
     try:
@@ -253,15 +279,67 @@ def upload_regroupement_attachments(regroupement_id, files_data, current_user):
             blob.upload_from_string(file_info["bytes"])
             public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{blob_path}"
             
+            ext = filename.split('.')[-1].lower() if '.' in filename else ''
+            att_type = 'IMAGE' if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp'] else ('VIDEO' if ext in ['mp4', 'webm', 'mov'] else 'DOCUMENT')
+
             cursor.execute("""
                 INSERT INTO c_issue_attachment (id_regroupment, attachment_name, attachment_type, url_path) 
-                VALUES (%s, %s, 'DOCUMENT', %s)
-            """, (regroupement_id, filename, public_url))
+                VALUES (%s, %s, %s, %s)
+            """, (regroupement_id, filename, att_type, public_url))
             
         connection.commit()
         return {"message": "success.attachments_uploaded"}, 200
     except Exception as e:
         connection.rollback()
         return {"error": "error.storage", "details": str(e)}, 500
+    finally:
+        connection.close()
+
+
+def upload_regroupement_comment_attachments(regroupement_id, comment_id, files_data, current_user):
+    connection = get_db_connection()
+    if not connection: return {"error": "error.database_connection"}, 500
+    try:
+        client = storage.Client()
+        bucket = client.bucket(BUCKET_NAME)
+        cursor = connection.cursor()
+        
+        for file_info in files_data:
+            filename = file_info["filename"]
+            safe_file_name = f"comment_{uuid.uuid4().hex[:8]}_{filename}"
+            blob_path = f"regroupements/reg_{regroupement_id}/comments/{safe_file_name}"
+            
+            blob = bucket.blob(blob_path)
+            blob.upload_from_string(file_info["bytes"])
+            public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{blob_path}"
+            
+            ext = filename.split('.')[-1].lower() if '.' in filename else ''
+            att_type = 'IMAGE' if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp'] else ('VIDEO' if ext in ['mp4', 'webm', 'mov'] else 'DOCUMENT')
+
+            cursor.execute("""
+                INSERT INTO c_issue_attachment (id_regroupment, id_comment, attachment_name, attachment_type, url_path) 
+                VALUES (%s, %s, %s, %s, %s)
+            """, (regroupement_id, comment_id, filename, att_type, public_url))
+            
+        connection.commit()
+        return {"message": "success.comment_attachments_uploaded"}, 200
+    except Exception as e:
+        connection.rollback()
+        return {"error": "error.storage", "details": str(e)}, 500
+    finally:
+        connection.close()
+
+
+def delete_regroupement_attachment(regroupement_id, filename, current_user, client_ip):
+    connection = get_db_connection()
+    if not connection: return {"error": "error.database_connection"}, 500
+    try:
+        cursor = connection.cursor()
+        cursor.execute("DELETE FROM c_issue_attachment WHERE id_regroupment = %s AND attachment_name = %s", (regroupement_id, filename))
+        connection.commit()
+        return {"message": "success.attachment_deleted"}, 200
+    except Exception as e:
+        connection.rollback()
+        return {"error": "error.database", "details": str(e)}, 500
     finally:
         connection.close()

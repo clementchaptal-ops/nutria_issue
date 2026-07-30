@@ -262,17 +262,31 @@ def nutria_api(request):
                 data, http_code = get_regroupement(int(parts[1]), current_user)
                 return jsonify(data), http_code, headers
 
-            # POST /regroupements/{id}/link-issue
-            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "link-issue" and request.method == "POST":
-                from routers.regroupement import link_issue_to_regroupement
-                request_json = request.get_json(silent=True) or {}
-                data, http_code = link_issue_to_regroupement(int(parts[1]), request_json, current_user, client_ip)
-                return jsonify(data), http_code, headers
-            
             # PUT /regroupements/{id}/close
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "close" and request.method == "PUT":
                 from routers.regroupement import close_regroupement
                 data, http_code = close_regroupement(int(parts[1]), current_user, client_ip)
+                return jsonify(data), http_code, headers
+
+            # GET /regroupements/{id}/comments
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "comments" and request.method == "GET":
+                from routers.regroupement import get_regroupement_comments
+                data, http_code = get_regroupement_comments(int(parts[1]), current_user)
+                return jsonify(data), http_code, headers
+
+            # POST /regroupements/{id}/comments
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "comments" and request.method == "POST":
+                from routers.regroupement import add_regroupement_comment
+                request_json = request.get_json(silent=True) or {}
+                data, http_code = add_regroupement_comment(int(parts[1]), request_json, current_user, client_ip)
+                return jsonify(data), http_code, headers
+
+            # POST /regroupements/{id}/comments/{comment_id}/attachments
+            elif len(parts) == 5 and parts[1].isdigit() and parts[2] == "comments" and parts[3].isdigit() and parts[4] == "attachments" and request.method == "POST":
+                from routers.regroupement import upload_regroupement_comment_attachments
+                reg_id, comment_id = int(parts[1]), int(parts[3])
+                files_data = [{"filename": f.filename, "content_type": f.content_type, "bytes": f.read()} for k in request.files for f in request.files.getlist(k)]
+                data, http_code = upload_regroupement_comment_attachments(reg_id, comment_id, files_data, current_user)
                 return jsonify(data), http_code, headers
 
             # POST /regroupements/{id}/attachments
@@ -280,6 +294,14 @@ def nutria_api(request):
                 from routers.regroupement import upload_regroupement_attachments
                 files_data = [{"filename": f.filename, "content_type": f.content_type, "bytes": f.read()} for k in request.files for f in request.files.getlist(k)]
                 data, http_code = upload_regroupement_attachments(int(parts[1]), files_data, current_user)
+                return jsonify(data), http_code, headers
+
+            # DELETE /regroupements/{id}/attachments/{filename}
+            elif len(parts) >= 4 and parts[1].isdigit() and parts[2] == "attachments" and request.method == "DELETE":
+                from routers.regroupement import delete_regroupement_attachment
+                reg_id = int(parts[1])
+                filename = "/".join(parts[3:])
+                data, http_code = delete_regroupement_attachment(reg_id, filename, current_user, client_ip)
                 return jsonify(data), http_code, headers
                 
             else:
