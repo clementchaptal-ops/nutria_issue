@@ -1,23 +1,21 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { useTranslation } from 'react-i18next' // 🚨 Ajout de l'import i18n
+import { useTranslation } from 'react-i18next'
 import styles from './MainLayout.module.css'
 
 function MainLayout() {
-  const { t } = useTranslation() // 🚨 Initialisation du hook
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation() 
   
   const isLoggedIn = !!localStorage.getItem('nutria_token')
 
-  // 🚨 RECONSTRUCTION PROPRE DU PARSING DE L'UTILISATEUR
   const rawUser = localStorage.getItem('nutria_user')
-  let displayUser = t('layout.default_user', 'User') // 🚨 Traduction de la valeur par défaut
+  let displayUser = t('layout.default_user', 'User')
   let displayLocation = ''
   let isAdmin = false
   if (rawUser) {
     try {
       const parsed = JSON.parse(rawUser)
-      // On pioche dans "full_name" (Clément CHAPTAL), sinon "user_name" (PL_CHACLE)
       displayUser = parsed.full_name || parsed.user_name || t('layout.default_user', 'User')
       displayLocation = parsed.location || ''
       const role = parsed.role || parsed.current_role || 'USER'
@@ -42,7 +40,7 @@ function MainLayout() {
             className={styles.logoText} 
             onClick={() => navigate('/dashboard')}
             style={{ cursor: 'pointer' }}
-            title={t('layout.go_to_dashboard', 'Go to Dashboard')} // 🚨 Traduction du tooltip
+            title={t('layout.go_to_dashboard', 'Go to Dashboard')}
           >
             NUTRIA
           </span>
@@ -52,22 +50,32 @@ function MainLayout() {
               onClick={() => navigate('/dashboard')}
               className={styles.dashboardBtn}
             >
-              🏠 {t('layout.dashboard_btn', 'Dashboard')} {/* 🚨 Traduction */}
+              🏠 {t('layout.dashboard_btn', 'Dashboard')}
             </button>
           )}
-          {/* 🚨 NOUVEAU BOUTON : Uniquement pour les admins */}
+
+          {/* 🚨 NOUVEAU BOUTON : Accès aux Regroupements */}
+          {isLoggedIn && location.pathname !== '/regroupements' && (
+            <button 
+              onClick={() => navigate('/regroupements')}
+              className={styles.dashboardBtn}
+              style={{ marginLeft: '10px', borderColor: '#0052cc', color: '#0052cc' }}
+            >
+              📁 {t('layout.regroupements_btn', 'Regroupements')}
+            </button>
+          )}
+
           {isLoggedIn && isAdmin && location.pathname !== '/audit' && (
             <button 
               onClick={() => navigate('/audit')}
               className={styles.dashboardBtn}
-              style={{ marginLeft: '10px', borderColor: '#ff991f', color: '#d97008' }} // Style légèrement distinct (orange admin)
+              style={{ marginLeft: '10px', borderColor: '#ff991f', color: '#d97008' }}
             >
               🛡️ Audit Logs
             </button>
           )}
         </div>
 
-        {/* 🚨 BLOC DROITE : On regroupe l'utilisateur et la déconnexion */}
         {isLoggedIn && (
           <div className={styles.headerRight}>
             <div className={styles.userInfo}>
@@ -78,7 +86,7 @@ function MainLayout() {
             </div>
 
             <button onClick={handleLogout} className={styles.logoutBtn}>
-              🚪 {t('layout.logout_btn', 'Logout')} {/* 🚨 Traduction */}
+              🚪 {t('layout.logout_btn', 'Logout')}
             </button>
           </div>
         )}

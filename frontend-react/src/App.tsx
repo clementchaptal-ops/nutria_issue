@@ -5,7 +5,11 @@ import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import ProtectedRoute from './components/ProtectedRoute' 
 import AuditLogs from './pages/AuditLogs'
+import RegroupementList from './pages/RegroupementList'
+import RegroupementForm from './pages/RegroupementForm'
+import RegroupementDetail from './pages/RegroupementDetail'
 import { Toaster } from 'react-hot-toast';
+
 
 function App() {
   return (
@@ -31,6 +35,11 @@ function App() {
             
             {/* Fallback redirection: if the URL doesn't exist, redirect to home */}
             <Route path="*" element={<Navigate to="/" replace />} />
+            
+
+            <Route path="/regroupements" element={<RegroupementList />} />
+            <Route path="/regroupements/new" element={<RegroupementForm />} />
+            <Route path="/regroupements/:id" element={<RegroupementDetail />} />
             
           </Route>
           

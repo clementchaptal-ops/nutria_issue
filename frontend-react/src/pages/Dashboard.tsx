@@ -4,10 +4,20 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { fetchAllIssues } from '../api/issues'
 import styles from './Dashboard.module.css'
+import StatCard from '../components/StatCard'
+import SearchBar from '../components/SearchBar'
+import GenericTable, { TableColumn } from '../components/GenericTable'
 
 type SortConfig = {
   key: string;
   direction: 'asc' | 'desc';
+}
+
+const getGroupBadgeStyle = (groupId: number | null | undefined) => {
+  if (!groupId) return { background: 'transparent', color: '#a5adba', text: '-' };
+  const colors = ['#0052cc', '#36b37e', '#ff991f', '#ff5630', '#6554c0', '#00b8d9', '#ff7452', '#2684ff'];
+  const bgColor = colors[groupId % colors.length];
+  return { background: bgColor, color: 'white', text: `G-${groupId}` };
 }
 
 function Dashboard() {
@@ -27,11 +37,6 @@ function Dashboard() {
     ? (statusParam ? statusParam.split(',') : []) 
     : ['IN PROGRESS']
 
-  const showPreticket = activeStatuses.includes('PRETICKET')
-  const showInProgress = activeStatuses.includes('IN PROGRESS') 
-  const showActKnowledge = activeStatuses.includes('ACT KNOWLEDGE')
-  const showClosed = activeStatuses.includes('CLOSED')
-
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'id_issue', direction: 'desc' })
 
   const updateUrlParam = (key: string, value: string) => {
@@ -44,12 +49,12 @@ function Dashboard() {
     setSearchParams(newParams)
   }
 
-  const toggleStatusFilter = (targetStatus: string, isChecked: boolean) => {
+  const toggleStatusFilter = (targetStatus: string) => {
     let newStatuses = [...activeStatuses]
-    if (isChecked) {
-      newStatuses.push(targetStatus)
-    } else {
+    if (activeStatuses.includes(targetStatus)) {
       newStatuses = newStatuses.filter(s => s !== targetStatus)
+    } else {
+      newStatuses.push(targetStatus)
     }
     updateUrlParam('status', newStatuses.join(','))
   }
@@ -75,11 +80,6 @@ function Dashboard() {
     setSortConfig({ key, direction })
   }
 
-  const getSortIcon = (key: string) => {
-    if (sortConfig.key !== key) return ' ↕'
-    return sortConfig.direction === 'asc' ? ' ▲' : ' ▼'
-  }
-
   const preticketCount = tickets.filter(t => t.status === 'PRETICKET').length
   const inProgressCount = tickets.filter(t => t.status === 'IN PROGRESS').length
   const actKnowledgeCount = tickets.filter(t => t.status === 'ACT KNOWLEDGE').length
@@ -87,21 +87,15 @@ function Dashboard() {
 
   let filteredTickets = tickets.filter((ticket) => {
     const status = ticket.status ? ticket.status.toUpperCase() : ''
-
-    if (!activeStatuses.includes(status)) {
-        return false
-    }
+    if (!activeStatuses.includes(status)) return false
 
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
     
     if (searchColumn === 'ALL') {
-      return Object.values(ticket).some(val => 
-        String(val).toLowerCase().includes(query)
-      )
+      return Object.values(ticket).some(val => String(val).toLowerCase().includes(query))
     } else {
-      const value = ticket[searchColumn]
-      return String(value || '').toLowerCase().includes(query)
+      return String(ticket[searchColumn] || '').toLowerCase().includes(query)
     }
   })
 
@@ -110,21 +104,69 @@ function Dashboard() {
     let valA = a[key]
     let valB = b[key]
 
-    if (key === 'id_issue') {
-      return sortConfig.direction === 'asc' ? valA - valB : valB - valA
+    if (key === 'id_issue' || key === 'id_regroupment') {
+      return sortConfig.direction === 'asc' ? (valA || 0) - (valB || 0) : (valB || 0) - (valA || 0)
     }
 
     valA = String(valA || '').toLowerCase()
     valB = String(valB || '').toLowerCase()
-
     if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
     if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
     return 0
   })
 
-  const handleRowClick = (id: number) => {
-    navigate(`/?id=${id}`) 
-  }
+  // Configuration de la barre de recherche
+  const searchColumns = [
+    { value: 'ALL', label: t('dashboard.search.all_columns', 'All Columns') },
+    { value: 'id_issue', label: t('dashboard.search.id', 'ID') },
+    { value: 'title', label: t('dashboard.search.title', 'Title') },
+    { value: 'status', label: t('dashboard.search.status', 'Status') },
+    { value: 'issue_type', label: t('dashboard.search.issue_type', 'Issue Type') },
+    { value: 'user_name', label: t('dashboard.search.username', 'User Name') },
+    { value: 'full_name', label: t('dashboard.search.fullname', 'Full Name') },
+    { value: 'criticity', label: t('dashboard.search.criticity', 'Criticity') },
+    { value: 'environment', label: t('dashboard.search.env', 'Environment') },
+    { value: 'country', label: t('dashboard.search.location', 'Location') }
+  ]
+
+  // Configuration dynamique des colonnes de la table
+  const tableColumns: TableColumn<any>[] = [
+    { key: 'id_issue', label: t('dashboard.table.id', 'ID'), render: (item) => <span className={styles.tdId}>#{item.id_issue}</span> },
+    { 
+      key: 'id_regroupment', 
+      label: t('dashboard.table.group', 'Group'), 
+      align: 'center',
+      render: (item) => {
+        const groupStyle = getGroupBadgeStyle(item.id_regroupment);
+        return (
+          <span style={{ background: groupStyle.background, color: groupStyle.color, padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', minWidth: '40px' }}>
+            {groupStyle.text}
+          </span>
+        )
+      }
+    },
+    { key: 'title', label: t('dashboard.table.title', 'Title'), render: (item) => <span className={styles.tdTitle}>{item.title}</span> },
+    { 
+      key: 'status', 
+      label: t('dashboard.table.status', 'Status'),
+      render: (item) => <span className={`${styles.badge} ${styles['status_' + item.status.replace(' ', '_')] || styles.badgeDefault}`}>{item.status}</span>
+    },
+    { 
+      key: 'issue_type', 
+      label: t('dashboard.table.type', 'Type'),
+      render: (item) => <span className={`${styles.badge} ${styles['type_' + item.issue_type] || styles.badgeDefault}`}>{item.issue_type}</span>
+    },
+    { key: 'user_name', label: t('dashboard.table.username', 'Username') },
+    { key: 'full_name', label: t('dashboard.table.fullname', 'Full Name') },
+    { 
+      key: 'criticity', 
+      label: t('dashboard.table.criticity', 'Criticity'),
+      render: (item) => <span className={`${styles.badge} ${styles['criticity_' + item.criticity] || styles.criticity_DEFAULT}`}>{item.criticity}</span>
+    },
+    { key: 'environment', label: t('dashboard.table.env', 'Environment'), render: (item) => item.env || item.environment },
+    { key: 'country', label: t('dashboard.table.location', 'Location'), render: (item) => <span className={styles.tdLocation}>{item.country}</span> },
+    { key: 'creation_date', label: t('dashboard.table.date', 'Date'), render: (item) => <span className={styles.tdDate}>{item.creation_date}</span> }
+  ]
 
   if (loading) {
     return <p style={{ padding: '40px', textAlign: 'center' }}>{t('dashboard.loading', 'Loading dashboard data...')}</p>
@@ -140,106 +182,23 @@ function Dashboard() {
       </div>
 
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-        
-        <div onClick={() => toggleStatusFilter('PRETICKET', !showPreticket)} style={{ flex: 1, padding: '15px', background: '#fff', borderRadius: '8px', border: '1px solid #dfe1e6', cursor: 'pointer', textAlign: 'center', boxShadow: showPreticket ? '0 0 0 2px #ffab00' : 'none' }}>
-          <div style={{ fontSize: '12px', color: '#7a869a' }}>{t('dashboard.status.preticket', 'Pretickets')}</div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ffab00' }}>{preticketCount}</div>
-        </div>
-
-        <div onClick={() => toggleStatusFilter('IN PROGRESS', !showInProgress)} style={{ flex: 1, padding: '15px', background: '#fff', borderRadius: '8px', border: '1px solid #dfe1e6', cursor: 'pointer', textAlign: 'center', boxShadow: showInProgress ? '0 0 0 2px #0052cc' : 'none' }}>
-          <div style={{ fontSize: '12px', color: '#7a869a' }}>{t('dashboard.status.in_progress', 'In Progress')}</div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#0052cc' }}>{inProgressCount}</div>
-        </div>
-
-        <div onClick={() => toggleStatusFilter('ACT KNOWLEDGE', !showActKnowledge)} style={{ flex: 1, padding: '15px', background: '#fff', borderRadius: '8px', border: '1px solid #dfe1e6', cursor: 'pointer', textAlign: 'center', boxShadow: showActKnowledge ? '0 0 0 2px #36b37e' : 'none' }}>
-          <div style={{ fontSize: '12px', color: '#7a869a' }}>{t('dashboard.status.act_knowledge', 'Act Knowledge')}</div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#36b37e' }}>{actKnowledgeCount}</div>
-        </div>
-
-        <div onClick={() => toggleStatusFilter('CLOSED', !showClosed)} style={{ flex: 1, padding: '15px', background: '#fff', borderRadius: '8px', border: '1px solid #dfe1e6', cursor: 'pointer', textAlign: 'center', boxShadow: showClosed ? '0 0 0 2px #42526e' : 'none' }}>
-          <div style={{ fontSize: '12px', color: '#7a869a' }}>{t('dashboard.status.closed', 'Closed')}</div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#42526e' }}>{closedCount}</div>
-        </div>
-
+        <StatCard label={t('dashboard.status.preticket', 'Pretickets')} count={preticketCount} color="#ffab00" isActive={activeStatuses.includes('PRETICKET')} onClick={() => toggleStatusFilter('PRETICKET')} />
+        <StatCard label={t('dashboard.status.in_progress', 'In Progress')} count={inProgressCount} color="#0052cc" isActive={activeStatuses.includes('IN PROGRESS')} onClick={() => toggleStatusFilter('IN PROGRESS')} />
+        <StatCard label={t('dashboard.status.act_knowledge', 'Act Knowledge')} count={actKnowledgeCount} color="#36b37e" isActive={activeStatuses.includes('ACT KNOWLEDGE')} onClick={() => toggleStatusFilter('ACT KNOWLEDGE')} />
+        <StatCard label={t('dashboard.status.closed', 'Closed')} count={closedCount} color="#42526e" isActive={activeStatuses.includes('CLOSED')} onClick={() => toggleStatusFilter('CLOSED')} />
       </div>
 
-      <div className={styles.searchBar}>
-        <select 
-          value={searchColumn} 
-          onChange={(e) => updateUrlParam('column', e.target.value)} 
-          className={styles.select}
-        >
-          <option value="ALL">{t('dashboard.search.all_columns', 'All Columns')}</option>
-          <option value="id_issue">{t('dashboard.search.id', 'ID')}</option>
-          <option value="title">{t('dashboard.search.title', 'Title')}</option>
-          <option value="status">{t('dashboard.search.status', 'Status')}</option>
-          <option value="issue_type">{t('dashboard.search.issue_type', 'Issue Type')}</option>
-          <option value="user_name">{t('dashboard.search.username', 'User Name')}</option>
-          <option value="full_name">{t('dashboard.search.fullname', 'Full Name')}</option>
-          <option value="criticity">{t('dashboard.search.criticity', 'Criticity')}</option>
-          <option value="env">{t('dashboard.search.env', 'Environment')}</option>
-          <option value="country">{t('dashboard.search.location', 'Location')}</option>
-          <option value="creation_date">{t('dashboard.search.date', 'Date')}</option>
-        </select>
-
-        <input 
-          type="text" 
+      <div className={styles.actionBar} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <SearchBar 
+          columns={searchColumns} 
+          searchColumn={searchColumn} 
+          onColumnChange={(val) => updateUrlParam('column', val)}
+          searchQuery={searchQuery}
+          onSearchChange={(val) => updateUrlParam('search', val)}
           placeholder={t('dashboard.search.placeholder', 'Search...')}
-          value={searchQuery} 
-          onChange={(e) => updateUrlParam('search', e.target.value)} 
-          className={styles.inputSearch}
         />
-      </div>
 
-      <div className={styles.actionBar}>
-        <div className={styles.filterGroup}>
-          <span className={styles.filterLabel}>👁️ {t('dashboard.filters.show', 'Show:')}</span>
-          
-          <label className={styles.checkboxPill}>
-            <input 
-              type="checkbox" 
-              checked={showPreticket} 
-              onChange={(e) => toggleStatusFilter('PRETICKET', e.target.checked)} 
-              className={styles.checkboxInput}
-            />
-            📋 {t('dashboard.filters.preticket', 'PRETICKET')}
-          </label>
-
-          <label className={styles.checkboxPill}>
-            <input 
-              type="checkbox" 
-              checked={showInProgress} 
-              onChange={(e) => toggleStatusFilter('IN PROGRESS', e.target.checked)} 
-              className={styles.checkboxInput}
-            />
-            🚀 {t('dashboard.filters.in_progress', 'IN PROGRESS')}
-          </label>
-
-          <label className={styles.checkboxPill}>
-            <input 
-              type="checkbox" 
-              checked={showActKnowledge} 
-              onChange={(e) => toggleStatusFilter('ACT KNOWLEDGE', e.target.checked)} 
-              className={styles.checkboxInput}
-            />
-            ✅ {t('dashboard.filters.act_knowledge', 'ACT KNOWLEDGE')}
-          </label>
-
-          <label className={styles.checkboxPill}>
-            <input 
-              type="checkbox" 
-              checked={showClosed} 
-              onChange={(e) => toggleStatusFilter('CLOSED', e.target.checked)} 
-              className={styles.checkboxInput}
-            />
-            🔒 {t('dashboard.filters.closed', 'CLOSED')}
-          </label>
-        </div>
-
-        <button 
-          className={styles.createBtn}
-          onClick={() => navigate('/?new=true')}
-        >
+        <button className={styles.createBtn} onClick={() => navigate('/?new=true')}>
           ➕ {t('dashboard.create_button', 'Create a Ticket')}
         </button>
       </div>
@@ -249,76 +208,14 @@ function Dashboard() {
           <h3>{t('dashboard.empty_state', 'No matching tickets found')}</h3>
         </div>
       ) : (
-        <div className={styles.tableWrapper}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th onClick={() => requestSort('id_issue')}>
-                  {t('dashboard.table.id', 'ID')} {getSortIcon('id_issue')}
-                </th>
-                <th onClick={() => requestSort('title')}>
-                  {t('dashboard.table.title', 'Title')} {getSortIcon('title')}
-                </th>
-                <th onClick={() => requestSort('status')}>
-                  {t('dashboard.table.status', 'Status')} {getSortIcon('status')}
-                </th>
-                <th onClick={() => requestSort('issue_type')}>
-                  {t('dashboard.table.type', 'Type')} {getSortIcon('issue_type')}
-                </th>
-                <th onClick={() => requestSort('user_name')}>
-                  {t('dashboard.table.username', 'Username')} {getSortIcon('user_name')}
-                </th>
-                <th onClick={() => requestSort('full_name')}>
-                  {t('dashboard.table.fullname', 'Full Name')} {getSortIcon('full_name')}
-                </th>
-                <th onClick={() => requestSort('criticity')}>
-                  {t('dashboard.table.criticity', 'Criticity')} {getSortIcon('criticity')}
-                </th>
-                <th onClick={() => requestSort('env')}>
-                  {t('dashboard.table.env', 'Environment')} {getSortIcon('env')}
-                </th>
-                <th onClick={() => requestSort('country')}>
-                  {t('dashboard.table.location', 'Location')} {getSortIcon('country')}
-                </th>
-                <th onClick={() => requestSort('creation_date')}>
-                  {t('dashboard.table.date', 'Date')} {getSortIcon('creation_date')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTickets.map((ticket) => (
-                <tr 
-                  key={ticket.id_issue} 
-                  onClick={() => handleRowClick(ticket.id_issue)}
-                  className={styles.tableRow}
-                >
-                  <td className={styles.tdId}>#{ticket.id_issue}</td>
-                  <td className={styles.tdTitle}>{ticket.title}</td>
-                  <td>
-                    <span className={`${styles.badge} ${styles['status_' + ticket.status.replace(' ', '_')] || styles.badgeDefault}`}>
-                      {ticket.status}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`${styles.badge} ${styles['type_' + ticket.issue_type] || styles.badgeDefault}`}>
-                      {ticket.issue_type}
-                    </span>
-                  </td>
-                  <td>{ticket.user_name}</td>
-                  <td>{ticket.full_name}</td>
-                  <td>
-                  <span className={`${styles.badge} ${styles['criticity_' + ticket.criticity] || styles.criticity_DEFAULT}`}>
-                  {ticket.criticity}
-                  </span>
-                  </td>
-                  <td>{ticket.env || ticket.environment}</td>
-                  <td className={styles.tdLocation}>{ticket.country}</td>
-                  <td className={styles.tdDate}>{ticket.creation_date}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <GenericTable 
+          columns={tableColumns} 
+          data={filteredTickets} 
+          sortConfig={sortConfig} 
+          onSort={requestSort} 
+          onRowClick={(item) => navigate(`/?id=${item.id_issue}`)} 
+          rowKey={(item) => item.id_issue}
+        />
       )}
     </div>
   )
