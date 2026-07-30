@@ -6,6 +6,7 @@ from flask import jsonify
 from routers.security import verify_token
 from routers.auth import google_auth
 from routers.issues import get_all_issues
+from routers import regroupement
 
 @functions_framework.http
 def nutria_api(request):
@@ -228,6 +229,49 @@ def nutria_api(request):
             else:
                 return jsonify({"error": f"Unhandled sub-route: {path}"}), 404, headers
 
+        # ---------------------------------------------------------
+        # REGROUPEMENTS MODULE
+        # ---------------------------------------------------------
+        elif path.startswith("regroupements"):
+            
+            auth_header = request.headers.get("Authorization")
+            current_user, error_msg = verify_token(auth_header)
+
+            if error_msg:
+                return jsonify({"error": "Unauthorized Access", "details": error_msg}), 401, headers
+            
+            client_ip = request.remote_addr or "Unknown"
+            parts = path.split("/")
+
+            # GET /regroupements
+            if path == "regroupements" and request.method == "GET":
+                from routers.regroupement import get_all_regroupements
+                data, http_code = get_all_regroupements(current_user)
+                return jsonify(data), http_code, headers
+                
+            # POST /regroupements
+            elif path == "regroupements" and request.method == "POST":
+                from routers.regroupement import create_regroupement
+                request_json = request.get_json(silent=True) or {}
+                data, http_code = create_regroupement(request_json, current_user, client_ip)
+                return jsonify(data), http_code, headers
+                
+            # GET /regroupements/{id}
+            elif len(parts) == 2 and parts[1].isdigit() and request.method == "GET":
+                from routers.regroupement import get_regroupement
+                data, http_code = get_regroupement(int(parts[1]), current_user)
+                return jsonify(data), http_code, headers
+
+            # POST /regroupements/{id}/link-issue
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "link-issue" and request.method == "POST":
+                from routers.regroupement import link_issue_to_regroupement
+                request_json = request.get_json(silent=True) or {}
+                data, http_code = link_issue_to_regroupement(int(parts[1]), request_json, current_user, client_ip)
+                return jsonify(data), http_code, headers
+                
+            else:
+                return jsonify({"error": f"Unhandled sub-route: {path}"}), 404, headers
+            
         else:
             return jsonify({"error": "Route not found"}), 404, headers
 
