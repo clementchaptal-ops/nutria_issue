@@ -303,9 +303,24 @@ def nutria_api(request):
                 filename = "/".join(parts[3:])
                 data, http_code = delete_regroupement_attachment(reg_id, filename, current_user, client_ip)
                 return jsonify(data), http_code, headers
+            
+            # GET /regroupements/{id}
+            elif len(parts) == 2 and parts[1].isdigit() and request.method == "GET":
+                from routers.regroupement import get_regroupement
+                data, http_code = get_regroupement(int(parts[1]), current_user)
+                return jsonify(data), http_code, headers
+
+            # 🚨 NOUVELLE ROUTE : PUT /regroupements/{id} (MODIFICATION)
+            elif len(parts) == 2 and parts[1].isdigit() and request.method == "PUT":
+                from routers.regroupement import update_regroupement
+                request_json = request.get_json(silent=True) or {}
+                data, http_code = update_regroupement(int(parts[1]), request_json, current_user, client_ip)
+                return jsonify(data), http_code, headers
                 
             else:
                 return jsonify({"error": f"Unhandled sub-route: {path}"}), 404, headers
+            
+            
             
         else:
             return jsonify({"error": "Route not found"}), 404, headers

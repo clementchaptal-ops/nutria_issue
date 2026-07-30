@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from .schemas import RegroupementCreate
 from .audit import log_user_action
+from .issues import make_signed_url
 
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 
@@ -112,6 +113,7 @@ def get_regroupement(regroupement_id, current_user):
             })
 
         # 3. Pièces jointes du regroupement
+        # 3. Pièces jointes du regroupement
         qry_attachments = """
             SELECT id_attachment, attachment_name, attachment_type, url_path
             FROM c_issue_attachment
@@ -123,7 +125,7 @@ def get_regroupement(regroupement_id, current_user):
                 "id_attachment": att[0],
                 "attachment_name": att[1],
                 "attachment_type": att[2],
-                "url_path": att[3]
+                "url_path": make_signed_url(att[3]) 
             })
             
         return group_data, 200
@@ -223,9 +225,8 @@ def get_regroupement_comments(regroupement_id, current_user):
         rows = cursor.fetchall()
         for r in rows:
             comment_id = r[0]
-            # Pièces jointes par commentaire
             cursor.execute("SELECT attachment_name, attachment_type, url_path FROM c_issue_attachment WHERE id_comment = %s", (comment_id,))
-            atts = [{"attachment_name": a[0], "attachment_type": a[1], "url_path": a[2]} for a in cursor.fetchall()]
+            atts = [{"attachment_name": a[0], "attachment_type": a[1], "url_path": make_signed_url(a[2])} for a in cursor.fetchall()]
             comments.append({
                 "id_comment": comment_id,
                 "comment_text": r[1],
@@ -339,6 +340,36 @@ def delete_regroupement_attachment(regroupement_id, filename, current_user, clie
         cursor.execute("DELETE FROM c_issue_attachment WHERE id_regroupment = %s AND attachment_name = %s", (regroupement_id, filename))
         connection.commit()
         return {"message": "success.attachment_deleted"}, 200
+    except Exception as e:
+        connection.rollback()
+        return {"error": "error.database", "details": str(e)}, 500
+    finally:
+        connection.close()
+
+def update_regroupement(regroupement_id, request_json, current_user, client_ip):
+    """Met à jour le titre, la description et le ticket SSP d'un regroupement."""
+    title = request_json.get("title")
+    description = request_json.get("description")
+    ssp_ticket = request_json.get("ssp_ticket")
+    
+    username = current_user.get("sub", "UNKNOWN")
+    connection = get_db_connection()
+    if not connection: return {"error": "error.database_connection"}, 500
+    
+    try:
+        cursor = connection.cursor()
+        cursor.execute("""
+            UPDATE c_issue_regroupment 
+            SET title = %s, description = %s, ssp_ticket = %s, changed_on = CURRENT_TIMESTAMP, changed_by = %s
+            WHERE id_regroupment = %s
+        """, (title, description, ssp_ticket, username, regroupement_id))
+        connection.commit()
+        
+        log_user_action(
+            user_name=username, action_type="UPDATE_REGROUPEMENT", target_id=str(regroupement_id), 
+            details="Regroupement details updated.", ip_address=client_ip
+        )
+        return {"message": "success.regroupement_updated"}, 200
     except Exception as e:
         connection.rollback()
         return {"error": "error.database", "details": str(e)}, 500

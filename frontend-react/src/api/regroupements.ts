@@ -53,7 +53,9 @@ export const uploadRegroupementAttachments = async (id: number, formData: FormDa
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
   })
 }
-
+export const updateRegroupement = async (id: number, data: { title: string, description: string, ssp_ticket?: string }) => {
+  return await axios.put(`${API_BASE_URL}/regroupements/${id}`, data, { headers: getAuthHeaders() })
+}
 export const deleteRegroupementAttachment = async (id: number, filename: string) => {
   return await axios.delete(`${API_BASE_URL}/regroupements/${id}/attachments/${filename}`, { headers: getAuthHeaders() })
 }

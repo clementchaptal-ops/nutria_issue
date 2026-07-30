@@ -6,6 +6,7 @@ import FileUploader from '../components/FileUploader'
 import { 
   fetchRegroupement, 
   closeRegroupement, 
+  updateRegroupement,
   fetchRegroupementComments, 
   addRegroupementComment, 
   uploadRegroupementCommentAttachments, 
@@ -24,6 +25,10 @@ function RegroupementDetail() {
   const [regroupement, setRegroupement] = useState<any>(null)
   const [loading, setLoading] = useState<boolean>(true)
   
+  // 🚨 NOUVEAU : Mode Édition
+  const [isEditing, setIsEditing] = useState<boolean>(false)
+  const [editFormData, setEditFormData] = useState({ title: '', description: '', ssp_ticket: '' })
+  
   // Attachments & Comments states
   const [attachments, setAttachments] = useState<File[]>([])
   const [comments, setComments] = useState<any[]>([])
@@ -34,10 +39,14 @@ function RegroupementDetail() {
 
   const loadData = async () => {
     if (!regroupementId) return
-    setIsLoadingData(true)
     try {
       const res = await fetchRegroupement(regroupementId)
       setRegroupement(res.data)
+      setEditFormData({
+        title: res.data.title || '',
+        description: res.data.description || '',
+        ssp_ticket: res.data.ssp_ticket || ''
+      })
       await fetchComments()
     } catch (err) {
       toast.error(t('regroupements.error.load_failed', 'Failed to load regroupement details.'))
@@ -45,8 +54,6 @@ function RegroupementDetail() {
       setLoading(false)
     }
   }
-
-  const [isLoadingData, setIsLoadingData] = useState(false)
 
   const fetchComments = async () => {
     if (!regroupementId) return
@@ -74,17 +81,24 @@ function RegroupementDetail() {
     }
   }
 
-  const handleUploadMainAttachments = async () => {
-    if (attachments.length === 0) return
-    const formData = new FormData()
-    attachments.forEach((file) => formData.append('files', file))
+  // 🚨 SAUVEGARDE DES MODIFICATIONS
+  const handleSaveChanges = async () => {
     try {
-      await uploadRegroupementAttachments(regroupementId, formData)
-      toast.success(t('ticket.success_msg_update', 'Attachments uploaded!'))
-      setAttachments([])
+      await updateRegroupement(regroupementId, editFormData)
+      
+      // S'il y a de nouvelles pièces jointes, on les envoie
+      if (attachments.length > 0) {
+        const formData = new FormData()
+        attachments.forEach((file) => formData.append('files', file))
+        await uploadRegroupementAttachments(regroupementId, formData)
+      }
+      
+      toast.success("Modifications sauvegardées avec succès !")
+      setIsEditing(false)
+      setAttachments([]) // On vide le uploader après sauvegarde
       loadData()
     } catch (err) {
-      toast.error(t('ticket.error.upload_attachments', 'Could not upload files.'))
+      toast.error("Erreur lors de la sauvegarde.")
     }
   }
 
@@ -130,12 +144,12 @@ function RegroupementDetail() {
     return <div className={styles.pageContainer}><p>{t('regroupements.not_found', 'Regroupement not found.')}</p></div>
   }
 
-  // 🎯 URL SSP CORRIGÉE
   const sspUrl = regroupement.ssp_ticket ? `https://it-ssp.mxns.com/a/tickets/${regroupement.ssp_ticket}` : null
 
   return (
     <div className={styles.pageContainer}>
-      {/* BANNIÈRE DE STATUT */}
+      
+      {/* BANNIÈRE DE STATUT & BOUTONS D'ACTION */}
       <div className={`${styles.statusBanner} ${regroupement.status === 'CLOSED' ? styles.closed : styles.in_progress}`} style={{ display: 'flex', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <button onClick={() => navigate('/regroupements')} style={{ background: 'none', border: 'none', color: '#0052cc', cursor: 'pointer', fontWeight: 'bold' }}>
@@ -148,41 +162,97 @@ function RegroupementDetail() {
           <span className={styles.ticketIdText}>REGROUPEMENT #{regroupement.id_regroupment}</span>
         </div>
 
-        {regroupement.status !== 'CLOSED' && (
-          <button type="button" onClick={handleClose} style={{ padding: '6px 16px', borderRadius: '4px', border: 'none', background: '#de350b', color: '#fff', cursor: 'pointer', fontWeight: 'bold' }}>
-            🔒 {t('regroupements.close_button', 'Close Regroupement')}
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '10px' }}>
+          {/* BOUTON ÉDITION */}
+          {!isEditing && regroupement.status !== 'CLOSED' && (
+            <>
+              <button type="button" onClick={() => setIsEditing(true)} style={{ padding: '6px 16px', borderRadius: '4px', border: '1px solid #0052cc', background: '#fff', color: '#0052cc', cursor: 'pointer', fontWeight: 'bold' }}>
+                ✏️ {t('ticket.edit', 'Edit')}
+              </button>
+              <button type="button" onClick={handleClose} style={{ padding: '6px 16px', borderRadius: '4px', border: 'none', background: '#de350b', color: '#fff', cursor: 'pointer', fontWeight: 'bold' }}>
+                🔒 {t('regroupements.close_button', 'Close Regroupement')}
+              </button>
+            </>
+          )}
+
+          {/* BOUTONS SAUVEGARDE / ANNULATION (Si Édition) */}
+          {isEditing && (
+            <>
+              <button type="button" onClick={() => { setIsEditing(false); setAttachments([]); }} style={{ padding: '6px 16px', borderRadius: '4px', border: '1px solid #42526e', background: '#fff', color: '#42526e', cursor: 'pointer', fontWeight: 'bold' }}>
+                ❌ {t('common.cancel', 'Cancel')}
+              </button>
+              <button type="button" onClick={handleSaveChanges} style={{ padding: '6px 16px', borderRadius: '4px', border: 'none', background: '#0052cc', color: '#fff', cursor: 'pointer', fontWeight: 'bold' }}>
+                💾 {t('common.save', 'Save Changes')}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className={styles.gridContainer}>
-        {/* COLONNE GAUCHE: INFOS & PIÈCES JOINTES */}
+        {/* =========================================
+            COLONNE GAUCHE: INFOS & PIÈCES JOINTES 
+            ========================================= */}
         <div className={styles.leftColumn}>
-          <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <h2 className={styles.sectionTitle}>📁 {regroupement.title}</h2>
-            <p style={{ color: '#7a869a', fontSize: '13px', marginBottom: '15px' }}>
+          <div style={{ background: '#fff', padding: '24px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            
+            {/* TITRE */}
+            {isEditing ? (
+              <div className={styles.formGroup} style={{ marginBottom: '15px' }}>
+                <label className={styles.label}>{t('form.title', 'Title')} <span className={styles.required}>*</span></label>
+                <input 
+                  type="text" 
+                  className={styles.input} 
+                  value={editFormData.title} 
+                  onChange={(e) => setEditFormData({...editFormData, title: e.target.value})} 
+                />
+              </div>
+            ) : (
+              <h2 className={styles.sectionTitle}>📁 {regroupement.title}</h2>
+            )}
+            
+            <p style={{ color: '#7a869a', fontSize: '13px', marginBottom: '20px' }}>
               Created by <strong>{regroupement.created_by}</strong> on {regroupement.created_on}
             </p>
 
+            {/* DESCRIPTION */}
             <div className={styles.formGroup}>
               <label className={styles.label}>{t('form.description', 'Description')}</label>
-              <div style={{ background: '#f4f5f7', padding: '12px', borderRadius: '4px', whiteSpace: 'pre-wrap', color: '#172b4d' }}>
-                {regroupement.description}
-              </div>
+              {isEditing ? (
+                <textarea 
+                  rows={5} 
+                  className={styles.textarea} 
+                  value={editFormData.description} 
+                  onChange={(e) => setEditFormData({...editFormData, description: e.target.value})} 
+                />
+              ) : (
+                <div style={{ background: '#f4f5f7', padding: '12px', borderRadius: '4px', whiteSpace: 'pre-wrap', color: '#172b4d' }}>
+                  {regroupement.description}
+                </div>
+              )}
             </div>
 
-            {/* 🎯 CORRECTION SSP LINK */}
-            {sspUrl && (
-              <div className={styles.formGroup} style={{ marginTop: '15px' }}>
-                <label className={styles.label}>{t('form.ssp_ticket', 'SSP Ticket')}</label>
-                <a href={sspUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#0052cc', fontWeight: 'bold', fontSize: '15px' }}>
-                  #{regroupement.ssp_ticket} 🔗
-                </a>
-              </div>
-            )}
+            {/* SSP TICKET */}
+            <div className={styles.formGroup} style={{ marginTop: '15px' }}>
+              <label className={styles.label}>{t('form.ssp_ticket', 'SSP Ticket')}</label>
+              {isEditing ? (
+                <input 
+                  type="text" 
+                  className={styles.input} 
+                  value={editFormData.ssp_ticket} 
+                  onChange={(e) => setEditFormData({...editFormData, ssp_ticket: e.target.value})} 
+                />
+              ) : (
+                sspUrl ? (
+                  <a href={sspUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#0052cc', fontWeight: 'bold', fontSize: '15px' }}>
+                    #{regroupement.ssp_ticket} 🔗
+                  </a>
+                ) : <span style={{ color: '#7a869a' }}>-</span>
+              )}
+            </div>
           </div>
 
-          {/* GALERIE DES PIÈCES JOINTES (AVEC LIGHTBOX) */}
+          {/* GALERIE DES PIÈCES JOINTES */}
           <div className={styles.attachmentsContainer} style={{ marginTop: '20px' }}>
             <h3 className={styles.attachmentsTitle}>📁 {t('ticket.existing_files', 'Regroupement Attachments')}</h3>
 
@@ -222,7 +292,8 @@ function RegroupementDetail() {
                         </div>
                       )}
 
-                      {regroupement.status !== 'CLOSED' && (
+                      {/* On ne peut supprimer que si on est en mode Édition */}
+                      {isEditing && (
                         <button type="button" onClick={() => handleDeleteAttachment(file.attachment_name)} className={styles.deleteBtn}>🗑️</button>
                       )}
                     </div>
@@ -230,25 +301,25 @@ function RegroupementDetail() {
                 })}
               </div>
             ) : (
-              <p style={{ color: '#7a869a', fontSize: '13px' }}>{t('regroupements.no_attachments', 'No attachments uploaded.')}</p>
+              <p style={{ color: '#7a869a', fontSize: '13px', marginLeft: '10px' }}>{t('regroupements.no_attachments', 'No attachments uploaded.')}</p>
             )}
 
-            {/* AJOUTER DE NOUVELLES PJ */}
-            {regroupement.status !== 'CLOSED' && (
-              <div style={{ marginTop: '20px' }}>
-                <label className={styles.label}>{t('ticket.attachments', 'Add Attachments')}</label>
+            {/* 🚨 FILE UPLOADER PRINCIPAL (Visible UNIQUEMENT en mode édition) */}
+            {isEditing && (
+              <div style={{ marginTop: '20px', padding: '15px', border: '1px dashed #0052cc', borderRadius: '4px', background: '#e9f2ff' }}>
+                <label className={styles.label} style={{ color: '#0052cc' }}>➕ {t('ticket.attachments', 'Add New Attachments')}</label>
                 <FileUploader files={attachments} onFilesChange={(files: File[]) => setAttachments(files)} />
-                {attachments.length > 0 && (
-                  <button type="button" onClick={handleUploadMainAttachments} className={styles.commentBtn} style={{ marginTop: '10px' }}>
-                    ⬆️ Upload {attachments.length} file(s)
-                  </button>
-                )}
+                <small style={{ display: 'block', marginTop: '10px', color: '#7a869a' }}>
+                  Ces fichiers seront sauvegardés lors du clic sur le bouton "Save Changes" en haut.
+                </small>
               </div>
             )}
           </div>
         </div>
 
-        {/* COLONNE DROITE: ISSUES LIÉES */}
+        {/* =========================================
+            COLONNE DROITE: ISSUES LIÉES 
+            ========================================= */}
         <div className={styles.rightColumn}>
           <div className={`${styles.sidebarCard} ${styles.readOnlyCard}`}>
             <h3 className={styles.cardTitle}>📋 {t('regroupements.linked_issues', 'Linked Issues')} ({regroupement.linked_issues?.length || 0})</h3>
@@ -260,7 +331,7 @@ function RegroupementDetail() {
                   {regroupement.linked_issues.map((issue: any) => (
                     <div 
                       key={issue.id_issue} 
-                      onClick={() => navigate(`/dashboard?id=${issue.id_issue}`)}
+                      onClick={() => navigate(`/?id=${issue.id_issue}`)} // 🚨 CORRECTION URL ICI ( /?id= )
                       style={{ padding: '10px', border: '1px solid #dfe1e6', borderRadius: '4px', cursor: 'pointer', background: '#fafbfc' }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -279,81 +350,88 @@ function RegroupementDetail() {
         </div>
       </div>
 
-      {/* SECTION DISCUSSION / COMMENTAIRES */}
-      <div className={styles.commentsSection} style={{ width: '100%', marginTop: '30px' }}>
-        <h3 className={styles.commentsTitle}>💬 {t('ticket.discussion', 'Discussion')}</h3>
+      {/* =========================================
+          SECTION DISCUSSION / COMMENTAIRES 
+          Visible UNIQUEMENT si on n'est PAS en mode édition
+          ========================================= */}
+      {!isEditing && (
+        <div className={styles.commentsSection} style={{ width: '100%', marginTop: '30px' }}>
+          <h3 className={styles.commentsTitle}>💬 {t('ticket.discussion', 'Discussion')}</h3>
 
-        <div className={styles.commentsList}>
-          {comments.length === 0 ? (
-            <p className={styles.noComments}>{t('ticket.no_comments', 'No comment for the moment')}</p>
-          ) : (
-            comments.map((comment) => (
-              <div key={comment.id_comment} className={styles.commentBubble}>
-                <div className={styles.commentHeader}>
-                  <strong>{comment.full_name}</strong>
-                  <span className={styles.commentDate}>{comment.created_on}</span>
-                </div>
-                <div className={styles.commentBody}>
-                  {comment.comment_text.split('\n').map((line: string, i: number) => (
-                    <React.Fragment key={i}>
-                      {line}<br />
-                    </React.Fragment>
-                  ))}
-                </div>
-
-                {comment.attachments && comment.attachments.length > 0 && (
-                  <div className={styles.commentAttachmentsRow}>
-                    {comment.attachments.map((file: any, i: number) => {
-                      const fileUrl = file.url_path
-                      const isImg = file.attachment_type === 'IMAGE' || file.attachment_type?.includes('IMAGE')
-                      return (
-                        <div key={i} className={styles.commentAttachmentPill} onClick={() => {
-                          if (isImg || file.attachment_type === 'VIDEO') {
-                            setLightboxMedia({ url: fileUrl, type: isImg ? 'IMAGE' : 'VIDEO' })
-                          } else {
-                            window.open(fileUrl, '_blank')
-                          }
-                        }}>
-                          {isImg ? '🖼️' : file.attachment_type === 'VIDEO' ? '🎥' : '📄'} 
-                          <span className={styles.pillText}>{file.attachment_name}</span>
-                        </div>
-                      )
-                    })}
+          <div className={styles.commentsList}>
+            {comments.length === 0 ? (
+              <p className={styles.noComments}>{t('ticket.no_comments', 'No comment for the moment')}</p>
+            ) : (
+              comments.map((comment) => (
+                <div key={comment.id_comment} className={styles.commentBubble}>
+                  <div className={styles.commentHeader}>
+                    <strong>{comment.full_name}</strong>
+                    <span className={styles.commentDate}>{comment.created_on}</span>
                   </div>
-                )}
+                  <div className={styles.commentBody}>
+                    {comment.comment_text.split('\n').map((line: string, i: number) => (
+                      <React.Fragment key={i}>
+                        {line}<br />
+                      </React.Fragment>
+                    ))}
+                  </div>
+
+                  {comment.attachments && comment.attachments.length > 0 && (
+                    <div className={styles.commentAttachmentsRow}>
+                      {comment.attachments.map((file: any, i: number) => {
+                        const fileUrl = file.url_path
+                        const isImg = file.attachment_type === 'IMAGE' || file.attachment_type?.includes('IMAGE')
+                        return (
+                          <div key={i} className={styles.commentAttachmentPill} onClick={() => {
+                            if (isImg || file.attachment_type === 'VIDEO') {
+                              setLightboxMedia({ url: fileUrl, type: isImg ? 'IMAGE' : 'VIDEO' })
+                            } else {
+                              window.open(fileUrl, '_blank')
+                            }
+                          }}>
+                            {isImg ? '🖼️' : file.attachment_type === 'VIDEO' ? '🎥' : '📄'} 
+                            <span className={styles.pillText}>{file.attachment_name}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          {regroupement.status !== 'CLOSED' && (
+            <div className={styles.commentInputArea}>
+              <textarea 
+                value={newComment} 
+                onChange={(e) => setNewComment(e.target.value)} 
+                placeholder={t('ticket.type_comment', 'Type your comment here...')} 
+                className={styles.commentTextarea}
+                rows={3}
+              />
+              
+              <div style={{ marginTop: '10px' }}>
+                <FileUploader files={commentFiles} onFilesChange={(files: File[]) => setCommentFiles(files)} />
               </div>
-            ))
+
+              <button 
+                type="button" 
+                onClick={handlePostComment} 
+                disabled={!newComment.trim() || isPostingComment}
+                className={styles.commentBtn}
+                style={{ marginTop: '10px' }}
+              >
+                {isPostingComment ? '⏳...' : t('ticket.button_send', '✉️ Send')}
+              </button>
+            </div>
           )}
         </div>
+      )}
 
-        {regroupement.status !== 'CLOSED' && (
-          <div className={styles.commentInputArea}>
-            <textarea 
-              value={newComment} 
-              onChange={(e) => setNewComment(e.target.value)} 
-              placeholder={t('ticket.type_comment', 'Type your comment here...')} 
-              className={styles.commentTextarea}
-              rows={3}
-            />
-            
-            <div style={{ marginTop: '10px' }}>
-              <FileUploader files={commentFiles} onFilesChange={(files: File[]) => setCommentFiles(files)} />
-            </div>
-
-            <button 
-              type="button" 
-              onClick={handlePostComment} 
-              disabled={!newComment.trim() || isPostingComment}
-              className={styles.commentBtn}
-              style={{ marginTop: '10px' }}
-            >
-              {isPostingComment ? '⏳...' : t('ticket.button_send', '✉️ Send')}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* OVERLAY LIGHTBOX POUR IMAGES ET VIDÉOS */}
+      {/* =========================================
+          OVERLAY LIGHTBOX POUR IMAGES ET VIDÉOS 
+          ========================================= */}
       {lightboxMedia && (
         <div className={styles.lightboxOverlay} onClick={() => setLightboxMedia(null)}>
           <span className={styles.lightboxClose}>&times;</span>
