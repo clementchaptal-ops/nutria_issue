@@ -856,6 +856,7 @@ def system_cleanup():
     1. Supprime les PRETICKETS (> 1h) ET leurs fichiers sur Cloud Storage.
     2. Supprime les logs d'audit (> 2 ans).
     3. Supprime les tickets CLOSED (> 6 mois) ET leurs fichiers sur Cloud Storage.
+    4. Supprime les REGROUPEMENTS CLOSED dont la dernière issue a > 6 mois (ou vides > 6 mois) ET leurs fichiers.
     """
     connection = get_db_connection()
     if not connection:
@@ -866,49 +867,108 @@ def system_cleanup():
         client = storage.Client()
         bucket = client.bucket(BUCKET_NAME)
 
-        # --- Fonction interne pour nettoyer un dossier GCS ---
-        def delete_gcs_folder(issue_id):
+        # --- Fonctions internes pour nettoyer les dossiers GCS ---
+        def delete_gcs_issue_folder(issue_id):
             blobs = bucket.list_blobs(prefix=f"tickets/ticket_{issue_id}/")
             for blob in blobs:
                 blob.delete()
-            # Force la suppression du dossier visuel (créé manuellement ou IHM)
             for folder_path in [f"tickets/ticket_{issue_id}/", f"tickets/ticket_{issue_id}"]:
                 folder_blob = bucket.blob(folder_path)
                 if folder_blob.exists():
                     folder_blob.delete()
 
-        # --- 1. NETTOYAGE DES PRETICKETS (> 1 heure) ---
+        def delete_gcs_regroupement_folder(regroupement_id):
+            blobs = bucket.list_blobs(prefix=f"regroupements/reg_{regroupement_id}/")
+            for blob in blobs:
+                blob.delete()
+            for folder_path in [f"regroupements/reg_{regroupement_id}/", f"regroupements/reg_{regroupement_id}"]:
+                folder_blob = bucket.blob(folder_path)
+                if folder_blob.exists():
+                    folder_blob.delete()
+
+        # =========================================================
+        # 1. NETTOYAGE DES PRETICKETS (> 1 heure)
+        # =========================================================
         cursor.execute("SELECT id_issue FROM c_issue WHERE status = 'PRETICKET' AND created_on < CURRENT_TIMESTAMP - INTERVAL '1 hour'")
         expired_pretickets = [row[0] for row in cursor.fetchall()]
         deleted_pretickets_count = len(expired_pretickets)
 
         if deleted_pretickets_count > 0:
             for p_id in expired_pretickets:
-                delete_gcs_folder(p_id)
-
+                delete_gcs_issue_folder(p_id)
             p_format = ','.join(['%s'] * deleted_pretickets_count)
             p_tuple = tuple(expired_pretickets)
-            
             cursor.execute(f"DELETE FROM c_issue_attachment WHERE id_issue IN ({p_format})", p_tuple)
             cursor.execute(f"DELETE FROM c_issue_comments WHERE id_issue IN ({p_format})", p_tuple)
             cursor.execute(f"DELETE FROM c_issue WHERE id_issue IN ({p_format})", p_tuple)
 
-        # --- 2. NETTOYAGE DES LOGS D'AUDIT (> 2 ans) ---
+        # =========================================================
+        # 2. NETTOYAGE DES LOGS D'AUDIT (> 2 ans)
+        # =========================================================
         cursor.execute("DELETE FROM c_issue_audit_logs WHERE created_at < CURRENT_TIMESTAMP - INTERVAL '2 years'")
         deleted_logs = cursor.rowcount
 
-        # --- 3. NETTOYAGE DES TICKETS FERMÉS (> 6 mois) ---
-        cursor.execute("SELECT id_issue FROM c_issue WHERE status = 'CLOSED' AND changed_on < CURRENT_TIMESTAMP - INTERVAL '6 months'")
+        # =========================================================
+        # 3. NETTOYAGE DES REGROUPEMENTS (Règle stricte des 6 mois)
+        # =========================================================
+        qry_regroupements = """
+            SELECT r.id_regroupment
+            FROM c_issue_regroupment r
+            WHERE r.status = 'CLOSED'
+              AND (
+                  -- CAS A : Le regroupement contient des issues
+                  (
+                      NOT EXISTS (
+                          SELECT 1 FROM c_link_issue_regroupment l
+                          JOIN c_issue i ON l.id_issue = i.id_issue
+                          WHERE l.id_regroupment = r.id_regroupment AND i.status != 'CLOSED'
+                      )
+                      AND (
+                          SELECT MAX(i2.created_on)
+                          FROM c_link_issue_regroupment l2
+                          JOIN c_issue i2 ON l2.id_issue = i2.id_issue
+                          WHERE l2.id_regroupment = r.id_regroupment
+                      ) < CURRENT_TIMESTAMP - INTERVAL '6 months'
+                  )
+                  OR
+                  -- CAS B : Le regroupement est vide et a plus de 6 mois
+                  (
+                      NOT EXISTS (SELECT 1 FROM c_link_issue_regroupment l3 WHERE l3.id_regroupment = r.id_regroupment)
+                      AND r.created_on < CURRENT_TIMESTAMP - INTERVAL '6 months'
+                  )
+              )
+        """
+        cursor.execute(qry_regroupements)
+        closed_regroupements = [row[0] for row in cursor.fetchall()]
+        deleted_regroupements_count = len(closed_regroupements)
+
+        if deleted_regroupements_count > 0:
+            for r_id in closed_regroupements:
+                delete_gcs_regroupement_folder(r_id)
+            r_format = ','.join(['%s'] * deleted_regroupements_count)
+            r_tuple = tuple(closed_regroupements)
+            # Pas besoin de supprimer à la main link et attachment car CASCADE est configuré dans ta BDD,
+            # mais on le fait proprement si PostgreSQL n'est pas strict :
+            cursor.execute(f"DELETE FROM c_issue_regroupment WHERE id_regroupment IN ({r_format})", r_tuple)
+
+        # =========================================================
+        # 4. NETTOYAGE DES TICKETS FERMÉS ORPHELINS (> 6 mois)
+        # =========================================================
+        # On supprime les tickets fermés depuis 6 mois qui ne sont PAS liés à un regroupement
+        # (S'ils sont liés à un regroupement, ils ont déjà été supprimés par l'étape CASCADE précédente).
+        cursor.execute("""
+            SELECT id_issue FROM c_issue 
+            WHERE status = 'CLOSED' 
+              AND changed_on < CURRENT_TIMESTAMP - INTERVAL '6 months'
+        """)
         closed_issues = [row[0] for row in cursor.fetchall()]
         deleted_closed_count = len(closed_issues)
 
         if deleted_closed_count > 0:
             for c_id in closed_issues:
-                delete_gcs_folder(c_id)
-
+                delete_gcs_issue_folder(c_id)
             c_format = ','.join(['%s'] * deleted_closed_count)
             c_tuple = tuple(closed_issues)
-            
             cursor.execute(f"DELETE FROM c_issue_attachment WHERE id_issue IN ({c_format})", c_tuple)
             cursor.execute(f"DELETE FROM c_issue_comments WHERE id_issue IN ({c_format})", c_tuple)
             cursor.execute(f"DELETE FROM c_issue WHERE id_issue IN ({c_format})", c_tuple)
@@ -920,6 +980,7 @@ def system_cleanup():
             "details": {
                 "deleted_pretickets": deleted_pretickets_count,
                 "deleted_audit_logs": deleted_logs,
+                "deleted_closed_regroupements": deleted_regroupements_count,
                 "deleted_closed_issues": deleted_closed_count
             }
         }, 200

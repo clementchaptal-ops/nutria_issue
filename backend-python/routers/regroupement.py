@@ -211,10 +211,10 @@ def get_regroupement_comments(regroupement_id, current_user):
     try:
         cursor = connection.cursor()
         qry = """
-            SELECT c.id_comment, c.comment_text, u.full_name, c.created_by,
+            SELECT c.id_comment, c.comment_text, u.full_name, c.user_name,
                    TO_CHAR(c.created_on, 'YYYY-MM-DD HH24:MI') as created_on
-            FROM c_issue_comment c
-            LEFT JOIN lims_users u ON TRIM(UPPER(c.created_by)) = TRIM(UPPER(u.user_name))
+            FROM c_issue_comments c
+            LEFT JOIN lims_users u ON TRIM(UPPER(c.user_name)) = TRIM(UPPER(u.user_name))
             WHERE c.id_regroupment = %s
             ORDER BY c.id_comment ASC
         """
@@ -223,7 +223,7 @@ def get_regroupement_comments(regroupement_id, current_user):
         rows = cursor.fetchall()
         for r in rows:
             comment_id = r[0]
-            # Attachments per comment
+            # Pièces jointes par commentaire
             cursor.execute("SELECT attachment_name, attachment_type, url_path FROM c_issue_attachment WHERE id_comment = %s", (comment_id,))
             atts = [{"attachment_name": a[0], "attachment_type": a[1], "url_path": a[2]} for a in cursor.fetchall()]
             comments.append({
@@ -243,13 +243,14 @@ def get_regroupement_comments(regroupement_id, current_user):
 def add_regroupement_comment(regroupement_id, request_json, current_user, client_ip):
     comment_text = request_json.get("comment_text")
     if not comment_text: return {"error": "error.missing_text"}, 400
+    
     username = current_user.get("sub", "UNKNOWN")
     connection = get_db_connection()
     if not connection: return {"error": "error.database_connection"}, 500
     try:
         cursor = connection.cursor()
         cursor.execute("""
-            INSERT INTO c_issue_comment (id_regroupment, comment_text, created_by)
+            INSERT INTO c_issue_comments (id_regroupment, comment_text, user_name)
             VALUES (%s, %s, %s) RETURNING id_comment
         """, (regroupement_id, comment_text, username))
         new_comment_id = cursor.fetchone()[0]

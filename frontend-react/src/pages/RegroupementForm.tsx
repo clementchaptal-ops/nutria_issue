@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
-import { createRegroupement } from '../api/regroupements'
+import { createRegroupement, uploadRegroupementAttachments } from '../api/regroupements'
 import { fetchAllIssues } from '../api/issues'
+import FileUploader from '../components/FileUploader' // 🚨 Ajout de l'uploader
 import styles from './IssueForm.module.css' 
 
 function RegroupementForm() {
@@ -11,6 +12,9 @@ function RegroupementForm() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [availableIssues, setAvailableIssues] = useState<any[]>([])
+  
+  // 🚨 Ajout du state pour les pièces jointes
+  const [attachments, setAttachments] = useState<File[]>([])
 
   const [formData, setFormData] = useState({
     title: '',
@@ -50,9 +54,25 @@ function RegroupementForm() {
 
     setLoading(true)
     try {
+      // 1. Création du regroupement
       const response = await createRegroupement(formData)
+      const newRegroupementId = response.data.id_regroupment
+      
+      // 2. Upload des pièces jointes si présentes
+      if (attachments.length > 0 && newRegroupementId) {
+        const uploadData = new FormData()
+        attachments.forEach((file) => uploadData.append('files', file))
+        
+        try {
+          await uploadRegroupementAttachments(newRegroupementId, uploadData)
+        } catch (uploadError) {
+          toast.error("Le regroupement est créé, mais certaines pièces jointes n'ont pas pu être envoyées.")
+        }
+      }
+
       toast.success(t('regroupements.success_created', 'Regroupement created successfully!'))
-      navigate(`/regroupements/${response.data.id_regroupment}`)
+      // 3. Redirection vers la vue de détail
+      navigate(`/regroupements/${newRegroupementId}`)
     } catch (error: any) {
       toast.error(t('error.generic', 'An error occurred'))
       setLoading(false)
@@ -104,6 +124,12 @@ function RegroupementForm() {
           <small style={{ color: '#7a869a', marginTop: '4px', display: 'block' }}>
             {t('form.ssp_help', 'Just enter the number, the link will be generated automatically.')}
           </small>
+        </div>
+
+        {/* 🚨 NOUVEAU BLOC : PIÈCES JOINTES */}
+        <div className={styles.formGroup} style={{ marginTop: '20px' }}>
+          <label className={styles.label}>{t('ticket.attachments', 'Add Attachments')}</label>
+          <FileUploader files={attachments} onFilesChange={(files: File[]) => setAttachments(files)} />
         </div>
 
         {/* Bloc Sélection d'Issues */}
