@@ -154,9 +154,9 @@ def get_my_profile(current_user):
 
 
 def create_issue(request_json, current_user, client_ip):
-    """Creates a new manual ticket through the web platform and routes it straight to 'IN PROGRESS'."""
+    """Creates a new manual issue through the web platform and routes it straight to 'IN PROGRESS'."""
     try:
-        ticket = TicketCreate(**request_json)
+        issue_payload = IssueCreate(**request_json)
     except ValidationError as e:
         return {"error": "error.invalid_data_format", "details": e.errors()}, 400
 
@@ -167,21 +167,20 @@ def create_issue(request_json, current_user, client_ip):
         
     try:
         cursor = connection.cursor()
-        # PostgreSQL: RETURNING id_issue and %s variables (CURRENT_TIMESTAMP replaces SYSDATE)
+        # 🚨 Retour à 'IN PROGRESS'
         insert_qry = """
             INSERT INTO c_issue (title, issue_type, criticity, frequency, description, status, user_name, created_on, changed_on) 
             VALUES (%s, %s, %s, %s, %s, 'IN PROGRESS', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
             RETURNING id_issue
         """
-        cursor.execute(insert_qry, (ticket.title, ticket.issue_type, ticket.criticity, ticket.frequency, ticket.description, username))
+        cursor.execute(insert_qry, (issue_payload.title, issue_payload.issue_type, issue_payload.criticity, issue_payload.frequency, issue_payload.description, username))
         
-        # Retrieve generated primary key
         next_id = cursor.fetchone()[0]
         connection.commit()
 
-        log_user_action(user_name=username, action_type="CREATE_TICKET", target_id=str(next_id), details=f"Manual web creation. Title: '{ticket.title}'", ip_address=client_ip)
+        log_user_action(user_name=username, action_type="CREATE_ISSUE", target_id=str(next_id), details=f"Manual web creation. Title: '{issue_payload.title}'", ip_address=client_ip)
         
-        return {"id_issue": next_id, "message": "success.ticket_created"}, 201
+        return {"id_issue": next_id, "message": "success.issue_created"}, 201
     except Exception as e:
         connection.rollback()
         print(f"[DATABASE ERROR - create_issue]: {str(e)}")
@@ -417,7 +416,7 @@ def upload_comment_attachments(issue_id, comment_id, files_data, current_user):
 def validate_issue(issue_id, request_json, current_user, client_ip):
     """Validates data alterations and updates an issue payload to 'IN PROGRESS' status."""
     try:
-        ticket = TicketUpdate(**request_json)
+        issue_payload = IssueUpdate(**request_json)
     except ValidationError as e:
         return {"error": "error.invalid_data_format", "details": e.errors()}, 400
 
@@ -434,22 +433,22 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
         cursor = connection.cursor()
         check_qry = "SELECT u.location, u.email_addr FROM c_issue i LEFT JOIN lims_users u ON TRIM(UPPER(i.user_name)) = TRIM(UPPER(u.user_name)) WHERE i.id_issue = %s"
         cursor.execute(check_qry, (issue_id,))
-        ticket_row = cursor.fetchone()
+        issue_row = cursor.fetchone()
         
-        if not ticket_row:
+        if not issue_row:
             return {"error": "error.issue_not_found"}, 404
             
         safe_user_email = str(user_email).strip().lower() if user_email else "NONE"
-        safe_ticket_email = str(ticket_row[1]).strip().lower() if ticket_row[1] else "NONE"
+        safe_issue_email = str(issue_row[1]).strip().lower() if issue_row[1] else "NONE"
         safe_user_loc = str(user_location).strip().upper() if user_location else "NONE"
-        safe_ticket_loc = str(ticket_row[0]).strip().upper() if ticket_row[0] else "NONE"
+        safe_issue_loc = str(issue_row[0]).strip().upper() if issue_row[0] else "NONE"
 
-        if user_role == "USER" and safe_ticket_email != safe_user_email:
+        if user_role == "USER" and safe_issue_email != safe_user_email:
             return {"error": "error.forbidden_access"}, 403
-        elif user_role == "LOCAL_ADMIN" and safe_ticket_loc != safe_user_loc:
+        elif user_role == "LOCAL_ADMIN" and safe_issue_loc != safe_user_loc:
             return {"error": "error.forbidden_access"}, 403
 
-        # UPDATE avec le sspticket retiré
+        # 🚨 Retour à 'IN PROGRESS'
         update_qry = """
             UPDATE c_issue 
             SET title = %s, issue_type = %s, criticity = %s, frequency = %s, 
@@ -461,18 +460,18 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
             WHERE id_issue = %s AND status NOT IN ('CANCELED', 'CLOSED')
         """
         cursor.execute(update_qry, (
-            ticket.title, ticket.issue_type, ticket.criticity, ticket.frequency, 
-            ticket.blocking_issue, ticket.description, 
-            ticket.current_project, ticket.current_batch, ticket.current_sample,
-            ticket.current_analysis, ticket.current_analysis_variation,
-            ticket.current_customer, username, issue_id
+            issue_payload.title, issue_payload.issue_type, issue_payload.criticity, issue_payload.frequency, 
+            issue_payload.blocking_issue, issue_payload.description,
+            issue_payload.current_project, issue_payload.current_batch, issue_payload.current_sample,
+            issue_payload.current_analysis, issue_payload.current_analysis_variation,
+            issue_payload.current_customer, username, issue_id
         ))
         connection.commit()
         
         if cursor.rowcount == 0:
-            return {"error": "error.unable_to_modify_ticket"}, 400
+            return {"error": "error.unable_to_modify_issue"}, 400
 
-        log_user_action(user_name=username, action_type="UPDATE_TICKET", target_id=str(issue_id), details=f"Ticket updated/validated. New title: '{ticket.title}'", ip_address=client_ip)
+        log_user_action(user_name=username, action_type="UPDATE_ISSUE", target_id=str(issue_id), details=f"Issue updated/validated. New title: '{issue_payload.title}'", ip_address=client_ip)
             
         return {"message": "success.issue_validated"}, 200
     except Exception as e:

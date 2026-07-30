@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { createRegroupement } from '../api/regroupements'
-// Tu peux réutiliser le CSS de TicketForm s'il existe, sinon on utilise des styles inline simples pour aller vite
-import styles from './TicketForm.module.css' 
+import styles from './IssueForm.module.css' 
 
 function RegroupementForm() {
   const { t } = useTranslation()

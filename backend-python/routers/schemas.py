@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 
-class TicketCreate(BaseModel):
+class IssueCreate(BaseModel):
     title: str
     issue_type: str
     criticity: str        
@@ -14,8 +14,9 @@ class TicketCreate(BaseModel):
     current_analysis: Optional[str] = None
     current_analysis_variation: Optional[str] = None
     current_customer: Optional[str] = None
+    environment: Optional[str] = None
 
-class TicketUpdate(BaseModel):
+class IssueUpdate(BaseModel):
     title: str
     issue_type: str
     criticity: str        
@@ -28,6 +29,7 @@ class TicketUpdate(BaseModel):
     current_analysis: Optional[str] = None
     current_analysis_variation: Optional[str] = None
     current_customer: Optional[str] = None
+    environment: Optional[str] = None
 
 class StatusUpdate(BaseModel):
     new_status: str
@@ -36,7 +38,7 @@ class GoogleTokenRequest(BaseModel):
     credential: str
     token: Optional[str] = None
     selected_profile: Optional[str] = None
-    
+
 class RegroupementCreate(BaseModel):
     title: str
     description: str

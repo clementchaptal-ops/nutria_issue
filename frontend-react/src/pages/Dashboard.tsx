@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { fetchAllIssues } from '../api/issues'
 import styles from './Dashboard.module.css'
+
 import StatCard from '../components/StatCard'
 import SearchBar from '../components/SearchBar'
 import GenericTable, { TableColumn } from '../components/GenericTable'
@@ -26,7 +27,7 @@ function Dashboard() {
 
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const [tickets, setTickets] = useState<any[]>([])
+  const [issues, setIssues] = useState<any[]>([])
   const [loading, setLoading] = useState<boolean>(true)
 
   const searchQuery = searchParams.get('search') || ''
@@ -35,7 +36,7 @@ function Dashboard() {
   const statusParam = searchParams.get('status')
   const activeStatuses = statusParam !== null 
     ? (statusParam ? statusParam.split(',') : []) 
-    : ['IN PROGRESS']
+    : ['IN PROGRESS'] // 🚨 Affichage par défaut sur IN PROGRESS
 
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'id_issue', direction: 'desc' })
 
@@ -62,8 +63,8 @@ function Dashboard() {
   useEffect(() => {
     fetchAllIssues()
       .then((response) => {
-        const listeTickets = response.data || [];
-        setTickets(listeTickets);
+        const issueList = response.data || [];
+        setIssues(issueList);
         setLoading(false);
       })
       .catch((err) => {
@@ -80,26 +81,27 @@ function Dashboard() {
     setSortConfig({ key, direction })
   }
 
-  const preticketCount = tickets.filter(t => t.status === 'PRETICKET').length
-  const inProgressCount = tickets.filter(t => t.status === 'IN PROGRESS').length
-  const actKnowledgeCount = tickets.filter(t => t.status === 'ACT KNOWLEDGE').length
-  const closedCount = tickets.filter(t => t.status === 'CLOSED').length
+  // 🚨 Les 4 compteurs restaurés
+  const preticketCount = issues.filter(i => i.status === 'PRETICKET').length
+  const inProgressCount = issues.filter(i => i.status === 'IN PROGRESS').length
+  const actKnowledgeCount = issues.filter(i => i.status === 'ACT KNOWLEDGE').length
+  const closedCount = issues.filter(i => i.status === 'CLOSED').length
 
-  let filteredTickets = tickets.filter((ticket) => {
-    const status = ticket.status ? ticket.status.toUpperCase() : ''
+  let filteredIssues = issues.filter((issue) => {
+    const status = issue.status ? issue.status.toUpperCase() : ''
     if (!activeStatuses.includes(status)) return false
 
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
     
     if (searchColumn === 'ALL') {
-      return Object.values(ticket).some(val => String(val).toLowerCase().includes(query))
+      return Object.values(issue).some(val => String(val).toLowerCase().includes(query))
     } else {
-      return String(ticket[searchColumn] || '').toLowerCase().includes(query)
+      return String(issue[searchColumn] || '').toLowerCase().includes(query)
     }
   })
 
-  filteredTickets.sort((a, b) => {
+  filteredIssues.sort((a, b) => {
     const key = sortConfig.key
     let valA = a[key]
     let valB = b[key]
@@ -115,7 +117,6 @@ function Dashboard() {
     return 0
   })
 
-  // Configuration de la barre de recherche
   const searchColumns = [
     { value: 'ALL', label: t('dashboard.search.all_columns', 'All Columns') },
     { value: 'id_issue', label: t('dashboard.search.id', 'ID') },
@@ -129,7 +130,6 @@ function Dashboard() {
     { value: 'country', label: t('dashboard.search.location', 'Location') }
   ]
 
-  // Configuration dynamique des colonnes de la table
   const tableColumns: TableColumn<any>[] = [
     { key: 'id_issue', label: t('dashboard.table.id', 'ID'), render: (item) => <span className={styles.tdId}>#{item.id_issue}</span> },
     { 
@@ -175,12 +175,13 @@ function Dashboard() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>{t('dashboard.title', 'Tickets Dashboard')}</h1>
+        <h1 className={styles.title}>{t('dashboard.title', 'Issues Dashboard')}</h1>
         <span className={styles.ticketCount}>
-          {filteredTickets.length} {t('dashboard.visible', 'visible(s)')}
+          {filteredIssues.length} {t('dashboard.visible', 'visible(s)')}
         </span>
       </div>
 
+      {/* 🚨 Les 4 StatCards sont bien là */}
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
         <StatCard label={t('dashboard.status.preticket', 'Pretickets')} count={preticketCount} color="#ffab00" isActive={activeStatuses.includes('PRETICKET')} onClick={() => toggleStatusFilter('PRETICKET')} />
         <StatCard label={t('dashboard.status.in_progress', 'In Progress')} count={inProgressCount} color="#0052cc" isActive={activeStatuses.includes('IN PROGRESS')} onClick={() => toggleStatusFilter('IN PROGRESS')} />
@@ -199,18 +200,18 @@ function Dashboard() {
         />
 
         <button className={styles.createBtn} onClick={() => navigate('/?new=true')}>
-          ➕ {t('dashboard.create_button', 'Create a Ticket')}
+          ➕ {t('dashboard.create_button', 'Create an Issue')}
         </button>
       </div>
 
-      {filteredTickets.length === 0 ? (
+      {filteredIssues.length === 0 ? (
         <div className={styles.emptyState}>
-          <h3>{t('dashboard.empty_state', 'No matching tickets found')}</h3>
+          <h3>{t('dashboard.empty_state', 'No matching issues found')}</h3>
         </div>
       ) : (
         <GenericTable 
           columns={tableColumns} 
-          data={filteredTickets} 
+          data={filteredIssues} 
           sortConfig={sortConfig} 
           onSort={requestSort} 
           onRowClick={(item) => navigate(`/?id=${item.id_issue}`)} 

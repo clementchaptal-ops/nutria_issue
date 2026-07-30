@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import FileUploader from '../components/FileUploader'
 import toast from 'react-hot-toast'
-import styles from './TicketForm.module.css'
+import styles from './IssueForm.module.css'
 
 const getDecodedToken = () => {
   const token = localStorage.getItem('nutria_token');
@@ -40,7 +40,7 @@ const showConfirmToast = (message: string, confirmText: string, cancelText: stri
   ), { duration: 6000 })
 }
 
-function TicketForm() {
+function IssueForm() {
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const ticketId = searchParams.get('id')
@@ -1001,4 +1001,4 @@ function TicketForm() {
   )
 }
 
-export default TicketForm
+export default IssueForm
