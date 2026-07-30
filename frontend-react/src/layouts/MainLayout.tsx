@@ -13,6 +13,7 @@ function MainLayout() {
   let displayUser = t('layout.default_user', 'User')
   let displayLocation = ''
   let isAdmin = false
+  
   if (rawUser) {
     try {
       const parsed = JSON.parse(rawUser)
@@ -54,8 +55,7 @@ function MainLayout() {
             </button>
           )}
 
-          {/* 🚨 NOUVEAU BOUTON : Accès aux Regroupements */}
-          {isLoggedIn && location.pathname !== '/regroupements' && (
+          {isLoggedIn && isAdmin && location.pathname !== '/regroupements' && (
             <button 
               onClick={() => navigate('/regroupements')}
               className={styles.dashboardBtn}

@@ -6,11 +6,12 @@ import IssueForm from './pages/IssueForm'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import ProtectedRoute from './components/ProtectedRoute' 
+import AdminRoute from './components/AdminRoute' // 🚨 Ajout du composant AdminRoute
 import AuditLogs from './pages/AuditLogs'
 import RegroupementList from './pages/RegroupementList'
 import RegroupementForm from './pages/RegroupementForm'
 import RegroupementDetail from './pages/RegroupementDetail'
-import { Toaster, toast } from 'react-hot-toast' // Ajout de toast ici
+import { Toaster, toast } from 'react-hot-toast' 
 
 function App() {
   
@@ -20,14 +21,11 @@ function App() {
       (response) => response,
       (error) => {
         if (error.response && error.response.status === 401) {
-          // On vide le stockage local
           localStorage.removeItem('nutria_token')
           localStorage.removeItem('nutria_user')
           
-          // Petit message pour prévenir l'utilisateur
           toast.error("Votre session a expiré, veuillez vous reconnecter.", { id: 'session-expired' })
           
-          // Redirection forcée vers la page de login
           if (window.location.pathname !== '/login') {
             window.location.href = '/login'
           }
@@ -57,13 +55,12 @@ function App() {
             <Route index element={<IssueForm />} />
             <Route path="dashboard" element={<Dashboard />} />
             
-            {/* Audit logs route */}
-            <Route path="audit" element={<AuditLogs />} />
-            
-            {/* Regroupements routes */}
-            <Route path="regroupements" element={<RegroupementList />} />
-            <Route path="regroupements/new" element={<RegroupementForm />} />
-            <Route path="regroupements/:id" element={<RegroupementDetail />} />
+            <Route element={<AdminRoute />}>
+               <Route path="audit" element={<AuditLogs />} />
+               <Route path="regroupements" element={<RegroupementList />} />
+               <Route path="regroupements/new" element={<RegroupementForm />} />
+               <Route path="regroupements/:id" element={<RegroupementDetail />} />
+            </Route>
 
             {/* Fallback redirection (placé à la toute fin) */}
             <Route path="*" element={<Navigate to="/" replace />} />

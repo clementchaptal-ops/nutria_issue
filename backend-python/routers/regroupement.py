@@ -15,6 +15,9 @@ BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 # =====================================================================
 
 def get_all_regroupements(current_user):
+    if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
+        return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
+
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -58,6 +61,9 @@ def get_all_regroupements(current_user):
 
 
 def get_regroupement(regroupement_id, current_user):
+    if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
+        return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
+
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -113,7 +119,6 @@ def get_regroupement(regroupement_id, current_user):
             })
 
         # 3. Pièces jointes du regroupement
-        # 3. Pièces jointes du regroupement
         qry_attachments = """
             SELECT id_attachment, attachment_name, attachment_type, url_path
             FROM c_issue_attachment
@@ -138,6 +143,9 @@ def get_regroupement(regroupement_id, current_user):
 
 
 def create_regroupement(request_json, current_user, client_ip):
+    if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
+        return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
+
     try:
         data = RegroupementCreate(**request_json)
     except ValidationError as e:
@@ -183,6 +191,9 @@ def create_regroupement(request_json, current_user, client_ip):
 
 
 def close_regroupement(regroupement_id, current_user, client_ip):
+    if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
+        return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
+
     username = current_user.get("sub", "UNKNOWN")
     connection = get_db_connection()
     if not connection: return {"error": "error.database_connection"}, 500
@@ -208,6 +219,9 @@ def close_regroupement(regroupement_id, current_user, client_ip):
 
 
 def get_regroupement_comments(regroupement_id, current_user):
+    if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
+        return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
+
     connection = get_db_connection()
     if not connection: return {"error": "error.database_connection"}, 500
     try:
@@ -242,6 +256,9 @@ def get_regroupement_comments(regroupement_id, current_user):
 
 
 def add_regroupement_comment(regroupement_id, request_json, current_user, client_ip):
+    if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
+        return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
+
     comment_text = request_json.get("comment_text")
     if not comment_text: return {"error": "error.missing_text"}, 400
     
@@ -265,6 +282,9 @@ def add_regroupement_comment(regroupement_id, request_json, current_user, client
 
 
 def upload_regroupement_attachments(regroupement_id, files_data, current_user):
+    if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
+        return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
+
     connection = get_db_connection()
     if not connection: return {"error": "error.database_connection"}, 500
     try:
@@ -299,6 +319,9 @@ def upload_regroupement_attachments(regroupement_id, files_data, current_user):
 
 
 def upload_regroupement_comment_attachments(regroupement_id, comment_id, files_data, current_user):
+    if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
+        return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
+
     connection = get_db_connection()
     if not connection: return {"error": "error.database_connection"}, 500
     try:
@@ -333,6 +356,9 @@ def upload_regroupement_comment_attachments(regroupement_id, comment_id, files_d
 
 
 def delete_regroupement_attachment(regroupement_id, filename, current_user, client_ip):
+    if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
+        return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
+
     connection = get_db_connection()
     if not connection: return {"error": "error.database_connection"}, 500
     try:
@@ -346,8 +372,11 @@ def delete_regroupement_attachment(regroupement_id, filename, current_user, clie
     finally:
         connection.close()
 
+
 def update_regroupement(regroupement_id, request_json, current_user, client_ip):
-    """Met à jour le titre, la description et le ticket SSP d'un regroupement."""
+    if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
+        return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
+
     title = request_json.get("title")
     description = request_json.get("description")
     ssp_ticket = request_json.get("ssp_ticket")

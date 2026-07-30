@@ -91,9 +91,6 @@ function IssueForm() {
     ip_adress: '', ip_config: '', workstation: '', current_pc: '', ping: '',
   })
 
-  const [aiAnalysis, setAiAnalysis] = useState<any>(null)
-  const [isAiLoading, setIsAiLoading] = useState(false)
-
   const workingDirUrl = `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/download/working_dir`
   const logsUrl = `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/download/logs`
 
@@ -504,34 +501,6 @@ function IssueForm() {
       setIsPostingComment(false)
     }
   }
-
-  const fetchAiAnalysis = async () => {
-    setIsAiLoading(true)
-    
-    try {
-      const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/ai-analysis`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || t('ai.error.fetch_failed', 'Failed to generate AI analysis.'))
-      }
-
-      const result = await response.json()
-      setAiAnalysis(result.data) 
-      toast.success(t('ai.success', 'AI Analysis generated successfully!'))
-
-    } catch (error: any) {
-      toast.error(error.message)
-    } finally {
-      setIsAiLoading(false)
-    }
-  }
   
   return (
     <div className={styles.pageContainer}>
@@ -820,70 +789,6 @@ function IssueForm() {
                     <div className={`${styles.codeBlock} ${styles.pingBlock}`}>{networkInfo.ping || 'N/A'}</div>
                   </details>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* =========================================================
-              🤖 AI ANALYSIS CARD
-          ========================================================= */}
-          {!isNewTicket && (
-            <div className={`${styles.sidebarCard} ${styles.editableCard}`} style={{ borderColor: '#6554c0', background: '#eae6ff', marginTop: '20px' }}>
-              <h3 className={styles.cardTitle} style={{ color: '#403294' }}>🤖 {t('ai.title', 'AI Analysis')}</h3>
-              
-              <div className={styles.cardContent}>
-                {!aiAnalysis ? (
-                  <div style={{ textAlign: 'center', padding: '10px 0' }}>
-                    <p style={{ color: '#5e6c84', fontSize: '13px', marginBottom: '15px' }}>
-                      {t('ai.no_analysis', 'No AI analysis available yet for this ticket.')}
-                    </p>
-                    <button 
-                      type="button"
-                      onClick={fetchAiAnalysis} 
-                      disabled={isAiLoading}
-                      style={{ background: '#6554c0', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                    >
-                      {isAiLoading ? '⏳...' : `✨ ${t('ai.generate_btn', 'Generate Analysis')}`}
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: '14px', color: '#172b4d' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                      <span><strong>{t('ai.category', 'Category:')}</strong> <span style={{ background: '#ff5630', color: 'white', padding: '2px 6px', borderRadius: '3px', fontSize: '12px' }}>{aiAnalysis.category}</span></span>
-                      <span><strong>{t('ai.confidence', 'Confidence:')}</strong> {aiAnalysis.confidence}</span>
-                    </div>
-                    
-                    <div style={{ background: '#ffffff', padding: '10px', borderRadius: '4px', border: '1px solid #dfe1e6', marginBottom: '15px' }}>
-                      <strong style={{ display: 'block', marginBottom: '5px' }}>{t('ai.summary', 'Summary')}</strong>
-                      {aiAnalysis.summary}
-                    </div>
-
-                    <div style={{ marginBottom: '15px' }}>
-                      <strong>{t('ai.similar_tickets', 'Similar Tickets:')}</strong>
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '5px' }}>
-                        {aiAnalysis.similar_tickets.map((simId: number) => (
-                          <a key={simId} href={`/?id=${simId}`} style={{ background: '#0052cc', color: 'white', padding: '4px 8px', borderRadius: '12px', textDecoration: 'none', fontSize: '12px', fontWeight: 'bold' }}>
-                            #{simId}
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        if (aiAnalysis.pdf_download_url) {
-                          window.open(aiAnalysis.pdf_download_url, '_blank')
-                        } else {
-                          toast.error("PDF URL not found.")
-                        }
-                      }} 
-                      style={{ width: '100%', background: '#ffffff', color: '#403294', border: '1px solid #6554c0', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                    >
-                      📄 {t('ai.download_pdf', 'Download PDF Report')}
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           )}
