@@ -11,6 +11,7 @@ from pydantic import ValidationError
 # Local file imports
 from .schemas import TicketCreate, TicketUpdate, StatusUpdate
 from .audit import log_user_action
+
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 
 def make_signed_url(public_url: str) -> str:
@@ -202,10 +203,11 @@ def get_issue(issue_id, current_user):
     try:
         cursor = connection.cursor()
         
+        # Champ sspticket supprimé de la requête
         qry = """
             SELECT i.id_issue, i.title, i.issue_type, i.description, i.user_name, i.ip_adress,
                    i.ip_config, i.ping, i.status, i.citrix_session, i.current_pc, i.frequency,
-                   i.blocking_issue, i.criticity, i.sspticket, i.workstation, i.working_dir,
+                   i.blocking_issue, i.criticity, i.workstation, i.working_dir,
                    i.current_active_role, i.current_project, i.current_batch, i.current_sample,
                    i.environment, i.current_analysis, i.current_analysis_variation, i.current_customer,
                    u.location as creator_location, u.full_name, u.lab as creator_lab, u.email_addr as user_email,
@@ -445,11 +447,11 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
         elif user_role == "LOCAL_ADMIN" and safe_ticket_loc != safe_user_loc:
             return {"error": "error.forbidden_access"}, 403
 
-        # PostgreSQL update query
+        # UPDATE avec le sspticket retiré
         update_qry = """
             UPDATE c_issue 
             SET title = %s, issue_type = %s, criticity = %s, frequency = %s, 
-                blocking_issue = %s, description = %s, sspticket = %s,
+                blocking_issue = %s, description = %s,
                 current_project = %s, current_batch = %s, current_sample = %s,
                 current_analysis = %s, current_analysis_variation = %s,
                 current_customer = %s, status = 'IN PROGRESS', 
@@ -458,7 +460,7 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
         """
         cursor.execute(update_qry, (
             ticket.title, ticket.issue_type, ticket.criticity, ticket.frequency, 
-            ticket.blocking_issue, ticket.description, ticket.sspticket,
+            ticket.blocking_issue, ticket.description, 
             ticket.current_project, ticket.current_batch, ticket.current_sample,
             ticket.current_analysis, ticket.current_analysis_variation,
             ticket.current_customer, username, issue_id
@@ -579,6 +581,7 @@ def download_file_path(ticket_id, file_type, current_user, client_ip):
         cursor.close()
         connection.close()
 
+
 def close_ticket(issue_id, request_json, current_user, client_ip):
     """Transitions the resolution status lifecycle parameters to 'RESOLVED' or 'CLOSED'."""
     try:
@@ -622,6 +625,7 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
     finally:
         cursor.close()
         connection.close()
+
 
 def create_preticket(request_json, current_user, client_ip):
     """
@@ -732,6 +736,7 @@ def create_preticket(request_json, current_user, client_ip):
         if connection:
             connection.close()
             
+
 def update_issue_environment(issue_id, request_json):
     """Updates only the contextual environment data of a preticket/ticket."""
     connection = get_db_connection()
@@ -769,6 +774,7 @@ def update_issue_environment(issue_id, request_json):
         cursor.close()
         connection.close()
 
+
 def trigger_ai_analysis(issue_id, current_user, client_ip):
     """
     Triggers the AI analysis for a specific ticket.
@@ -790,6 +796,7 @@ def trigger_ai_analysis(issue_id, current_user, client_ip):
         )
     
     return result, status_code
+
 
 def sync_lims_user(request_json):
     """
@@ -841,6 +848,7 @@ def sync_lims_user(request_json):
         cursor.close()
         connection.close()
 
+
 def system_cleanup():
     """
     Tâche de maintenance globale :
@@ -857,19 +865,26 @@ def system_cleanup():
         client = storage.Client()
         bucket = client.bucket(BUCKET_NAME)
 
+        # --- Fonction interne pour nettoyer un dossier GCS ---
+        def delete_gcs_folder(issue_id):
+            blobs = bucket.list_blobs(prefix=f"tickets/ticket_{issue_id}/")
+            for blob in blobs:
+                blob.delete()
+            # Force la suppression du dossier visuel (créé manuellement ou IHM)
+            for folder_path in [f"tickets/ticket_{issue_id}/", f"tickets/ticket_{issue_id}"]:
+                folder_blob = bucket.blob(folder_path)
+                if folder_blob.exists():
+                    folder_blob.delete()
+
         # --- 1. NETTOYAGE DES PRETICKETS (> 1 heure) ---
         cursor.execute("SELECT id_issue FROM c_issue WHERE status = 'PRETICKET' AND created_on < CURRENT_TIMESTAMP - INTERVAL '1 hour'")
         expired_pretickets = [row[0] for row in cursor.fetchall()]
         deleted_pretickets_count = len(expired_pretickets)
 
         if deleted_pretickets_count > 0:
-            # A. Suppression des fichiers des PRETICKETS sur GCS
             for p_id in expired_pretickets:
-                blobs = bucket.list_blobs(prefix=f"tickets/ticket_{p_id}/")
-                for blob in blobs:
-                    blob.delete()
+                delete_gcs_folder(p_id)
 
-            # B. Suppression dans PostgreSQL
             p_format = ','.join(['%s'] * deleted_pretickets_count)
             p_tuple = tuple(expired_pretickets)
             
@@ -887,13 +902,9 @@ def system_cleanup():
         deleted_closed_count = len(closed_issues)
 
         if deleted_closed_count > 0:
-            # A. Suppression des fichiers des TICKETS FERMÉS sur GCS
             for c_id in closed_issues:
-                blobs = bucket.list_blobs(prefix=f"tickets/ticket_{c_id}/")
-                for blob in blobs:
-                    blob.delete()
+                delete_gcs_folder(c_id)
 
-            # B. Suppression dans PostgreSQL
             c_format = ','.join(['%s'] * deleted_closed_count)
             c_tuple = tuple(closed_issues)
             
@@ -901,7 +912,6 @@ def system_cleanup():
             cursor.execute(f"DELETE FROM c_issue_comments WHERE id_issue IN ({c_format})", c_tuple)
             cursor.execute(f"DELETE FROM c_issue WHERE id_issue IN ({c_format})", c_tuple)
 
-        # Validation globale
         connection.commit()
         
         return {
