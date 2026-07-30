@@ -72,9 +72,10 @@ def get_all_issues(current_user):
             SELECT DISTINCT ON (i.id_issue) 
                    i.id_issue, i.title, i.issue_type, i.status, i.user_name,
                    u.full_name, u.location, TO_CHAR(i.created_on, 'YYYY-MM-DD HH24:MI') as c_date,
-                   i.criticity, i.environment
+                   i.criticity, i.environment,l.id_regroupment  
             FROM c_issue i
             LEFT JOIN lims_users u ON TRIM(UPPER(i.user_name)) = TRIM(UPPER(u.user_name))
+            LEFT JOIN c_link_issue_regroupment l ON i.id_issue = l.id_issue  
         """
 
         if user_role == "IT_TEAM":
@@ -107,7 +108,8 @@ def get_all_issues(current_user):
                 "country": row[6] if row[6] else "Global", 
                 "creation_date": row[7] if row[7] else "",
                 "criticity": row[8] if row[8] else "N/A",
-                "environment": row[9] if row[9] else "UNKNOWN"
+                "environment": row[9] if row[9] else "UNKNOWN",
+                "id_regroupement": row[10] if row[10] else "No Regroupement"
             })
         return tickets, 200
     except Exception as e:

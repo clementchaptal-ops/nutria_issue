@@ -8,7 +8,6 @@ class TicketCreate(BaseModel):
     frequency: str        
     blocking_issue: str   
     description: str
-    sspticket: Optional[str] = None
     current_project: Optional[str] = None
     current_batch: Optional[str] = None
     current_sample: Optional[int] = None
@@ -23,7 +22,6 @@ class TicketUpdate(BaseModel):
     frequency: str        
     blocking_issue: str   
     description: str
-    sspticket: Optional[str] = None
     current_project: Optional[str] = None
     current_batch: Optional[str] = None
     current_sample: Optional[int] = None
@@ -38,3 +36,13 @@ class GoogleTokenRequest(BaseModel):
     credential: str
     token: Optional[str] = None
     selected_profile: Optional[str] = None
+    
+class RegroupementCreate(BaseModel):
+    title: str
+    description: str
+    ssp_ticket: Optional[str] = None
+
+class RegroupementUpdate(BaseModel):
+    title: str
+    description: str
+    ssp_ticket: Optional[str] = None
