@@ -69,8 +69,16 @@ function Login() {
         location: data.location  
       }))
       
+      // 🚨 NOUVEAU : On récupère la destination sauvegardée avant la redirection Google
+      const savedTarget = localStorage.getItem('nutria_redirect_target')
+      const finalDestination = savedTarget || from
+      
+      // On nettoie la mémoire
+      localStorage.removeItem('nutria_redirect_target')
+      
       toast.success(t('login.success', `Welcome ${data.full_name || data.user_name}!`))
-      navigate(from, { replace: true })
+      
+      navigate(finalDestination, { replace: true })
       
     } catch (err: any) {
       if (selectedProfile) {
@@ -100,6 +108,9 @@ function Login() {
   // --- GOOGLE REDIRECTION ---
   const handleGoogleRedirect = () => {
     setLoading(true) // Enable loading before Google redirect
+    
+    localStorage.setItem('nutria_redirect_target', from)
+    
     const REDIRECT_URI = window.location.origin + window.location.pathname;
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=id_token&scope=email profile openid&nonce=nutria123&prompt=select_account`;
     window.location.href = authUrl;
