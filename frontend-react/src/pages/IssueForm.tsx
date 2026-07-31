@@ -795,9 +795,7 @@ function IssueForm() {
         </div>
       </div> 
 
-      {/* =========================================================
-          💬 COMMENTS SECTION (FULL WIDTH)
-      ========================================================= */}
+      {/* COMMENTS SECTION */}
       {!isNewTicket && !isEditing && (
         <div className={styles.commentsSection} style={{ width: '100%', marginTop: '30px' }}>
           <h3 className={styles.commentsTitle}>💬 {t('ticket.discussion', 'Discussion')}</h3>
@@ -873,9 +871,7 @@ function IssueForm() {
         </div>
       )}
 
-      {/* =========================================================
-          🖼️ OVERLAY LIGHTBOX CLEAN & ROBUST
-      ========================================================= */}
+      {/* OVERLAY LIGHTBOX */}
       {lightboxMedia && (
         <div 
           className={styles.lightboxOverlay}

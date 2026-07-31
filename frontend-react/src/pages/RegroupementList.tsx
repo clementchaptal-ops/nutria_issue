@@ -25,7 +25,7 @@ function RegroupementList() {
   const searchQuery = searchParams.get('search') || ''
   const searchColumn = searchParams.get('column') || 'ALL'
   
-  // 🚨 Ajout du filtre de statuts
+  // Status filter state
   const statusParam = searchParams.get('status')
   const activeStatuses = statusParam !== null ? (statusParam ? statusParam.split(',') : []) : ['OPEN']
   
@@ -71,13 +71,13 @@ function RegroupementList() {
     setSortConfig({ key, direction })
   }
 
-  // 🚨 Compteurs pour les StatCards
+  // Counters for StatCards
   const openCount = regroupements.filter(r => r.status === 'OPEN').length
   const closedCount = regroupements.filter(r => r.status === 'CLOSED').length
 
-  // Filtrage
+  // Filtering
   let filteredList = regroupements.filter((grp) => {
-    if (!activeStatuses.includes(grp.status)) return false // Filtre par statut
+    if (!activeStatuses.includes(grp.status)) return false // Filter by status
     if (!searchQuery) return true
     
     const query = searchQuery.toLowerCase()
@@ -88,7 +88,7 @@ function RegroupementList() {
     }
   })
 
-  // Tri
+  // Sorting
   filteredList.sort((a, b) => {
     const key = sortConfig.key
     let valA = a[key]
@@ -120,7 +120,7 @@ function RegroupementList() {
     { key: 'title', label: t('dashboard.search.title', 'Title'), render: (item) => <strong>{item.title}</strong> },
     { 
       key: 'status', 
-      label: 'Status',
+      label: t('dashboard.search.status', 'Status'),
       render: (item) => (
         <span style={{ 
           background: item.status === 'CLOSED' ? '#dfe1e6' : '#deebff', 
@@ -142,10 +142,10 @@ function RegroupementList() {
     },
     { key: 'created_by', label: t('regroupements.table.creator', 'Created By') },
     { key: 'created_on', label: t('dashboard.table.date', 'Date') },
-    { key: 'ticket_count', label: 'Issues' }
+    { key: 'ticket_count', label: t('regroupements.table.issues', 'Issues') }
   ]
 
-  if (loading) return <p style={{ padding: '40px', textAlign: 'center' }}>{t('dashboard.loading', 'Loading data...')}</p>
+  if (loading) return <p style={{ padding: '40px', textAlign: 'center' }}>{t('common.loading', 'Loading data...')}</p>
 
   return (
     <div className={styles.container}>
@@ -157,8 +157,8 @@ function RegroupementList() {
       </div>
 
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-        <StatCard label="Open" count={openCount} color="#0052cc" isActive={activeStatuses.includes('OPEN')} onClick={() => toggleStatusFilter('OPEN')} />
-        <StatCard label="Closed" count={closedCount} color="#42526e" isActive={activeStatuses.includes('CLOSED')} onClick={() => toggleStatusFilter('CLOSED')} />
+        <StatCard label={t('regroupements.status.open', 'Open')} count={openCount} color="#0052cc" isActive={activeStatuses.includes('OPEN')} onClick={() => toggleStatusFilter('OPEN')} />
+        <StatCard label={t('regroupements.status.closed', 'Closed')} count={closedCount} color="#42526e" isActive={activeStatuses.includes('CLOSED')} onClick={() => toggleStatusFilter('CLOSED')} />
       </div>
 
       <div className={styles.actionBar}>

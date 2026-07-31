@@ -36,7 +36,7 @@ function Dashboard() {
   const statusParam = searchParams.get('status')
   const activeStatuses = statusParam !== null 
     ? (statusParam ? statusParam.split(',') : []) 
-    : ['IN PROGRESS'] // 🚨 Affichage par défaut sur IN PROGRESS
+    : ['IN PROGRESS'] // Default view filtered on IN PROGRESS
 
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'id_issue', direction: 'desc' })
 
@@ -81,7 +81,7 @@ function Dashboard() {
     setSortConfig({ key, direction })
   }
 
-  // 🚨 Les 4 compteurs restaurés
+  // Calculate issue counts for all 4 status categories
   const preticketCount = issues.filter(i => i.status === 'PRETICKET').length
   const inProgressCount = issues.filter(i => i.status === 'IN PROGRESS').length
   const actKnowledgeCount = issues.filter(i => i.status === 'ACT KNOWLEDGE').length
@@ -181,7 +181,6 @@ function Dashboard() {
         </span>
       </div>
 
-      {/* 🚨 Les 4 StatCards sont bien là */}
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
         <StatCard label={t('dashboard.status.preticket', 'Pretickets')} count={preticketCount} color="#ffab00" isActive={activeStatuses.includes('PRETICKET')} onClick={() => toggleStatusFilter('PRETICKET')} />
         <StatCard label={t('dashboard.status.in_progress', 'In Progress')} count={inProgressCount} color="#0052cc" isActive={activeStatuses.includes('IN PROGRESS')} onClick={() => toggleStatusFilter('IN PROGRESS')} />

@@ -12,7 +12,12 @@
     "type_label": "Type of problem:",
     "desc_label": "Detailed description:",
     "desc_placeholder": "Describe step by step what you were doing just before the incident...",
-    "submit": "Submit to technical support"
+    "submit": "Submit to technical support",
+    "title": "Title",
+    "description": "Description",
+    "ssp_ticket": "SSP Ticket Number (Optional)",
+    "ssp_help": "Just enter the number, the link will be generated automatically.",
+    "missing_fields": "Please fill all required fields."
   },
   "issues": {
     "SLOW": "Application slowness (SLOW)",
@@ -41,12 +46,20 @@
     "select": "Select",
     "no": "No",
     "yes": "Yes",
-    "loading": "Loading data..."
+    "loading": "Loading data...",
+    "cancel": "Cancel",
+    "save": "Save",
+    "back": "Back",
+    "delete": "Delete",
+    "error_detail": "Error: {{detail}}",
+    "yes_confirm": "Yes, confirm",
+    "no_cancel": "No, cancel"
   },
   "layout": {
     "default_user": "User",
     "go_to_dashboard": "Go to Dashboard",
     "dashboard_btn": "Dashboard",
+    "regroupements_btn": "Regroupements",
     "logout_btn": "Logout"
   },
   "login": {
@@ -126,7 +139,44 @@
     "download_logs": "System Logs",
     "submit_create": "Create Ticket",
     "submit_update": "Submit & Update Ticket",
-    "download_video": "Click here to Download the Video"
+    "download_video": "Click here to Download the Video",
+    "discussion": "Discussion",
+    "no_comments": "No comment for the moment",
+    "type_comment": "Type your comment here...",
+    "button_send": "Send",
+    "existing_files": "Ticket Attachments",
+    "confirm_delete_file": "Are you sure you want to delete this file?",
+    "success": {
+      "file_deleted": "File deleted successfully."
+    },
+    "error": {
+      "fetch": "Error loading ticket data.",
+      "upload_attachments": "Text saved, but files could not be uploaded.",
+      "submit_failed": "An error occurred during submission.",
+      "network_cancel": "Network error while canceling ticket.",
+      "network_status": "Network error while changing status.",
+      "network_delete": "Network error while deleting file.",
+      "network_comment": "Network error while posting comment."
+    }
+  },
+  "regroupements": {
+    "title": "Regroupements Dashboard",
+    "create_title": "Create a new Regroupement",
+    "success_created": "Regroupement created successfully!",
+    "not_found": "Regroupement not found.",
+    "closed_success": "Regroupement closed successfully!",
+    "close_button": "Close Regroupement",
+    "confirm_close": "Are you sure you want to close this regroupement?",
+    "linked_issues": "Linked Issues",
+    "no_issues_linked": "No issues linked yet.",
+    "no_attachments": "No attachments uploaded.",
+    "link_issues": "Link existing issues",
+    "no_issues_available": "No unlinked issues available.",
+    "error": {
+      "load_failed": "Failed to load regroupement details.",
+      "close_failed": "Failed to close regroupement.",
+      "fetch_issues": "Could not load available issues."
+    }
   },
   "sidebar": {
     "user_title": "User Information",
@@ -169,15 +219,5 @@
       "ip": "IP Address"
     },
     "empty": "No logs found."
-  },
-  "ai": {
-    "title": "AI Analysis",
-    "generate_btn": "Generate Analysis",
-    "download_pdf": "Download PDF Report",
-    "category": "Category:",
-    "confidence": "Confidence:",
-    "summary": "Summary",
-    "similar_tickets": "Similar Tickets:",
-    "no_analysis": "No AI analysis available yet for this ticket."
   }
 }

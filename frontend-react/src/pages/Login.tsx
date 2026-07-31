@@ -19,7 +19,7 @@ function Login() {
   const [googleToken, setGoogleToken] = useState<string | null>(null)
   const [requireSelection, setRequireSelection] = useState<boolean>(false)
   
-  // 🚨 ÉTAT DE CHARGEMENT AJOUTÉ ICI
+  // LOADING STATE
   const [loading, setLoading] = useState<boolean>(false)
 
   const GOOGLE_CLIENT_ID = "549394697229-tvgof9to9fcu4um4260vnigbtt57o9fo.apps.googleusercontent.com"
@@ -34,7 +34,7 @@ function Login() {
   const preselectedProfile = searchParams.get('user_name') || undefined
 
   const loginToServer = async (token: string, selectedProfile?: string) => {
-    setLoading(true) // 🚨 On active le chargement au début
+    setLoading(true) // Enable loading at start
     
     try {
       const response = await fetch('https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/auth', {
@@ -57,7 +57,7 @@ function Login() {
         setGoogleToken(token)
         setProfiles(data.profiles)
         setRequireSelection(true)
-        setLoading(false) // 🚨 Fin du chargement si on doit choisir un profil
+        setLoading(false) // Stop loading if profile selection is needed
         return
       }
 
@@ -79,7 +79,7 @@ function Login() {
         toast.error(err.message || t('login.error.server_fail', 'Unable to connect to the Nutria server.'))
       }
     } finally {
-      setLoading(false) // 🚨 On désactive le chargement quoi qu'il arrive
+      setLoading(false) // Disable loading in all cases
     }
   }
 
@@ -99,7 +99,7 @@ function Login() {
 
   // --- GOOGLE REDIRECTION ---
   const handleGoogleRedirect = () => {
-    setLoading(true) // 🚨 On active le chargement avant de partir sur la page Google
+    setLoading(true) // Enable loading before Google redirect
     const REDIRECT_URI = window.location.origin + window.location.pathname;
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=id_token&scope=email profile openid&nonce=nutria123&prompt=select_account`;
     window.location.href = authUrl;
@@ -132,12 +132,12 @@ function Login() {
                 {t('login.choose_profile', 'Multiple LIMS profiles detected.')}
               </h3>
               <div className={styles.profileList}>
-                {profiles.map((prof) => (
+                {profiles.map((prof: { user_name: string; location: any }) => (
                   <button 
                     key={prof.user_name} 
                     onClick={() => handleProfileSelect(prof.user_name)} 
                     className={styles.profileButton}
-                    disabled={loading} // 🚨 On bloque si chargement
+                    disabled={loading} // Block if loading
                     style={{ opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
                   >
                     <span className={styles.profileIcon}>👤</span>
@@ -160,14 +160,14 @@ function Login() {
               <div className={styles.buttonWrapper}>
                 <button 
                   onClick={handleGoogleRedirect}
-                  disabled={loading} // 🚨 Désactive le clic
+                  disabled={loading} // Disable click
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
                     width: '100%', padding: '10px 24px', backgroundColor: '#ffffff', color: '#3c4043',
                     border: '1px solid #dadce0', borderRadius: '24px', fontSize: '14px', fontWeight: '500',
                     fontFamily: '"Google Sans", Roboto, Arial, sans-serif', 
-                    cursor: loading ? 'not-allowed' : 'pointer', // Change le curseur
-                    opacity: loading ? 0.7 : 1, // Baisse l'opacité
+                    cursor: loading ? 'not-allowed' : 'pointer', // Change cursor
+                    opacity: loading ? 0.7 : 1, // Lower opacity
                     transition: 'background-color 0.2s', boxShadow: '0 1px 2px 0 rgba(60,64,67,0.3)'
                   }}
                   onMouseOver={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#f8f9fa' }}
@@ -181,7 +181,7 @@ function Login() {
                       <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
                     </svg>
                   )}
-                  {loading ? t('login.loading', 'Chargement en cours...') : t('login.signin_with', 'Sign in with Google')}
+                  {loading ? t('login.loading', 'Loading...') : t('login.signin_with', 'Sign in with Google')}
                 </button>
               </div>
             </>

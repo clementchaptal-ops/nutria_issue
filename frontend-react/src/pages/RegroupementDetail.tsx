@@ -25,7 +25,7 @@ function RegroupementDetail() {
   const [regroupement, setRegroupement] = useState<any>(null)
   const [loading, setLoading] = useState<boolean>(true)
   
-  // 🚨 NOUVEAU : Mode Édition
+  // Edit Mode state
   const [isEditing, setIsEditing] = useState<boolean>(false)
   const [editFormData, setEditFormData] = useState({ title: '', description: '', ssp_ticket: '' })
   
@@ -81,24 +81,24 @@ function RegroupementDetail() {
     }
   }
 
-  // 🚨 SAUVEGARDE DES MODIFICATIONS
+  // Save changes handler
   const handleSaveChanges = async () => {
     try {
       await updateRegroupement(regroupementId, editFormData)
       
-      // S'il y a de nouvelles pièces jointes, on les envoie
+      // Upload new attachments if present
       if (attachments.length > 0) {
         const formData = new FormData()
         attachments.forEach((file) => formData.append('files', file))
         await uploadRegroupementAttachments(regroupementId, formData)
       }
       
-      toast.success("Modifications sauvegardées avec succès !")
+      toast.success(t('regroupements.success_updated', 'Changes saved successfully!'))
       setIsEditing(false)
-      setAttachments([]) // On vide le uploader après sauvegarde
+      setAttachments([]) // Reset uploader state
       loadData()
     } catch (err) {
-      toast.error("Erreur lors de la sauvegarde.")
+      toast.error(t('regroupements.error.update_failed', 'Error while saving changes.'))
     }
   }
 
@@ -149,7 +149,7 @@ function RegroupementDetail() {
   return (
     <div className={styles.pageContainer}>
       
-      {/* BANNIÈRE DE STATUT & BOUTONS D'ACTION */}
+      {/* STATUS BANNER & ACTION BUTTONS */}
       <div className={`${styles.statusBanner} ${regroupement.status === 'CLOSED' ? styles.closed : styles.in_progress}`} style={{ display: 'flex', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <button onClick={() => navigate('/regroupements')} style={{ background: 'none', border: 'none', color: '#0052cc', cursor: 'pointer', fontWeight: 'bold' }}>
@@ -163,7 +163,7 @@ function RegroupementDetail() {
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
-          {/* BOUTON ÉDITION */}
+          {/* EDIT BUTTON */}
           {!isEditing && regroupement.status !== 'CLOSED' && (
             <>
               <button type="button" onClick={() => setIsEditing(true)} style={{ padding: '6px 16px', borderRadius: '4px', border: '1px solid #0052cc', background: '#fff', color: '#0052cc', cursor: 'pointer', fontWeight: 'bold' }}>
@@ -175,7 +175,7 @@ function RegroupementDetail() {
             </>
           )}
 
-          {/* BOUTONS SAUVEGARDE / ANNULATION (Si Édition) */}
+          {/* SAVE / CANCEL BUTTONS (When in Edit mode) */}
           {isEditing && (
             <>
               <button type="button" onClick={() => { setIsEditing(false); setAttachments([]); }} style={{ padding: '6px 16px', borderRadius: '4px', border: '1px solid #42526e', background: '#fff', color: '#42526e', cursor: 'pointer', fontWeight: 'bold' }}>
@@ -191,12 +191,12 @@ function RegroupementDetail() {
 
       <div className={styles.gridContainer}>
         {/* =========================================
-            COLONNE GAUCHE: INFOS & PIÈCES JOINTES 
+            LEFT COLUMN: DETAILS & ATTACHMENTS 
             ========================================= */}
         <div className={styles.leftColumn}>
           <div style={{ background: '#fff', padding: '24px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
             
-            {/* TITRE */}
+            {/* TITLE */}
             {isEditing ? (
               <div className={styles.formGroup} style={{ marginBottom: '15px' }}>
                 <label className={styles.label}>{t('form.title', 'Title')} <span className={styles.required}>*</span></label>
@@ -252,7 +252,7 @@ function RegroupementDetail() {
             </div>
           </div>
 
-          {/* GALERIE DES PIÈCES JOINTES */}
+          {/* ATTACHMENTS GALLERY */}
           <div className={styles.attachmentsContainer} style={{ marginTop: '20px' }}>
             <h3 className={styles.attachmentsTitle}>📁 {t('ticket.existing_files', 'Regroupement Attachments')}</h3>
 
@@ -292,7 +292,7 @@ function RegroupementDetail() {
                         </div>
                       )}
 
-                      {/* On ne peut supprimer que si on est en mode Édition */}
+                      {/* Deletion allowed only in Edit Mode */}
                       {isEditing && (
                         <button type="button" onClick={() => handleDeleteAttachment(file.attachment_name)} className={styles.deleteBtn}>🗑️</button>
                       )}
@@ -304,13 +304,13 @@ function RegroupementDetail() {
               <p style={{ color: '#7a869a', fontSize: '13px', marginLeft: '10px' }}>{t('regroupements.no_attachments', 'No attachments uploaded.')}</p>
             )}
 
-            {/* 🚨 FILE UPLOADER PRINCIPAL (Visible UNIQUEMENT en mode édition) */}
+            {/* MAIN FILE UPLOADER (Visible ONLY in Edit Mode) */}
             {isEditing && (
               <div style={{ marginTop: '20px', padding: '15px', border: '1px dashed #0052cc', borderRadius: '4px', background: '#e9f2ff' }}>
                 <label className={styles.label} style={{ color: '#0052cc' }}>➕ {t('ticket.attachments', 'Add New Attachments')}</label>
                 <FileUploader files={attachments} onFilesChange={(files: File[]) => setAttachments(files)} />
                 <small style={{ display: 'block', marginTop: '10px', color: '#7a869a' }}>
-                  Ces fichiers seront sauvegardés lors du clic sur le bouton "Save Changes" en haut.
+                  {t('regroupements.uploader_help', 'These files will be uploaded when clicking the "Save Changes" button above.')}
                 </small>
               </div>
             )}
@@ -318,7 +318,7 @@ function RegroupementDetail() {
         </div>
 
         {/* =========================================
-            COLONNE DROITE: ISSUES LIÉES 
+            RIGHT COLUMN: LINKED ISSUES 
             ========================================= */}
         <div className={styles.rightColumn}>
           <div className={`${styles.sidebarCard} ${styles.readOnlyCard}`}>
@@ -331,7 +331,7 @@ function RegroupementDetail() {
                   {regroupement.linked_issues.map((issue: any) => (
                     <div 
                       key={issue.id_issue} 
-                      onClick={() => navigate(`/?id=${issue.id_issue}`)} // 🚨 CORRECTION URL ICI ( /?id= )
+                      onClick={() => navigate(`/?id=${issue.id_issue}`)}
                       style={{ padding: '10px', border: '1px solid #dfe1e6', borderRadius: '4px', cursor: 'pointer', background: '#fafbfc' }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -351,8 +351,8 @@ function RegroupementDetail() {
       </div>
 
       {/* =========================================
-          SECTION DISCUSSION / COMMENTAIRES 
-          Visible UNIQUEMENT si on n'est PAS en mode édition
+          DISCUSSION / COMMENTS SECTION 
+          Visible ONLY when NOT in Edit Mode
           ========================================= */}
       {!isEditing && (
         <div className={styles.commentsSection} style={{ width: '100%', marginTop: '30px' }}>
@@ -430,7 +430,7 @@ function RegroupementDetail() {
       )}
 
       {/* =========================================
-          OVERLAY LIGHTBOX POUR IMAGES ET VIDÉOS 
+          LIGHTBOX OVERLAY FOR IMAGES AND VIDEOS 
           ========================================= */}
       {lightboxMedia && (
         <div className={styles.lightboxOverlay} onClick={() => setLightboxMedia(null)}>

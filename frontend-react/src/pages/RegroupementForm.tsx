@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { createRegroupement, uploadRegroupementAttachments } from '../api/regroupements'
 import { fetchAllIssues } from '../api/issues'
-import FileUploader from '../components/FileUploader' // 🚨 Ajout de l'uploader
+import FileUploader from '../components/FileUploader'
 import styles from './IssueForm.module.css' 
 
 function RegroupementForm() {
@@ -13,7 +13,7 @@ function RegroupementForm() {
   const [loading, setLoading] = useState(false)
   const [availableIssues, setAvailableIssues] = useState<any[]>([])
   
-  // 🚨 Ajout du state pour les pièces jointes
+  // Attachments state
   const [attachments, setAttachments] = useState<File[]>([])
 
   const [formData, setFormData] = useState({
@@ -54,11 +54,11 @@ function RegroupementForm() {
 
     setLoading(true)
     try {
-      // 1. Création du regroupement
+      // 1. Create regroupement
       const response = await createRegroupement(formData)
       const newRegroupementId = response.data.id_regroupment
       
-      // 2. Upload des pièces jointes si présentes
+      // 2. Upload attachments if present
       if (attachments.length > 0 && newRegroupementId) {
         const uploadData = new FormData()
         attachments.forEach((file) => uploadData.append('files', file))
@@ -66,15 +66,15 @@ function RegroupementForm() {
         try {
           await uploadRegroupementAttachments(newRegroupementId, uploadData)
         } catch (uploadError) {
-          toast.error("Le regroupement est créé, mais certaines pièces jointes n'ont pas pu être envoyées.")
+          toast.error(t('regroupements.error.partial_upload', 'Regroupement created, but some attachments could not be uploaded.'))
         }
       }
 
       toast.success(t('regroupements.success_created', 'Regroupement created successfully!'))
-      // 3. Redirection vers la vue de détail
+      // 3. Redirect to detail view
       navigate(`/regroupements/${newRegroupementId}`)
     } catch (error: any) {
-      toast.error(t('error.generic', 'An error occurred'))
+      toast.error(t('common.error_detail', 'Error: {{detail}}', { detail: error.message || 'An error occurred' }))
       setLoading(false)
     }
   }
@@ -126,13 +126,13 @@ function RegroupementForm() {
           </small>
         </div>
 
-        {/* 🚨 NOUVEAU BLOC : PIÈCES JOINTES */}
+        {/* ATTACHMENTS BLOCK */}
         <div className={styles.formGroup} style={{ marginTop: '20px' }}>
           <label className={styles.label}>{t('ticket.attachments', 'Add Attachments')}</label>
           <FileUploader files={attachments} onFilesChange={(files: File[]) => setAttachments(files)} />
         </div>
 
-        {/* Bloc Sélection d'Issues */}
+        {/* ISSUE SELECTION BLOCK */}
         <div style={{ background: '#f4f5f7', padding: '16px', borderRadius: '6px', marginTop: '20px' }}>
           <label className={styles.label} style={{ marginBottom: '8px' }}>
             {t('regroupements.link_issues', 'Link existing issues')} ({formData.issue_ids.length})

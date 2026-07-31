@@ -1,21 +1,21 @@
 import { useEffect } from 'react'
 import axios from 'axios'
+import i18next from 'i18next'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import MainLayout from './layouts/MainLayout'
 import IssueForm from './pages/IssueForm' 
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
-import ProtectedRoute from './components/ProtectedRoute' 
-import AdminRoute from './components/AdminRoute' // 🚨 Ajout du composant AdminRoute
 import AuditLogs from './pages/AuditLogs'
+import ProtectedRoute from './components/ProtectedRoute' 
+import AdminRoute from './components/AdminRoute' 
 import RegroupementList from './pages/RegroupementList'
 import RegroupementForm from './pages/RegroupementForm'
 import RegroupementDetail from './pages/RegroupementDetail'
 import { Toaster, toast } from 'react-hot-toast' 
 
 function App() {
-  
-  // 🚨 INTERCEPTEUR GLOBAL POUR DÉCONNEXION AUTOMATIQUE (401)
+
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(
       (response) => response,
@@ -24,7 +24,10 @@ function App() {
           localStorage.removeItem('nutria_token')
           localStorage.removeItem('nutria_user')
           
-          toast.error("Votre session a expiré, veuillez vous reconnecter.", { id: 'session-expired' })
+          toast.error(
+            i18next.t('auth.session_expired', 'Your session has expired, please log in again.'), 
+            { id: 'session-expired' }
+          )
           
           if (window.location.pathname !== '/login') {
             window.location.href = '/login'
@@ -62,7 +65,7 @@ function App() {
                <Route path="regroupements/:id" element={<RegroupementDetail />} />
             </Route>
 
-            {/* Fallback redirection (placé à la toute fin) */}
+            {/* Fallback redirection */}
             <Route path="*" element={<Navigate to="/" replace />} />
 
           </Route>
