@@ -12,7 +12,12 @@
     "type_label": "Tipo de problema:",
     "desc_label": "Descripción detallada:",
     "desc_placeholder": "Describe paso a paso lo que estabas haciendo justo antes del incidente...",
-    "submit": "Enviar al soporte técnico"
+    "submit": "Enviar al soporte técnico",
+    "title": "Título",
+    "description": "Descripción",
+    "ssp_ticket": "Número de billete SSP (opcional)",
+    "ssp_help": "Simplemente ingrese el número, el enlace se generará automáticamente.",
+    "missing_fields": "Por favor complete todos los campos requeridos."
   },
   "issues": {
     "SLOW": "Lentitud de la aplicación (LENTA)",
@@ -41,12 +46,20 @@
     "select": "Seleccionar",
     "no": "No",
     "yes": "Sí",
-    "loading": "Cargando datos del billete..."
+    "loading": "Cargando datos del billete...",
+    "cancel": "Cancelar",
+    "save": "Ahorrar",
+    "back": "Atrás",
+    "delete": "Borrar",
+    "error_detail": "Error: {{detalle}}",
+    "yes_confirm": "Si, confirmar",
+    "no_cancel": "No, cancelar"
   },
   "layout": {
     "default_user": "Usuario",
     "go_to_dashboard": "Ir al panel",
     "dashboard_btn": "Panel",
+    "regroupements_btn": "Reagrupaciones",
     "logout_btn": "Cerrar sesión"
   },
   "login": {
@@ -126,7 +139,44 @@
     "download_logs": "Registros del sistema",
     "submit_create": "Crear billete",
     "submit_update": "Enviar y actualizar ticket",
-    "download_video": "Haga clic aquí para descargar el vídeo"
+    "download_video": "Haga clic aquí para descargar el vídeo",
+    "discussion": "Discusión",
+    "no_comments": "Sin comentarios por el momento.",
+    "type_comment": "Escribe tu comentario aquí...",
+    "button_send": "Enviar",
+    "existing_files": "Adjuntos de boletos",
+    "confirm_delete_file": "¿Está seguro de que desea eliminar este archivo?",
+    "success": {
+      "file_deleted": "Archivo eliminado exitosamente."
+    },
+    "error": {
+      "fetch": "Error al cargar los datos del ticket.",
+      "upload_attachments": "Texto guardado, pero no se pudieron cargar los archivos.",
+      "submit_failed": "Se produjo un error durante el envío.",
+      "network_cancel": "Error de red al cancelar el billete.",
+      "network_status": "Error de red al cambiar de estado.",
+      "network_delete": "Error de red al eliminar el archivo.",
+      "network_comment": "Error de red al publicar un comentario."
+    }
+  },
+  "regroupements": {
+    "title": "Panel de reagrupaciones",
+    "create_title": "Crear un nuevo Reagrupamiento",
+    "success_created": "¡Reagrupación creada con éxito!",
+    "not_found": "Reagrupamiento no encontrado.",
+    "closed_success": "¡El reagrupamiento se cerró con éxito!",
+    "close_button": "Cerrar reagrupamiento",
+    "confirm_close": "¿Estás seguro de que quieres cerrar este reagrupamiento?",
+    "linked_issues": "Problemas vinculados",
+    "no_issues_linked": "Aún no hay problemas vinculados.",
+    "no_attachments": "No se han subido archivos adjuntos.",
+    "link_issues": "Vincular problemas existentes",
+    "no_issues_available": "No hay problemas desvinculados disponibles.",
+    "error": {
+      "load_failed": "No se pudieron cargar los detalles del reagrupamiento.",
+      "close_failed": "No se pudo cerrar el reagrupamiento.",
+      "fetch_issues": "No se pudieron cargar los números disponibles."
+    }
   },
   "sidebar": {
     "user_title": "Información del usuario",

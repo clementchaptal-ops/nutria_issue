@@ -12,7 +12,12 @@
     "type_label": "Rodzaj problemu:",
     "desc_label": "Szczegółowy opis:",
     "desc_placeholder": "Opisz krok po kroku, co robiłeś tuż przed zdarzeniem...",
-    "submit": "Prześlij do pomocy technicznej"
+    "submit": "Prześlij do pomocy technicznej",
+    "title": "Tytuł",
+    "description": "Opis",
+    "ssp_ticket": "Numer biletu SSP (opcjonalnie)",
+    "ssp_help": "Wystarczy wpisać numer, link zostanie wygenerowany automatycznie.",
+    "missing_fields": "Proszę wypełnić wszystkie wymagane pola."
   },
   "issues": {
     "SLOW": "Powolność aplikacji (WOLNA)",
@@ -41,12 +46,20 @@
     "select": "Wybierać",
     "no": "NIE",
     "yes": "Tak",
-    "loading": "Ładowanie danych biletu..."
+    "loading": "Ładowanie danych biletu...",
+    "cancel": "Anulować",
+    "save": "Ratować",
+    "back": "Z powrotem",
+    "delete": "Usuwać",
+    "error_detail": "Błąd: {{szczegóły}}",
+    "yes_confirm": "Tak, potwierdź",
+    "no_cancel": "Nie, anuluj"
   },
   "layout": {
     "default_user": "Użytkownik",
     "go_to_dashboard": "Przejdź do Panelu",
     "dashboard_btn": "Panel",
+    "regroupements_btn": "Przegrupowania",
     "logout_btn": "Wyloguj się"
   },
   "login": {
@@ -126,7 +139,44 @@
     "download_logs": "Dzienniki systemowe",
     "submit_create": "Utwórz bilet",
     "submit_update": "Prześlij i zaktualizuj bilet",
-    "download_video": "Kliknij tutaj, aby pobrać wideo"
+    "download_video": "Kliknij tutaj, aby pobrać wideo",
+    "discussion": "Dyskusja",
+    "no_comments": "Na razie bez komentarza",
+    "type_comment": "Wpisz tutaj swój komentarz...",
+    "button_send": "Wysłać",
+    "existing_files": "Załączniki do biletów",
+    "confirm_delete_file": "Czy na pewno chcesz usunąć ten plik?",
+    "success": {
+      "file_deleted": "Plik został pomyślnie usunięty."
+    },
+    "error": {
+      "fetch": "Błąd podczas ładowania danych biletu.",
+      "upload_attachments": "Tekst został zapisany, ale nie można przesłać plików.",
+      "submit_failed": "Podczas przesyłania wystąpił błąd.",
+      "network_cancel": "Błąd sieci podczas anulowania biletu.",
+      "network_status": "Błąd sieciowy podczas zmiany statusu.",
+      "network_delete": "Błąd sieciowy podczas usuwania pliku.",
+      "network_comment": "Błąd sieciowy podczas publikowania komentarza."
+    }
+  },
+  "regroupements": {
+    "title": "Panel przegrupowań",
+    "create_title": "Utwórz nowe przegrupowanie",
+    "success_created": "Przegrupowanie zostało utworzone pomyślnie!",
+    "not_found": "Nie znaleziono przegrupowania.",
+    "closed_success": "Przegrupowanie zostało zakończone pomyślnie!",
+    "close_button": "Zamknij przegrupowanie",
+    "confirm_close": "Czy na pewno chcesz zamknąć to przegrupowanie?",
+    "linked_issues": "Powiązane problemy",
+    "no_issues_linked": "Nie powiązano jeszcze żadnych problemów.",
+    "no_attachments": "Brak przesłanych załączników.",
+    "link_issues": "Połącz istniejące problemy",
+    "no_issues_available": "Brak dostępnych niepowiązanych problemów.",
+    "error": {
+      "load_failed": "Nie udało się wczytać szczegółów przegrupowania.",
+      "close_failed": "Nie udało się zamknąć przegrupowania.",
+      "fetch_issues": "Nie udało się wczytać dostępnych problemów."
+    }
   },
   "sidebar": {
     "user_title": "Informacje o użytkowniku",
