@@ -87,8 +87,9 @@ function IssueForm() {
     current_project: '', current_batch: '', current_sample: '', current_analysis: '', current_analysis_variation: '', current_customer: '', citrix_session: ''
   })
 
+  // Retiré : workstation
   const [networkInfo, setNetworkInfo] = useState({
-    ip_adress: '', ip_config: '', workstation: '', current_pc: '', ping: '',
+    ip_adress: '', ip_config: '', current_pc: '', ping: '',
   })
 
   const workingDirUrl = `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/download/working_dir`
@@ -219,10 +220,10 @@ function IssueForm() {
           citrix_session: data.citrix_session || ''
         })
 
+        // Retiré : workstation
         setNetworkInfo({
           ip_adress: data.ip_adress || '',
           ip_config: data.ip_config || '',
-          workstation: data.workstation || '',
           current_pc: data.current_pc || '',
           ping: data.ping || ''
         })
@@ -773,7 +774,6 @@ function IssueForm() {
               <div className={styles.cardContent}>
                 <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.network.citrix', 'Citrix Session:')}</span><span className={styles.infoValue}>{currentContext.citrix_session || 'N/A'}</span></div>
                 <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.network.ip', 'IP Address:')}</span><span className={styles.infoValue}>{networkInfo.ip_adress || 'N/A'}</span></div>
-                <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.network.workstation', 'Workstation:')}</span><span className={styles.infoValue}>{networkInfo.workstation || 'N/A'}</span></div>
                 <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.network.pc', 'Current PC:')}</span><span className={styles.infoValue}>{networkInfo.current_pc || 'N/A'}</span></div>
                 
                 <div className={styles.infoBlock}>
