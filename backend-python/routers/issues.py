@@ -684,12 +684,9 @@ def create_preticket(request_json, current_user, client_ip):
         connection.commit()
 
         # --- 3. CREATION DU PRETICKET ---
-        title = request_json.get("title") or "Automated Preticket"
-        
-        # Formatage de la description avec l'heure client exacte
+        title = request_json.get("title","") 
         client_time = request_json.get("client_time", "Unknown Time")
-        raw_description = request_json.get("description", "")
-        description = f"[LIMS Local Time: {client_time}]\n{raw_description}"
+        description = request_json.get("description", "")
         
         workstation = request_json.get("workstation", "")
         ip_adress = request_json.get("ip_address", "")
