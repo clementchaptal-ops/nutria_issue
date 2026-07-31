@@ -70,20 +70,21 @@ def nutria_api(request):
             parts = path.split("/")
 
             # =========================================================================
-            # 🔒 VERROU DE SÉCURITÉ : RESTRICTION DU TOKEN LABWARE
+            #Security Check: If the token is from LabWare, restrict access to only certain routes
             # =========================================================================
             if current_user.get("sub") == "LABWARE_LIMS":
                 is_preticket = (path == "issues/preticket" and request.method == "POST")
                 is_attachment = (len(parts) == 3 and parts[1].isdigit() and parts[2] == "attachments" and request.method == "POST")
                 is_environment = (len(parts) == 3 and parts[1].isdigit() and parts[2] == "environment" and request.method == "PUT")
-                is_cleanup = (path == "issues/cleanup" and request.method == "POST")  # Autorisé pour Cloud Scheduler
+                is_cleanup = (path == "issues/cleanup" and request.method == "POST")  
+                is_audit_log = (path == "issues/audit/logs" and request.method == "POST")
                 
                 # Bloque immédiatement si le token essaie de faire autre chose (ex: GET /issues, PUT /close...)
                 if not (is_preticket or is_attachment or is_environment or is_cleanup):
                     print(f"[SECURITY ALERT] Attempt to use LIMS token for unauthorized route: {request.method} {path} from IP {client_ip}")
                     return jsonify({
                         "error": "Forbidden", 
-                        "details": "LabWare System Token is strictly restricted to preticket operations and system cleanup."
+                        "details": "LabWare System Token is strictly restricted to preticket operations dand system cleanup."
                     }), 403, headers
             # =========================================================================
             
