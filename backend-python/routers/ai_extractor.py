@@ -113,7 +113,7 @@ def analyze_issue_attachments_and_save(issue_id: int):
         prompt = f"""
         You are a LIMS AIOps expert. 
         Here are the files (images, videos, logs, documents) associated with support ticket #{issue_id} (Title: "{issue_title}").
-        
+        You are an expert log analyzer. Analyze the ENTIRE provided log file thoroughly to identify root causes, cascading errors, and key failure points.
         Analyze these attachments and generate a precise technical summary. 
         
         STRICT RULES:
@@ -123,6 +123,11 @@ def analyze_issue_attachments_and_save(issue_id: int):
         - State the probable root cause of the malfunction.
         - State if this error matches any known procedure or documented issue in the Nutria Knowledge base.
         - Do not include any introductions, pleasantries, or conversational filler. Output only the summary.
+
+        CRITICAL INSTRUCTIONS:
+        1. Output language: ENGLISH ONLY.
+        2. Citation/Reference format: DO NOT include any line numbers, citations, or brackets like or [X] under any circumstances.
+        3. Summary scope: Synthesize all major anomalies (cURL errors, Oracle ORA codes, OS errors, memory access violations ...) found across the entire log file into a clear, concise executive summary.
         """
         parts_for_gemini.append(types.Part.from_text(text=prompt))
 
