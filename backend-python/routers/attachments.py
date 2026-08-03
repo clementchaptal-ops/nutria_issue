@@ -86,12 +86,11 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
         files_str = ", ".join([f"'{name}'" for name in file_names_list])
         audit_details = f"Uploaded {files_count} attachment(s) to GCS. File list: [{files_str}]."
 
-        # 2. SAVE METADATA (Mock vs PostgreSQL)
+        # 2. SAVE METADATA
         if USE_MOCK_DATA:
             log_user_action(user_name=username, action_type="UPLOAD_ATTACHMENTS", target_id=str(issue_id), details=audit_details, ip_address=client_ip)
-            
             return {
-                "message": "Attachments uploaded to GCS (Mock DB).",
+                "message": "success.attachments_uploaded_mock",
                 "bucket": BUCKET_NAME,
                 "files": uploaded_files_info
             }, 200
@@ -105,7 +104,6 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
 
             try:
                 for file_data in uploaded_files_info:
-                    # PostgreSQL syntax: %s
                     qry = """
                         INSERT INTO c_issue_attachment (
                             id_issue, attachment_name, attachment_type, url_path
@@ -114,11 +112,15 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
                     cursor.execute(qry, (issue_id, file_data["original_name"], file_data["type"], file_data["url_path"]))
 
                 connection.commit()
-                
                 log_user_action(user_name=username, action_type="UPLOAD_ATTACHMENTS", target_id=str(issue_id), details=audit_details, ip_address=client_ip)
+                try:
+                    from routers.ai_extractor import analyze_issue_attachments_and_save
+                    analyze_issue_attachments_and_save(issue_id)
+                except Exception as ai_error:
+                    print(f"[WARNING] AI Analysis failed for issue {issue_id}, but upload succeeded: {ai_error}")
 
                 return {
-                    "message": "Attachments uploaded to GCS and saved in PostgreSQL.",
+                    "message": "success.attachments_uploaded",
                     "bucket": BUCKET_NAME,
                     "files": uploaded_files_info
                 }, 200
@@ -132,8 +134,7 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
 
     except Exception as e:
         print(f"[DATABASE/STORAGE ERROR - upload_attachments]: {str(e)}")
-        return {"error": "error.storage_upload", "details": "An internal error occurred during the upload process."}, 500
-
+        return {"error": "error.storage_upload", "details": "error.internal_upload_process"}, 500
 
 def get_attachment_file(issue_id, filename):
     # Files are always on GCS now, just return the public URL

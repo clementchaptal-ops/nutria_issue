@@ -403,11 +403,20 @@ def upload_comment_attachments(issue_id, comment_id, files_data, current_user):
             cursor.execute(qry, (issue_id, comment_id, filename, attach_type, public_url))
             
         connection.commit()
-        return {"message": "success.attachments_uploaded"}, 200
+
+        # --- 🤖 AI INTEGRATION: UPDATE ISSUE FINGERPRINT ---
+        try:
+            from routers.ai_extractor import analyze_issue_attachments_and_save
+            analyze_issue_attachments_and_save(issue_id)
+        except Exception as ai_error:
+            print(f"[WARNING] AI Analysis failed for issue {issue_id} (via comment): {ai_error}")
+        # ---------------------------------------------------
+
+        return {"message": "success.comment_attachments_uploaded"}, 200
     except Exception as e:
         connection.rollback()
         print(f"[STORAGE/DB ERROR - upload_comment_attachments]: {str(e)}")
-        return {"error": "error.storage_upload", "details": "An internal error occurred during file upload."}, 500
+        return {"error": "error.storage_upload", "details": "error.internal_upload_process"}, 500
     finally:
         cursor.close()
         connection.close()

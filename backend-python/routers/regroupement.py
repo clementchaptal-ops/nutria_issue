@@ -404,3 +404,89 @@ def update_regroupement(regroupement_id, request_json, current_user, client_ip):
         return {"error": "error.database", "details": str(e)}, 500
     finally:
         connection.close()
+
+
+def validate_ai_suggestion(reg_id, current_user, client_ip):
+    """
+    Transforms an AI-suggested regroupement into an official OPEN regroupement.
+    Updates the link_status of all associated tickets from 'AI_SUGGESTION' to 'VALIDATED'.
+    """
+    connection = get_db_connection()
+    if not connection:
+        return {"error": "error.database_connection"}, 500
+
+    username = current_user.get("sub", "UNKNOWN")
+    cursor = None
+    try:
+        cursor = connection.cursor()
+
+        # 1. Promote regroupement to 'OPEN'
+        update_reg_qry = """
+            UPDATE c_issue_regroupment 
+            SET status = 'OPEN', changed_by = %s, changed_on = CURRENT_TIMESTAMP
+            WHERE id_regroupment = %s AND status = 'SUGGESTED'
+        """
+        cursor.execute(update_reg_qry, (username, reg_id))
+
+        if cursor.rowcount == 0:
+            return {"error": "error.suggestion_not_found"}, 404
+
+        # 2. Validate all AI-linked tickets
+        update_links_qry = """
+            UPDATE c_link_issue_regroupment 
+            SET link_status = 'VALIDATED' 
+            WHERE id_regroupment = %s AND link_status = 'AI_SUGGESTION'
+        """
+        cursor.execute(update_links_qry, (reg_id,))
+
+        connection.commit()
+        log_user_action(user_name=username, action_type="VALIDATE_AI_REGROUPEMENT", target_id=str(reg_id), details="Validated AI suggested regroupement.", ip_address=client_ip)
+
+        return {"message": "success.suggestion_validated"}, 200
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        print(f"[DATABASE ERROR - validate_ai_suggestion]: {str(e)}")
+        return {"error": "error.database_query", "details": "error.internal_db_error"}, 500
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+
+def reject_ai_suggestion(reg_id, current_user, client_ip):
+    """
+    Deletes an AI-suggested regroupement if deemed irrelevant by the IT team.
+    Database CASCADE constraints will automatically clean up c_link_issue_regroupment.
+    """
+    connection = get_db_connection()
+    if not connection:
+        return {"error": "error.database_connection"}, 500
+
+    username = current_user.get("sub", "UNKNOWN")
+    cursor = None
+    try:
+        cursor = connection.cursor()
+
+        # Physically delete the suggestion (only if it is still a SUGGESTION)
+        delete_qry = "DELETE FROM c_issue_regroupment WHERE id_regroupment = %s AND status = 'SUGGESTED'"
+        cursor.execute(delete_qry, (reg_id,))
+
+        if cursor.rowcount == 0:
+            return {"error": "error.suggestion_not_found"}, 404
+
+        connection.commit()
+        log_user_action(user_name=username, action_type="REJECT_AI_REGROUPEMENT", target_id=str(reg_id), details="Rejected and deleted AI suggested regroupement.", ip_address=client_ip)
+
+        return {"message": "success.suggestion_rejected"}, 200
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        print(f"[DATABASE ERROR - reject_ai_suggestion]: {str(e)}")
+        return {"error": "error.database_query", "details": "error.internal_db_error"}, 500
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()

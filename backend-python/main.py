@@ -31,7 +31,7 @@ def nutria_api(request):
     try:
         # Home Route / Health Check
         if path in ("", "/"):
-            return jsonify({"message": "NUTRIA API Operational."}), 200, headers
+            return jsonify({"message": "success.api_operational"}), 200, headers
             
         # ---------------------------------------------------------
         # AUTHENTICATION
@@ -49,7 +49,7 @@ def nutria_api(request):
             auth_header = request.headers.get("Authorization")
             expected_labware_token = os.environ.get("LABWARE_API_TOKEN")
 
-            # 1. Vérification si la requête vient de LabWare (Système à Système)
+            # 1. Verification if request comes from LabWare (System to System)
             if expected_labware_token and auth_header == f"Bearer {expected_labware_token}":
                 current_user = {
                     "role": "SYSTEM",
@@ -59,18 +59,18 @@ def nutria_api(request):
                 }
                 error_msg = None
             else:
-                # 2. Sinon, vérification du token Google pour un utilisateur web
+                # 2. Otherwise, verify Google token for web user
                 current_user, error_msg = verify_token(auth_header)
 
-            # 3. Sécurité : On bloque l'accès si aucun token n'est valide
+            # 3. Security: Block access if no valid token
             if error_msg:
-                return jsonify({"error": "Unauthorized Access", "details": error_msg}), 401, headers
+                return jsonify({"error": "error.unauthorized_access", "details": error_msg}), 401, headers
             
             client_ip = request.remote_addr or "Unknown"
             parts = path.split("/")
 
             # =========================================================================
-            #Security 
+            # Security 
             # =========================================================================
             if current_user.get("sub") == "LABWARE_LIMS":
                 is_preticket = (path == "issues/preticket" and request.method == "POST")
@@ -79,19 +79,19 @@ def nutria_api(request):
                 is_cleanup = (path == "issues/cleanup" and request.method == "POST")  
                 is_audit_log = (path == "issues/audit/logs" and request.method == "POST")
                 
-                # Bloque immédiatement si le token essaie de faire autre chose (ex: GET /issues, PUT /close...)
+                # Block immediately if token tries unauthorized routes
                 if not (is_preticket or is_attachment or is_environment or is_cleanup or is_audit_log):
                     print(f"[SECURITY ALERT] Attempt to use LIMS token for unauthorized route: {request.method} {path} from IP {client_ip}")
                     return jsonify({
-                        "error": "Forbidden", 
-                        "details": "LabWare System Token is strictly restricted to preticket operations, system cleanup, and audit logs."
+                        "error": "error.forbidden", 
+                        "details": "error.lims_token_restricted"
                     }), 403, headers
             # =========================================================================
             
             # GET /issues
             if path == "issues" and request.method == "GET":
                 data, http_code = get_all_issues(current_user)
-                return jsonify({"status": "success", "data": data}), http_code, headers
+                return jsonify({"status": "success.data_retrieved", "data": data}), http_code, headers
                 
             # GET /issues/audit/logs
             elif path == "issues/audit/logs" and request.method == "GET":
@@ -201,20 +201,20 @@ def nutria_api(request):
                 data, http_code = download_file_path(int(parts[1]), parts[3], current_user, client_ip)
                 return jsonify(data), http_code, headers
             
-            # POST /issues/{id}/ai-analysis (ANALYSE IA)
+            # POST /issues/{id}/ai-analysis (AI ANALYSIS)
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "ai-analysis" and request.method == "POST":
                 from routers.issues import trigger_ai_analysis
                 data, http_code = trigger_ai_analysis(int(parts[1]), current_user, client_ip)
                 return jsonify(data), http_code, headers
             
-            # POST /issues/preticket (Pour LabWare)
+            # POST /issues/preticket (For LabWare)
             elif path == "issues/preticket" and request.method == "POST":
                 from routers.issues import create_preticket
                 request_json = request.get_json(silent=True) or {}
                 data, http_code = create_preticket(request_json, current_user, client_ip)
                 return jsonify(data), http_code, headers
             
-            # POST /issues/cleanup (Nettoyage automatique)
+            # POST /issues/cleanup (Automated Cleanup)
             elif path == "issues/cleanup" and request.method == "POST":
                 from routers.issues import system_cleanup
                 data, http_code = system_cleanup()
@@ -228,7 +228,7 @@ def nutria_api(request):
                 return jsonify(data), http_code, headers
             
             else:
-                return jsonify({"error": f"Unhandled sub-route: {path}"}), 404, headers
+                return jsonify({"error": "error.route_not_found"}), 404, headers
 
         # ---------------------------------------------------------
         # REGROUPEMENTS MODULE
@@ -239,7 +239,7 @@ def nutria_api(request):
             current_user, error_msg = verify_token(auth_header)
 
             if error_msg:
-                return jsonify({"error": "Unauthorized Access", "details": error_msg}), 401, headers
+                return jsonify({"error": "error.unauthorized_access", "details": error_msg}), 401, headers
             
             client_ip = request.remote_addr or "Unknown"
             parts = path.split("/")
@@ -261,6 +261,13 @@ def nutria_api(request):
             elif len(parts) == 2 and parts[1].isdigit() and request.method == "GET":
                 from routers.regroupement import get_regroupement
                 data, http_code = get_regroupement(int(parts[1]), current_user)
+                return jsonify(data), http_code, headers
+
+            # PUT /regroupements/{id} (MODIFICATION)
+            elif len(parts) == 2 and parts[1].isdigit() and request.method == "PUT":
+                from routers.regroupement import update_regroupement
+                request_json = request.get_json(silent=True) or {}
+                data, http_code = update_regroupement(int(parts[1]), request_json, current_user, client_ip)
                 return jsonify(data), http_code, headers
 
             # PUT /regroupements/{id}/close
@@ -305,30 +312,35 @@ def nutria_api(request):
                 data, http_code = delete_regroupement_attachment(reg_id, filename, current_user, client_ip)
                 return jsonify(data), http_code, headers
             
-            # GET /regroupements/{id}
-            elif len(parts) == 2 and parts[1].isdigit() and request.method == "GET":
-                from routers.regroupement import get_regroupement
-                data, http_code = get_regroupement(int(parts[1]), current_user)
+            # --- AI CLUSTERING ROUTES ---
+
+            # POST /regroupements/suggest-ai (Launch AI Clustering)
+            elif path == "regroupements/suggest-ai" and request.method == "POST":
+                from routers.ai_clustering import generate_suggested_regroupements
+                data, http_code = generate_suggested_regroupements()
                 return jsonify(data), http_code, headers
 
-            # 🚨 NOUVELLE ROUTE : PUT /regroupements/{id} (MODIFICATION)
-            elif len(parts) == 2 and parts[1].isdigit() and request.method == "PUT":
-                from routers.regroupement import update_regroupement
-                request_json = request.get_json(silent=True) or {}
-                data, http_code = update_regroupement(int(parts[1]), request_json, current_user, client_ip)
+            # PUT /regroupements/{id}/validate-suggestion (IT Validation)
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "validate-suggestion" and request.method == "PUT":
+                from routers.regroupement import validate_ai_suggestion
+                data, http_code = validate_ai_suggestion(int(parts[1]), current_user, client_ip)
                 return jsonify(data), http_code, headers
-                
+
+            # DELETE /regroupements/{id}/reject-suggestion (IT Rejection)
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "reject-suggestion" and request.method == "DELETE":
+                from routers.regroupement import reject_ai_suggestion
+                data, http_code = reject_ai_suggestion(int(parts[1]), current_user, client_ip)
+                return jsonify(data), http_code, headers
+
             else:
-                return jsonify({"error": f"Unhandled sub-route: {path}"}), 404, headers
-            
-            
+                return jsonify({"error": "error.route_not_found"}), 404, headers
             
         else:
-            return jsonify({"error": "Route not found"}), 404, headers
+            return jsonify({"error": "error.route_not_found"}), 404, headers
 
     except Exception as e:
         print(f"[FATAL SERVER ERROR] Route: {path} | Error: {str(e)}")
         return jsonify({
-            "error": "Internal Server Error", 
-            "details": "An unexpected error occurred. Please contact the administrator."
+            "error": "error.internal_server", 
+            "details": "error.unexpected_contact_admin"
         }), 500, headers
