@@ -74,7 +74,7 @@ def _generate_and_upload_state_json():
                 "location": r[22] or ""   # <-- Info Géographique
             })
 
-        json_data = json.dumps(global_issues, ensure_ascii=False, indent=2)
+        json_data = json.dumps(global_issues, ensure_ascii=False, indent=2, default=str)
 
         client = storage.Client()
         bucket = client.bucket(BUCKET_NAME)
@@ -91,7 +91,7 @@ def _generate_and_upload_state_json():
             cursor.close()
         if connection: 
             connection.close()
-            
+
 def trigger_state_json_update():
     """Lance la mise à jour du JSON en arrière-plan (sans bloquer l'API)."""
     thread = threading.Thread(target=_generate_and_upload_state_json)

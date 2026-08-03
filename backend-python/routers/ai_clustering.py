@@ -46,6 +46,7 @@ def generate_suggested_regroupements():
            - Same subnet or IP/ping issues (`ip_adress`, `ping`)
            - Same analysis batch (`current_batch`, `current_analysis`)
            - Same root cause extracted from attachments (`ai_attachments_summary`)
+           
         
         STRICT RULES:
         - A group MUST contain AT LEAST 2 tickets.
