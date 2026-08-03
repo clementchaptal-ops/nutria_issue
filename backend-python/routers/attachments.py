@@ -1,6 +1,7 @@
 import os
 import uuid
 from google.cloud import storage
+import threading
 
 # Database configuration import
 from config.database import get_db_connection
@@ -63,7 +64,7 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
     username = current_user.get("sub", "UNKNOWN")
 
     try:
-        # 1. ALWAYS UPLOAD TO GOOGLE CLOUD STORAGE FIRST
+        # 1. UPLOAD IMMÉDIAT SUR GCS (Très rapide, quelques ms)
         for file_info in files_data:
             filename = file_info["filename"]
             content_type = file_info["content_type"]
@@ -86,14 +87,14 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
         files_str = ", ".join([f"'{name}'" for name in file_names_list])
         audit_details = f"Uploaded {files_count} attachment(s) to GCS. File list: [{files_str}]."
 
-        # 2. SAVE METADATA
+        # 2. SAUVEGARDE DES MÉTADONNÉES EN BDD
         if USE_MOCK_DATA:
             log_user_action(user_name=username, action_type="UPLOAD_ATTACHMENTS", target_id=str(issue_id), details=audit_details, ip_address=client_ip)
             return {
                 "message": "success.attachments_uploaded_mock",
                 "bucket": BUCKET_NAME,
                 "files": uploaded_files_info
-            }, 200
+            }, 202  # <-- HTTP 202 Accepted
 
         else:
             connection = get_db_connection()
@@ -113,17 +114,26 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
 
                 connection.commit()
                 log_user_action(user_name=username, action_type="UPLOAD_ATTACHMENTS", target_id=str(issue_id), details=audit_details, ip_address=client_ip)
-                try:
-                    from routers.ai_extractor import analyze_issue_attachments_and_save
-                    analyze_issue_attachments_and_save(issue_id)
-                except Exception as ai_error:
-                    print(f"[WARNING] AI Analysis failed for issue {issue_id}, but upload succeeded: {ai_error}")
+
+                def run_ai_in_background(target_issue_id):
+                    try:
+                        from routers.ai_extractor import analyze_issue_attachments_and_save
+                        print(f"[ASYNC AI] Starting analysis for issue #{target_issue_id}...")
+                        analyze_issue_attachments_and_save(target_issue_id)
+                        print(f"[ASYNC AI] Successfully processed issue #{target_issue_id}")
+                    except Exception as ai_error:
+                        print(f"[WARNING] AI Background Analysis failed for issue {target_issue_id}: {ai_error}")
+
+                ai_thread = threading.Thread(target=run_ai_in_background, args=(issue_id,))
+                ai_thread.daemon = True
+                ai_thread.start()
+                # =================================================================
 
                 return {
-                    "message": "success.attachments_uploaded",
+                    "message": "success.attachments_uploaded_processing_ai",
                     "bucket": BUCKET_NAME,
                     "files": uploaded_files_info
-                }, 200
+                }, 202
 
             except Exception as e:
                 connection.rollback()
@@ -135,6 +145,7 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
     except Exception as e:
         print(f"[DATABASE/STORAGE ERROR - upload_attachments]: {str(e)}")
         return {"error": "error.storage_upload", "details": "error.internal_upload_process"}, 500
+    
 
 def get_attachment_file(issue_id, filename):
     # Files are always on GCS now, just return the public URL
