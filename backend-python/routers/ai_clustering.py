@@ -1,20 +1,18 @@
 import json
 import os
-import vertexai
-from vertexai.generative_models import GenerativeModel
+from google import genai
+from google.genai import types
 from config.database import get_db_connection
 
 # --- CONFIGURATION GCP & VERTEX AI ---
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 PROJECT_ID = os.environ.get("GCP_PROJECT", os.environ.get("GOOGLE_CLOUD_PROJECT", "nutria-issue"))
 
-# 💡 FORCER us-central1 pour éviter les erreurs 404 sur les modèles Gemini Vertex AI
 LOCATION = os.environ.get("GCP_LOCATION", "us-central1")
-MODEL_NAME = "gemini-1.5-flash"
+MODEL_NAME = "gemini-2.5-flash"
 
-# Initialisation unique du SDK Vertex AI
-if PROJECT_ID:
-    vertexai.init(project=PROJECT_ID, location=LOCATION)
+# Initialisation du client GenAI unifié (Authentification Cloud Run automatique)
+client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
 
 
 def generate_suggested_regroupements():
@@ -100,16 +98,22 @@ def generate_suggested_regroupements():
         }}
         """
 
-        # Utilisation de la variable MODEL_NAME ("gemini-1.5-flash")
-        model = GenerativeModel(MODEL_NAME)
-        response = model.generate_content(prompt)
+        # 4. Appel de génération via la nouvelle API
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.1,  # Faible température pour garantir le respect strict du JSON
+                response_mime_type="application/json"  # Force Gemini à répondre en JSON valide
+            )
+        )
 
         raw_text = response.text.strip().replace("```json", "").replace("```", "").strip()
         data = json.loads(raw_text)
 
         created_groups_count = 0
 
-        # 4. Insertion des suggestions en base de données
+        # 5. Insertion des suggestions en base de données
         for group in data.get("suggested_groups", []):
             issue_ids = group.get("issue_ids", [])
             if len(issue_ids) < 2:

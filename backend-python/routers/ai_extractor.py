@@ -1,8 +1,8 @@
 import io
 import os
 import zipfile
-import vertexai
-from vertexai.generative_models import GenerativeModel, Part, Tool, grounding
+from google import genai
+from google.genai import types
 from google.cloud import storage
 
 from config.database import get_db_connection
@@ -11,21 +11,16 @@ from config.database import get_db_connection
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 PROJECT_ID = os.environ.get("GCP_PROJECT", os.environ.get("GOOGLE_CLOUD_PROJECT", "nutria-issue"))
 
-# 💡 1. Vertex AI Generative Models (Gemini) requis sur us-central1
 LOCATION_GEMINI = "us-central1"
+DATASTORE_ID = os.environ.get("DATASTORE_ID", "nutria-knowledge-base_1784796187534")
 
-# 💡 2. Data Store Nutria Knowledge (Visible sur ta capture GCP : Location = global)
-DATASTORE_ID = "nutria-knowledge-base_1784796187534"
-LOCATION_DATASTORE = "global"
+# Le modèle validé sur ton projet
+MODEL_NAME = "gemini-2.5-flash"
 
-# Nom standard du modèle Gemini Flash
-MODEL_NAME = "gemini-1.5-flash"
-
-# Initialisation de Vertex AI sur us-central1 pour charger Gemini
-if PROJECT_ID:
-    vertexai.init(project=PROJECT_ID, location=LOCATION_GEMINI)
-
+# Initialisation du client officiel (Authentification Cloud Run gérée nativement)
+client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION_GEMINI)
 storage_client = storage.Client()
+
 
 def _clean_blob_name(public_url_or_path: str) -> str:
     """Extrait le chemin d'accès relatif du fichier dans le bucket GCS."""
@@ -36,7 +31,7 @@ def _clean_blob_name(public_url_or_path: str) -> str:
 
 
 def extract_text_from_zip(raw_blob_name: str) -> str:
-    """Télécharge un ZIP depuis GCS et extrait les 50 000 derniers caractères des fichiers .log et .txt."""
+    """Télécharge un ZIP depuis GCS et extrait les logs/txt."""
     try:
         blob_path = _clean_blob_name(raw_blob_name)
         bucket = storage_client.bucket(BUCKET_NAME)
@@ -60,10 +55,7 @@ def extract_text_from_zip(raw_blob_name: str) -> str:
 
 
 def analyze_issue_attachments_and_save(issue_id: int):
-    """
-    Extrait le contenu des pièces jointes d'une issue,
-    consulte le Datastore Nutria Knowledge et sauvegarde le résumé dans c_issue.
-    """
+    """Analyse les pièces jointes d'une issue avec Gemini + Grounding Datastore."""
     connection = get_db_connection()
     if not connection:
         print("[AI EXTRACTOR ERROR]: Connexion BDD impossible")
@@ -73,12 +65,10 @@ def analyze_issue_attachments_and_save(issue_id: int):
     try:
         cursor = connection.cursor()
 
-        # 1. Récupération du titre de l'issue
         cursor.execute("SELECT title FROM c_issue WHERE id_issue = %s", (issue_id,))
         issue_row = cursor.fetchone()
         issue_title = issue_row[0] if issue_row else f"Issue #{issue_id}"
 
-        # 2. Récupération des pièces jointes actives (hors commentaires)
         qry = """
             SELECT attachment_name, attachment_type, url_path 
             FROM c_issue_attachment 
@@ -94,34 +84,32 @@ def analyze_issue_attachments_and_save(issue_id: int):
 
         parts_for_gemini = []
 
-        # 3. Préparation des éléments multimédias
         for att_name, att_type, public_url in attachments:
             blob_name = _clean_blob_name(public_url)
             gcs_uri = f"gs://{BUCKET_NAME}/{blob_name}"
 
             if att_type == 'IMAGE':
-                parts_for_gemini.append(Part.from_uri(uri=gcs_uri, mime_type="image/jpeg"))
+                parts_for_gemini.append(types.Part.from_uri(file_uri=gcs_uri, mime_type="image/jpeg"))
 
             elif att_type == 'VIDEO':
-                parts_for_gemini.append(Part.from_uri(uri=gcs_uri, mime_type="video/mp4"))
+                parts_for_gemini.append(types.Part.from_uri(file_uri=gcs_uri, mime_type="video/mp4"))
 
             elif att_type == 'ZIP':
                 zip_logs = extract_text_from_zip(blob_name)
                 if zip_logs.strip():
-                    parts_for_gemini.append(Part.from_text(f"--- LOGS DU ZIP ({att_name}) ---\n{zip_logs}"))
+                    parts_for_gemini.append(types.Part.from_text(text=f"--- LOGS DU ZIP ({att_name}) ---\n{zip_logs}"))
 
             elif att_type == 'DOCUMENT':
                 if att_name.lower().endswith('.pdf'):
-                    parts_for_gemini.append(Part.from_uri(uri=gcs_uri, mime_type="application/pdf"))
+                    parts_for_gemini.append(types.Part.from_uri(file_uri=gcs_uri, mime_type="application/pdf"))
                 else:
                     blob = storage_client.bucket(BUCKET_NAME).blob(blob_name)
                     doc_text = blob.download_as_string().decode('utf-8', errors='ignore')
-                    parts_for_gemini.append(Part.from_text(f"--- DOCUMENT ({att_name}) ---\n{doc_text[:20000]}"))
+                    parts_for_gemini.append(types.Part.from_text(text=f"--- DOCUMENT ({att_name}) ---\n{doc_text[:20000]}"))
 
         if not parts_for_gemini:
             return
 
-        # 4. Prompt synthétique pour l'IA
         prompt = f"""
         You are a LIMS AIOps expert. 
         Here are the files (images, videos, logs, documents) associated with support ticket #{issue_id} (Title: "{issue_title}").
@@ -136,30 +124,35 @@ def analyze_issue_attachments_and_save(issue_id: int):
         - State if this error matches any known procedure or documented issue in the Nutria Knowledge base.
         - Do not include any introductions, pleasantries, or conversational filler. Output only the summary.
         """
-        parts_for_gemini.append(Part.from_text(prompt))
+        parts_for_gemini.append(types.Part.from_text(text=prompt))
 
-        # 5. Ancrage Vertex AI Search (Nutria Knowledge Datastore)
+        # Config de l'outil Grounding Datastore
         tools = []
         try:
-            datastore_tool = Tool.from_retrieval(
-                grounding.Retrieval(
-                    grounding.VertexAISearch(
-                        project=PROJECT_ID,
-                        datastore=DATASTORE_ID,
-                        location="LOCATION_DATASTORE"
+            datastore_resource_path = f"projects/{PROJECT_ID}/locations/global/collections/default_collection/dataStores/{DATASTORE_ID}"
+            datastore_tool = types.Tool(
+                retrieval=types.Retrieval(
+                    vertex_ai_search=types.VertexAISearch(
+                        datastore=datastore_resource_path
                     )
                 )
             )
             tools.append(datastore_tool)
         except Exception as e:
-            print(f"[WARNING]: Impossibilité d'attacher le datastore Nutria Knowledge : {e}")
+            print(f"[WARNING]: Impossibilité d'attacher le datastore : {e}")
 
-        # 6. Génération via Gemini 1.5 Flash
-        model = GenerativeModel(MODEL_NAME)
-        response = model.generate_content(parts_for_gemini, tools=tools if tools else None)
+        # Génération de la réponse via Vertex AI
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=parts_for_gemini,
+            config=types.GenerateContentConfig(
+                tools=tools if tools else None,
+                temperature=0.2
+            )
+        )
         ai_summary = response.text.strip()
 
-        # 7. Sauvegarde en base de données
+        # Enregistrement en base de données
         update_qry = "UPDATE c_issue SET ai_attachments_summary = %s WHERE id_issue = %s"
         cursor.execute(update_qry, (ai_summary, issue_id))
         connection.commit()
