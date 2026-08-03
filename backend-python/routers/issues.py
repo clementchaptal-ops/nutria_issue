@@ -12,6 +12,9 @@ from pydantic import ValidationError
 from .schemas import IssueCreate, IssueUpdate, StatusUpdate
 from .audit import log_user_action
 
+# 🚀 IMPORT DU GESTIONNAIRE D'ÉTAT JSON GLOBAL
+from .attachments import trigger_state_json_update
+
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 
 def make_signed_url(public_url: str) -> str:
@@ -177,6 +180,9 @@ def create_issue(request_json, current_user, client_ip):
         
         next_id = cursor.fetchone()[0]
         connection.commit()
+
+        # 🚀 UPDATE DU JSON GLOBAL SUR GCS
+        trigger_state_json_update()
 
         log_user_action(user_name=username, action_type="CREATE_ISSUE", target_id=str(next_id), details=f"Manual web creation. Title: '{issue_payload.title}'", ip_address=client_ip)
         
@@ -480,6 +486,9 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
         if cursor.rowcount == 0:
             return {"error": "error.unable_to_modify_issue"}, 400
 
+        # 🚀 UPDATE DU JSON GLOBAL SUR GCS
+        trigger_state_json_update()
+
         log_user_action(user_name=username, action_type="UPDATE_ISSUE", target_id=str(issue_id), details=f"Issue updated/validated. New title: '{issue_payload.title}'", ip_address=client_ip)
             
         return {"message": "success.issue_validated"}, 200
@@ -524,6 +533,9 @@ def cancel_issue(issue_id, current_user, client_ip):
 
         cursor.execute("UPDATE c_issue SET status = 'CANCELED', changed_on = CURRENT_TIMESTAMP WHERE id_issue = %s", (issue_id,))
         connection.commit()
+
+        # 🚀 UPDATE DU JSON GLOBAL SUR GCS
+        trigger_state_json_update()
 
         log_user_action(user_name=username, action_type="CANCEL_TICKET", target_id=str(issue_id), details="Ticket canceled by user.", ip_address=client_ip)
         return {"message": "success.ticket_canceled"}, 200
@@ -623,6 +635,9 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
 
         cursor.execute("UPDATE c_issue SET status = %s, changed_on = CURRENT_TIMESTAMP WHERE id_issue = %s", (payload.new_status, issue_id))
         connection.commit()
+
+        # 🚀 UPDATE DU JSON GLOBAL SUR GCS
+        trigger_state_json_update()
 
         action_type = "RESOLVE_TICKET" if payload.new_status == "ACT KNOWLEDGE" else "CLOSE_TICKET"
         log_user_action(user_name=current_user.get("sub", "UNKNOWN"), action_type=action_type, target_id=str(issue_id), details=f"Status modification validated: {payload.new_status}", ip_address=client_ip)
@@ -729,6 +744,9 @@ def create_preticket(request_json, current_user, client_ip):
         row = cursor.fetchone()
         next_id = row[0] if row else 0
         connection.commit()
+
+        # 🚀 UPDATE DU JSON GLOBAL SUR GCS
+        trigger_state_json_update()
         
         return {"id_issue": next_id, "message": "success.preticket_created"}, 201
         
@@ -771,6 +789,9 @@ def update_issue_environment(issue_id, request_json):
         """
         cursor.execute(update_qry, (project, batch, sample, analysis, variation, customer, issue_id))
         connection.commit()
+        
+        # 🚀 UPDATE DU JSON GLOBAL SUR GCS
+        trigger_state_json_update()
         
         return {"message": "success.environment_updated"}, 200
     except Exception as e:
@@ -954,7 +975,7 @@ def system_cleanup():
             r_format = ','.join(['%s'] * deleted_regroupements_count)
             r_tuple = tuple(closed_regroupements)
             # Pas besoin de supprimer à la main link et attachment car CASCADE est configuré dans ta BDD,
-            # mais on le fait proprement si PostgreSQL n'est pas strict :
+            # mais on le fait proprement si PostgreSQL n'est strict :
             cursor.execute(f"DELETE FROM c_issue_regroupment WHERE id_regroupment IN ({r_format})", r_tuple)
 
         # =========================================================
@@ -981,6 +1002,9 @@ def system_cleanup():
 
         connection.commit()
         
+        if deleted_pretickets_count > 0 or deleted_closed_count > 0:
+            trigger_state_json_update()
+
         return {
             "message": "success.system_cleanup_completed", 
             "details": {

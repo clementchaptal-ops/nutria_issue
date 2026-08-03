@@ -10,6 +10,7 @@ PROJECT_ID = os.environ.get("GCP_PROJECT", os.environ.get("GOOGLE_CLOUD_PROJECT"
 
 LOCATION = os.environ.get("GCP_LOCATION", "us-central1")
 MODEL_NAME = "gemini-2.5-flash"
+STATE_FILE_PATH = "system/active_issues_state.json"  # <-- NOUVEAU CHEMIN DU FICHIER
 
 # Initialisation du client GenAI unifié (Authentification Cloud Run automatique)
 client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
@@ -17,9 +18,9 @@ client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
 
 def generate_suggested_regroupements():
     """
-    1. Sélectionne toutes les issues IN PROGRESS et ACT KNOWLEDGE.
-    2. Construit le JSON Global (Métadonnées + ai_attachments_summary).
-    3. Gemini détecte les anomalies communes et crée les regroupements suggérés.
+    1. Récupère le JSON global des issues actives DIRECTEMENT depuis Google Cloud Storage.
+    2. Gemini l'analyse, détecte les anomalies communes et crée les regroupements suggérés.
+    3. Enregistre les suggestions dans la base de données PostgreSQL.
     """
     connection = get_db_connection()
     if not connection:
@@ -29,53 +30,19 @@ def generate_suggested_regroupements():
     try:
         cursor = connection.cursor()
 
-        # 1. Sélection des issues actives
-        qry = """
-            SELECT id_issue, title, issue_type, description, status,
-                   current_project, current_batch, current_sample, current_analysis,
-                   current_analysis_variation, current_customer, current_pc,
-                   citrix_session, environment, ai_attachments_summary
-            FROM c_issue
-            WHERE status IN ('IN PROGRESS', 'ACT KNOWLEDGE')
-            ORDER BY id_issue DESC
-        """
-        cursor.execute(qry)
-        rows = cursor.fetchall()
+        # --- 1. LECTURE DIRECTE DU FICHIER JSON SUR CLOUD STORAGE (ZÉRO CHARGE BDD) ---
+        gcs_uri = f"gs://{BUCKET_NAME}/{STATE_FILE_PATH}"
 
-        if not rows:
-            return {"message": "Aucune issue active à analyser."}, 200
-
-        # 2. Construction du JSON Global
-        global_issues = []
-        for r in rows:
-            global_issues.append({
-                "id_issue": r[0],
-                "title": r[1] or "",
-                "issue_type": r[2] or "",
-                "description": r[3] or "",
-                "status": r[4],
-                "project": r[5] or "",
-                "batch": r[6] or "",
-                "sample": r[7],
-                "analysis": r[8] or "",
-                "variation": r[9] or "",
-                "customer": r[10] or "",
-                "pc": r[11] or "",
-                "citrix": r[12] or "",
-                "environment": r[13] or "",
-                "ai_attachments_summary": r[14] or "Aucune analyse de fichier."
-            })
-
-        # 3. Prompt pour Gemini
+        # --- 2. Prompt pour Gemini ---
         prompt = f"""
         You are an AIOps incident correlation engine for a LIMS / Citrix platform.
-        Here is the complete Global JSON export of currently open support tickets:
-        {json.dumps(global_issues, ensure_ascii=False, indent=2)}
+        Analyze the attached JSON file containing the complete export of currently open support tickets.
 
         ANALYSIS AND CLUSTERING INSTRUCTIONS:
         1. Analyze all provided data across the tickets (title, description, ip_adress, ip_config, ping, citrix_session, current_pc, current_batch, current_analysis, ai_attachments_summary).
-        2. Detect strong technical correlations, such as:
+        2. Detect strong technical correlations, such as:.
            - Same Citrix server / Workstation (`current_pc`, `citrix_session`)
+           - Same physical laboratory or geographic site (`lab`, `location`)
            - Same subnet or IP/ping issues (`ip_adress`, `ping`)
            - Same analysis batch (`current_batch`, `current_analysis`)
            - Same root cause extracted from attachments (`ai_attachments_summary`)
@@ -83,7 +50,7 @@ def generate_suggested_regroupements():
         STRICT RULES:
         - A group MUST contain AT LEAST 2 tickets.
         - Only create a group if the technical correlation is strong and highly probable.
-        - The generated text for "title" and "reasoning" MUST be written in French.
+        - The "title" and "reasoning" MUST be in French.
         - Do not output any markdown formatting (e.g., do not use ```json). Output RAW JSON only.
 
         MANDATORY RESPONSE FORMAT (Strict JSON):
@@ -98,13 +65,18 @@ def generate_suggested_regroupements():
         }}
         """
 
-        # 4. Appel de génération via la nouvelle API
+        # --- 3. Appel de génération via Vertex AI en passant directement l'URI GCS ---
+        parts_for_gemini = [
+            types.Part.from_uri(file_uri=gcs_uri, mime_type="application/json"),
+            types.Part.from_text(text=prompt)
+        ]
+
         response = client.models.generate_content(
             model=MODEL_NAME,
-            contents=prompt,
+            contents=parts_for_gemini,
             config=types.GenerateContentConfig(
-                temperature=0.1,  # Faible température pour garantir le respect strict du JSON
-                response_mime_type="application/json"  # Force Gemini à répondre en JSON valide
+                temperature=0.1,  
+                response_mime_type="application/json" 
             )
         )
 
@@ -113,7 +85,7 @@ def generate_suggested_regroupements():
 
         created_groups_count = 0
 
-        # 5. Insertion des suggestions en base de données
+        # --- 4. Insertion des suggestions en base de données ---
         for group in data.get("suggested_groups", []):
             issue_ids = group.get("issue_ids", [])
             if len(issue_ids) < 2:

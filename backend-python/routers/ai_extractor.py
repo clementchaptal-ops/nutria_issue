@@ -1,11 +1,15 @@
 import io
 import os
+import re  # <-- IMPORT AJOUTÉ POUR LE NETTOYAGE DES CITATIONS
 import zipfile
 from google import genai
 from google.genai import types
 from google.cloud import storage
 
 from config.database import get_db_connection
+
+# 🚀 IMPORT DU GESTIONNAIRE D'ÉTAT JSON GLOBAL
+from routers.attachments import trigger_state_json_update
 
 # --- CONFIGURATION GCP & VERTEX AI ---
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
@@ -117,7 +121,6 @@ def analyze_issue_attachments_and_save(issue_id: int):
         Analyze these attachments and generate a precise technical summary. 
         
         STRICT RULES:
-        - The summary MUST be written in French.
         - Keep it concise: 3 to 4 sentences maximum.
         - You MUST explicitly mention any visible error codes or messages (e.g., ORA, HTTP, Citrix, LabWare).
         - State the probable root cause of the malfunction.
@@ -155,12 +158,22 @@ def analyze_issue_attachments_and_save(issue_id: int):
                 temperature=0.2
             )
         )
-        ai_summary = response.text.strip()
+        
+        raw_ai_summary = response.text.strip()
+
+        # --- NETTOYAGE POST-TRAITEMENT DES CITATIONS (REGEX) ---
+        cleaned_summary = re.sub(r'\[(?:cite:\s*)?\d+(?:,\s*\d+)*\]', '', raw_ai_summary)
+        cleaned_summary = re.sub(r'\[\d+\]', '', cleaned_summary)
+        cleaned_summary = " ".join(cleaned_summary.split()) 
 
         # Enregistrement en base de données
         update_qry = "UPDATE c_issue SET ai_attachments_summary = %s WHERE id_issue = %s"
-        cursor.execute(update_qry, (ai_summary, issue_id))
+        cursor.execute(update_qry, (cleaned_summary, issue_id))
         connection.commit()
+        
+        # 🚀 UPDATE DU JSON GLOBAL (Maintenant que le résumé IA est en BDD)
+        trigger_state_json_update()
+        
         print(f"[AI EXTRACTOR SUCCESS]: Résumé généré pour l'issue #{issue_id}")
 
     except Exception as e:

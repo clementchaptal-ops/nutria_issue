@@ -8,6 +8,9 @@ from .schemas import RegroupementCreate
 from .audit import log_user_action
 from .issues import make_signed_url
 
+# 🚀 IMPORT DU TRIGGER POUR METTRE A JOUR LE JSON GLOBAL
+from .attachments import trigger_state_json_update
+
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 
 # =====================================================================
@@ -176,6 +179,9 @@ def create_regroupement(request_json, current_user, client_ip):
 
         connection.commit()
 
+        # 🚀 UPDATE DU JSON GLOBAL
+        trigger_state_json_update()
+
         log_user_action(
             user_name=username, action_type="CREATE_REGROUPEMENT", target_id=str(next_id), 
             details=f"Created regroupement: '{data.title}'", ip_address=client_ip
@@ -206,6 +212,9 @@ def close_regroupement(regroupement_id, current_user, client_ip):
         """, (username, regroupement_id))
         connection.commit()
         
+        # 🚀 UPDATE DU JSON GLOBAL
+        trigger_state_json_update()
+
         log_user_action(
             user_name=username, action_type="CLOSE_REGROUPEMENT", target_id=str(regroupement_id), 
             details="Regroupement closed.", ip_address=client_ip
@@ -407,10 +416,7 @@ def update_regroupement(regroupement_id, request_json, current_user, client_ip):
 
 
 def validate_ai_suggestion(reg_id, current_user, client_ip):
-    """
-    Transforms an AI-suggested regroupement into an official OPEN regroupement.
-    Updates the link_status of all associated tickets from 'AI_SUGGESTION' to 'VALIDATED'.
-    """
+    """Transforms an AI-suggested regroupement into an official OPEN regroupement."""
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -440,6 +446,10 @@ def validate_ai_suggestion(reg_id, current_user, client_ip):
         cursor.execute(update_links_qry, (reg_id,))
 
         connection.commit()
+
+        # 🚀 UPDATE DU JSON GLOBAL
+        trigger_state_json_update()
+
         log_user_action(user_name=username, action_type="VALIDATE_AI_REGROUPEMENT", target_id=str(reg_id), details="Validated AI suggested regroupement.", ip_address=client_ip)
 
         return {"message": "success.suggestion_validated"}, 200
@@ -456,10 +466,7 @@ def validate_ai_suggestion(reg_id, current_user, client_ip):
 
 
 def reject_ai_suggestion(reg_id, current_user, client_ip):
-    """
-    Deletes an AI-suggested regroupement if deemed irrelevant by the IT team.
-    Database CASCADE constraints will automatically clean up c_link_issue_regroupment.
-    """
+    """Deletes an AI-suggested regroupement if deemed irrelevant by the IT team."""
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -469,7 +476,6 @@ def reject_ai_suggestion(reg_id, current_user, client_ip):
     try:
         cursor = connection.cursor()
 
-        # Physically delete the suggestion (only if it is still a SUGGESTION)
         delete_qry = "DELETE FROM c_issue_regroupment WHERE id_regroupment = %s AND status = 'SUGGESTED'"
         cursor.execute(delete_qry, (reg_id,))
 
@@ -477,6 +483,10 @@ def reject_ai_suggestion(reg_id, current_user, client_ip):
             return {"error": "error.suggestion_not_found"}, 404
 
         connection.commit()
+
+        # 🚀 UPDATE DU JSON GLOBAL
+        trigger_state_json_update()
+
         log_user_action(user_name=username, action_type="REJECT_AI_REGROUPEMENT", target_id=str(reg_id), details="Rejected and deleted AI suggested regroupement.", ip_address=client_ip)
 
         return {"message": "success.suggestion_rejected"}, 200
