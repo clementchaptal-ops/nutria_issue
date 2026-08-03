@@ -7,11 +7,18 @@ from google.cloud import storage
 
 from config.database import get_db_connection
 
-# Configuration GCP
+# --- CONFIGURATION GCP & VERTEX AI ---
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 PROJECT_ID = os.environ.get("GCP_PROJECT", os.environ.get("GOOGLE_CLOUD_PROJECT", "nutria-issue"))
-LOCATION = os.environ.get("GCP_LOCATION", "europe-west1")
+
+# 💡 FORCER us-central1 pour éviter les erreurs 404 sur les modèles Gemini Vertex AI
+LOCATION = os.environ.get("GCP_LOCATION", "us-central1")
 DATASTORE_ID = os.environ.get("DATASTORE_ID", "nutria-knowledge-base_1784796187534")
+MODEL_NAME = "gemini-1.5-flash"
+
+# Initialisation unique du SDK Vertex AI et du client Storage
+if PROJECT_ID:
+    vertexai.init(project=PROJECT_ID, location=LOCATION)
 
 storage_client = storage.Client()
 
@@ -76,7 +83,7 @@ def analyze_issue_attachments_and_save(issue_id: int):
 
         # 3. Préparation des éléments multimédias
         for att_name, att_type, public_url in attachments:
-            blob_name = public_url.replace(f"https://storage.googleapis.com/{BUCKET_NAME}/", "")
+            blob_name = public_url.replace(f"[https://storage.googleapis.com/](https://storage.googleapis.com/){BUCKET_NAME}/", "")
             gcs_uri = f"gs://{BUCKET_NAME}/{blob_name}"
 
             if att_type == 'IMAGE':
@@ -119,9 +126,6 @@ def analyze_issue_attachments_and_save(issue_id: int):
         parts_for_gemini.append(Part.from_text(prompt))
 
         # 5. Ancrage Vertex AI Search (Nutria Knowledge Datastore)
-        if PROJECT_ID:
-            vertexai.init(project=PROJECT_ID, location=LOCATION)
-
         tools = []
         try:
             datastore_tool = Tool.from_retrieval(
@@ -137,8 +141,8 @@ def analyze_issue_attachments_and_save(issue_id: int):
         except Exception as e:
             print(f"[WARNING]: Impossibilité d'attacher le datastore Nutria Knowledge : {e}")
 
-        # 6. Génération via Gemini 1.5 Flash
-        model = GenerativeModel("gemini-1.5-flash-001")
+        # 6. Génération via Gemini 1.5 Flash (Utilisation de MODEL_NAME)
+        model = GenerativeModel(MODEL_NAME)
         response = model.generate_content(parts_for_gemini, tools=tools if tools else None)
         ai_summary = response.text.strip()
 

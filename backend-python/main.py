@@ -51,11 +51,13 @@ def nutria_api(request):
 
             # 1. Verification if request comes from LabWare (System to System)
             if expected_labware_token and auth_header == f"Bearer {expected_labware_token}":
+                real_lims_user = request.headers.get("X-LIMS-User") or request.headers.get("X-User-Name") or "LABWARE_LIMS"
+                
                 current_user = {
                     "role": "SYSTEM",
                     "location": "GLOBAL",
-                    "sub": "LABWARE_LIMS",
-                    "email": "system@lims"
+                    "sub": real_lims_user.strip(), 
+                    "email": f"{real_lims_user.strip().lower()}@lims.internal"
                 }
                 error_msg = None
             else:

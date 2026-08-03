@@ -4,8 +4,17 @@ import vertexai
 from vertexai.generative_models import GenerativeModel
 from config.database import get_db_connection
 
+# --- CONFIGURATION GCP & VERTEX AI ---
+BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 PROJECT_ID = os.environ.get("GCP_PROJECT", os.environ.get("GOOGLE_CLOUD_PROJECT", "nutria-issue"))
-LOCATION = os.environ.get("GCP_LOCATION", "europe-west1")
+
+# 💡 FORCER us-central1 pour éviter les erreurs 404 sur les modèles Gemini Vertex AI
+LOCATION = os.environ.get("GCP_LOCATION", "us-central1")
+MODEL_NAME = "gemini-1.5-flash"
+
+# Initialisation unique du SDK Vertex AI
+if PROJECT_ID:
+    vertexai.init(project=PROJECT_ID, location=LOCATION)
 
 
 def generate_suggested_regroupements():
@@ -91,10 +100,8 @@ def generate_suggested_regroupements():
         }}
         """
 
-        if PROJECT_ID:
-            vertexai.init(project=PROJECT_ID, location=LOCATION)
-
-        model = GenerativeModel("gemini-1.5-flash-001")
+        # Utilisation de la variable MODEL_NAME ("gemini-1.5-flash")
+        model = GenerativeModel(MODEL_NAME)
         response = model.generate_content(prompt)
 
         raw_text = response.text.strip().replace("```json", "").replace("```", "").strip()
