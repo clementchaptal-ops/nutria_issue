@@ -11,23 +11,33 @@ from config.database import get_db_connection
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 PROJECT_ID = os.environ.get("GCP_PROJECT", os.environ.get("GOOGLE_CLOUD_PROJECT", "nutria-issue"))
 
-# 💡 FORCER us-central1 pour éviter les erreurs 404 sur les modèles Gemini Vertex AI
-LOCATION = os.environ.get("GCP_LOCATION", "us-central1")
+# Utilisation de la région par défaut GCP
+LOCATION = os.environ.get("GCP_LOCATION", "europe-west1")
 DATASTORE_ID = os.environ.get("DATASTORE_ID", "nutria-knowledge-base_1784796187534")
-MODEL_NAME = "gemini-1.5-flash"
 
-# Initialisation unique du SDK Vertex AI et du client Storage
+# Version exacte reconnue par Vertex AI
+MODEL_NAME = "gemini-1.5-flash-002"
+
 if PROJECT_ID:
     vertexai.init(project=PROJECT_ID, location=LOCATION)
 
 storage_client = storage.Client()
 
 
-def extract_text_from_zip(blob_name: str) -> str:
+def _clean_blob_name(public_url_or_path: str) -> str:
+    """Extrait le chemin d'accès relatif du fichier dans le bucket GCS."""
+    prefix = f"https://storage.googleapis.com/{BUCKET_NAME}/"
+    if public_url_or_path.startswith(prefix):
+        return public_url_or_path.replace(prefix, "")
+    return public_url_or_path
+
+
+def extract_text_from_zip(raw_blob_name: str) -> str:
     """Télécharge un ZIP depuis GCS et extrait les 50 000 derniers caractères des fichiers .log et .txt."""
     try:
+        blob_path = _clean_blob_name(raw_blob_name)
         bucket = storage_client.bucket(BUCKET_NAME)
-        blob = bucket.blob(blob_name)
+        blob = bucket.blob(blob_path)
         zip_bytes = blob.download_as_bytes()
 
         extracted_text = ""
@@ -83,7 +93,7 @@ def analyze_issue_attachments_and_save(issue_id: int):
 
         # 3. Préparation des éléments multimédias
         for att_name, att_type, public_url in attachments:
-            blob_name = public_url.replace(f"[https://storage.googleapis.com/](https://storage.googleapis.com/){BUCKET_NAME}/", "")
+            blob_name = _clean_blob_name(public_url)
             gcs_uri = f"gs://{BUCKET_NAME}/{blob_name}"
 
             if att_type == 'IMAGE':
@@ -141,7 +151,7 @@ def analyze_issue_attachments_and_save(issue_id: int):
         except Exception as e:
             print(f"[WARNING]: Impossibilité d'attacher le datastore Nutria Knowledge : {e}")
 
-        # 6. Génération via Gemini 1.5 Flash (Utilisation de MODEL_NAME)
+        # 6. Génération via Gemini 1.5 Flash
         model = GenerativeModel(MODEL_NAME)
         response = model.generate_content(parts_for_gemini, tools=tools if tools else None)
         ai_summary = response.text.strip()
