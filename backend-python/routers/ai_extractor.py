@@ -11,18 +11,21 @@ from config.database import get_db_connection
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 PROJECT_ID = os.environ.get("GCP_PROJECT", os.environ.get("GOOGLE_CLOUD_PROJECT", "nutria-issue"))
 
-# Utilisation de la région par défaut GCP
-LOCATION = os.environ.get("GCP_LOCATION", "europe-west1")
-DATASTORE_ID = os.environ.get("DATASTORE_ID", "nutria-knowledge-base_1784796187534")
+# 💡 1. Vertex AI Generative Models (Gemini) requis sur us-central1
+LOCATION_GEMINI = "us-central1"
 
-# Version exacte reconnue par Vertex AI
-MODEL_NAME = "gemini-1.5-flash-002"
+# 💡 2. Data Store Nutria Knowledge (Visible sur ta capture GCP : Location = global)
+DATASTORE_ID = "nutria-knowledge-base_1784796187534"
+LOCATION_DATASTORE = "global"
 
+# Nom standard du modèle Gemini Flash
+MODEL_NAME = "gemini-1.5-flash"
+
+# Initialisation de Vertex AI sur us-central1 pour charger Gemini
 if PROJECT_ID:
-    vertexai.init(project=PROJECT_ID, location=LOCATION)
+    vertexai.init(project=PROJECT_ID, location=LOCATION_GEMINI)
 
 storage_client = storage.Client()
-
 
 def _clean_blob_name(public_url_or_path: str) -> str:
     """Extrait le chemin d'accès relatif du fichier dans le bucket GCS."""
@@ -143,7 +146,7 @@ def analyze_issue_attachments_and_save(issue_id: int):
                     grounding.VertexAISearch(
                         project=PROJECT_ID,
                         datastore=DATASTORE_ID,
-                        location="global"
+                        location="LOCATION_DATASTORE"
                     )
                 )
             )
