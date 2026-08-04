@@ -32,48 +32,47 @@
   align-items: center;
   width: 100%;
   margin-bottom: 20px;
-  gap: 20px;
+  gap: 16px;
+}
+
+.actionBar > :first-child {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  flex: 1; 
+}
+
+.createBtn, 
+.aiBtn {
+  height: 38px; 
+  padding: 0 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  transition: background-color 0.2s, transform 0.1s;
 }
 
 .createBtn {
   background: #0052cc;
   color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.2s;
 }
 
 .createBtn:hover {
   background: #0047b3;
 }
 
-.emptyState {
-  text-align: center;
-  padding: 40px;
-  background: #f4f5f7;
-  border-radius: 8px;
-  color: #7a869a;
-}
-
-/* ==========================================
-   STYLES IA (Bouton et Panneau de résultat)
-   ========================================== */
-
 .aiBtn {
-  background-color: #6554C0; /* Violet tech pour l'IA */
+  background-color: #6554C0;
   color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: background-color 0.2s;
 }
 
 .aiBtn:hover:not(:disabled) {
@@ -84,6 +83,14 @@
   background-color: #A5ADBA;
   cursor: not-allowed;
   opacity: 0.8;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 40px;
+  background: #f4f5f7;
+  border-radius: 8px;
+  color: #7a869a;
 }
 
 .aiResultPanel {
