@@ -1,60 +1,105 @@
 .container {
-    padding: 20px;
-    max-width: 1400px;
-    margin: 0 auto;
-  }
-  
-  .header {
-    display: flex;
-    align-items: center;
-    margin-bottom: 24px;
-  }
-  
-  .title {
-    font-size: 24px;
-    color: #172b4d;
-    margin: 0;
-    margin-right: 15px;
-  }
-  
-  .count {
-    background: #dfe1e6;
-    color: #42526e;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: bold;
-  }
-  
-  .actionBar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #f4f5f7;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-  }
-  
-  .createBtn {
-    background: #0052cc;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-  
-  .createBtn:hover {
-    background: #0047b3;
-  }
-  
-  .emptyState {
-    text-align: center;
-    padding: 40px;
-    background: #f4f5f7;
-    border-radius: 8px;
-    color: #7a869a;
-  }
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.title {
+  font-size: 24px;
+  color: #172b4d;
+  margin: 0;
+  margin-right: 15px;
+}
+
+.count {
+  background: #dfe1e6;
+  color: #42526e;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.actionBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f4f5f7;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.createBtn {
+  background: #0052cc;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.createBtn:hover {
+  background: #0047b3;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 40px;
+  background: #f4f5f7;
+  border-radius: 8px;
+  color: #7a869a;
+}
+
+/* ==========================================
+   STYLES IA (Bouton et Panneau de résultat)
+   ========================================== */
+
+.aiBtn {
+  background-color: #6554C0; /* Violet tech pour l'IA */
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.2s;
+}
+
+.aiBtn:hover:not(:disabled) {
+  background-color: #5243AA;
+}
+
+.aiBtn:disabled {
+  background-color: #A5ADBA;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.aiResultPanel {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #F4F5F7;
+  border-radius: 8px;
+  border-left: 4px solid #6554C0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.aiResultTitle {
+  margin-top: 0;
+  color: #172B4D;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
