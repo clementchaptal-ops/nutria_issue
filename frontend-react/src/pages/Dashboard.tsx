@@ -106,8 +106,14 @@ function Dashboard() {
     let valA = a[key]
     let valB = b[key]
 
-    if (key === 'id_issue' || key === 'id_regroupment') {
+    if (key === 'id_issue') {
       return sortConfig.direction === 'asc' ? (valA || 0) - (valB || 0) : (valB || 0) - (valA || 0)
+    }
+
+    if (key === 'regroupements') {
+      const maxA = valA && valA.length > 0 ? Math.max(...valA) : 0;
+      const maxB = valB && valB.length > 0 ? Math.max(...valB) : 0;
+      return sortConfig.direction === 'asc' ? maxA - maxB : maxB - maxA;
     }
 
     valA = String(valA || '').toLowerCase()
@@ -133,15 +139,34 @@ function Dashboard() {
   const tableColumns: TableColumn<any>[] = [
     { key: 'id_issue', label: t('dashboard.table.id', 'ID'), render: (item) => <span className={styles.tdId}>#{item.id_issue}</span> },
     { 
-      key: 'id_regroupment', 
+      key: 'regroupements', 
       label: t('dashboard.table.group', 'Group'), 
       align: 'center',
       render: (item) => {
-        const groupStyle = getGroupBadgeStyle(item.id_regroupment);
+        const groups: number[] = item.regroupements || [];
+        if (groups.length === 0) return <span style={{ color: '#a5adba' }}>-</span>;
+
         return (
-          <span style={{ background: groupStyle.background, color: groupStyle.color, padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block', minWidth: '40px' }}>
-            {groupStyle.text}
-          </span>
+          <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {groups.map((gId) => {
+              const groupStyle = getGroupBadgeStyle(gId);
+              return (
+                <span 
+                  key={gId} 
+                  style={{ 
+                    background: groupStyle.background, 
+                    color: 'white', 
+                    padding: '2px 6px', 
+                    borderRadius: '8px', 
+                    fontSize: '10px', 
+                    fontWeight: 'bold' 
+                  }}
+                >
+                  G-{gId}
+                </span>
+              );
+            })}
+          </div>
         )
       }
     },
@@ -188,15 +213,17 @@ function Dashboard() {
         <StatCard label={t('dashboard.status.closed', 'Closed')} count={closedCount} color="#42526e" isActive={activeStatuses.includes('CLOSED')} onClick={() => toggleStatusFilter('CLOSED')} />
       </div>
 
-      <div className={styles.actionBar} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <SearchBar 
-          columns={searchColumns} 
-          searchColumn={searchColumn} 
-          onColumnChange={(val) => updateUrlParam('column', val)}
-          searchQuery={searchQuery}
-          onSearchChange={(val) => updateUrlParam('search', val)}
-          placeholder={t('dashboard.search.placeholder', 'Search...')}
-        />
+      <div className={styles.actionBar}>
+        <div className={styles.searchWrapper}>
+          <SearchBar 
+            columns={searchColumns} 
+            searchColumn={searchColumn} 
+            onColumnChange={(val) => updateUrlParam('column', val)}
+            searchQuery={searchQuery}
+            onSearchChange={(val) => updateUrlParam('search', val)}
+            placeholder={t('dashboard.search.placeholder', 'Search...')}
+          />
+        </div>
 
         <button className={styles.createBtn} onClick={() => navigate('/?new=true')}>
           ➕ {t('dashboard.create_button', 'Create an Issue')}

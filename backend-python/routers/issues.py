@@ -70,19 +70,22 @@ def get_all_issues(current_user):
     tickets = []
     
     try:
-        # Utilisation de DISTINCT ON pour garantir l'unicité stricte par ID de ticket
-        base_qry = """
-            SELECT DISTINCT ON (i.id_issue) 
-                   i.id_issue, i.title, i.issue_type, i.status, i.user_name,
+        # On utilise ARRAY_AGG pour récupérer TOUS les id_regroupment sous forme de tableau (liste)
+        # ARRAY_REMOVE permet de filtrer les NULL si le ticket n'est dans aucun groupe.
+        base_select = """
+            SELECT i.id_issue, i.title, i.issue_type, i.status, i.user_name,
                    u.full_name, u.location, TO_CHAR(i.created_on, 'YYYY-MM-DD HH24:MI') as c_date,
-                   i.criticity, i.environment,l.id_regroupment  
+                   i.criticity, i.environment,
+                   ARRAY_REMOVE(ARRAY_AGG(l.id_regroupment), NULL) as regroupements
             FROM c_issue i
             LEFT JOIN lims_users u ON TRIM(UPPER(i.user_name)) = TRIM(UPPER(u.user_name))
-            LEFT JOIN c_link_issue_regroupment l ON i.id_issue = l.id_issue  
+            LEFT JOIN c_link_issue_regroupment l ON i.id_issue = l.id_issue
         """
+        
+        group_and_order = " GROUP BY i.id_issue, u.full_name, u.location ORDER BY i.id_issue DESC"
 
         if user_role == "IT_TEAM":
-            qry = base_qry + " ORDER BY i.id_issue DESC"
+            qry = base_select + group_and_order
             cursor.execute(qry)
         else:
             safe_location = str(user_location).strip().upper() if user_location else ""
@@ -92,11 +95,8 @@ def get_all_issues(current_user):
             else:
                 site_root = safe_location
 
-            # PostgreSQL parameterized query
-            qry = base_qry + """
-                WHERE TRIM(UPPER(u.location)) LIKE TRIM(UPPER(%s)) || '%%' 
-                ORDER BY i.id_issue DESC
-            """
+            # Clause WHERE avant GROUP BY
+            qry = base_select + " WHERE TRIM(UPPER(u.location)) LIKE TRIM(UPPER(%s)) || '%%' " + group_and_order
             cursor.execute(qry, (site_root,))
             
         rows = cursor.fetchall()
@@ -112,7 +112,8 @@ def get_all_issues(current_user):
                 "creation_date": row[7] if row[7] else "",
                 "criticity": row[8] if row[8] else "N/A",
                 "environment": row[9] if row[9] else "UNKNOWN",
-                "id_regroupement": row[10] if row[10] else "No Regroupement"
+                # On renvoie la liste complète des regroupements
+                "regroupements": row[10] if row[10] else []
             })
         return tickets, 200
     except Exception as e:
