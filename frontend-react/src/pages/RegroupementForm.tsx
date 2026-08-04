@@ -11,7 +11,9 @@ function RegroupementForm() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
+  
   const [availableIssues, setAvailableIssues] = useState<any[]>([])
+  const [searchQuery, setSearchQuery] = useState('') // NOUVEAU: État pour la recherche
   
   // Attachments state
   const [attachments, setAttachments] = useState<File[]>([])
@@ -79,6 +81,16 @@ function RegroupementForm() {
     }
   }
 
+  // NOUVEAU: Filtrage dynamique basé sur la recherche (par ID ou par titre)
+  const filteredIssues = availableIssues.filter(issue => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      String(issue.id_issue).includes(query) || 
+      (issue.title && issue.title.toLowerCase().includes(query))
+    )
+  })
+
   return (
     <div className={styles.pageContainer} style={{ maxWidth: '800px', margin: '40px auto' }}>
       <form onSubmit={handleSubmit} style={{ background: '#fff', padding: '24px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
@@ -132,16 +144,35 @@ function RegroupementForm() {
           <FileUploader files={attachments} onFilesChange={(files: File[]) => setAttachments(files)} />
         </div>
 
-        {/* ISSUE SELECTION BLOCK */}
+        {/* ISSUE SELECTION BLOCK AVEC RECHERCHE */}
         <div style={{ background: '#f4f5f7', padding: '16px', borderRadius: '6px', marginTop: '20px' }}>
-          <label className={styles.label} style={{ marginBottom: '8px' }}>
-            {t('regroupements.link_issues', 'Link existing issues')} ({formData.issue_ids.length})
-          </label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
+            <label className={styles.label} style={{ margin: 0 }}>
+              {t('regroupements.link_issues', 'Link existing issues')} ({formData.issue_ids.length})
+            </label>
+            
+            {/* BARRE DE RECHERCHE */}
+            <input 
+              type="text" 
+              className={styles.input}
+              placeholder={t('dashboard.search.placeholder', 'Search issues...')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: '250px', padding: '6px 12px', height: '36px', margin: 0 }}
+            />
+          </div>
+
           <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #dfe1e6', padding: '10px', background: '#fff', borderRadius: '4px' }}>
-            {availableIssues.length === 0 ? (
-              <p style={{ color: '#7a869a', margin: 0, fontSize: '13px' }}>{t('regroupements.no_issues_available', 'No unlinked issues available.')}</p>
+            {filteredIssues.length === 0 ? (
+              <p style={{ color: '#7a869a', margin: 0, fontSize: '13px', textAlign: 'center', padding: '10px 0' }}>
+                {searchQuery 
+                  ? t('regroupements.no_search_results', 'No issues match your search.') 
+                  : t('regroupements.no_issues_available', 'No unlinked issues available.')}
+              </p>
             ) : null}
-            {availableIssues.map(issue => (
+            
+            {/* Utilisation de filteredIssues au lieu de availableIssues */}
+            {filteredIssues.map(issue => (
               <label key={issue.id_issue} style={{ display: 'flex', alignItems: 'center', margin: '8px 0', cursor: 'pointer', fontSize: '14px' }}>
                 <input 
                   type="checkbox" 
