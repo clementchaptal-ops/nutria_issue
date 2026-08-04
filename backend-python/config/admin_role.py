@@ -31,8 +31,8 @@ def fetch_group_members_from_google():
 
         for role_name, group_email in TARGET_GROUPS.items():
             try:
-                # Appelle directement l'API Google Directory
-                response = service.members().list(groupUniqueId=group_email).execute()
+                # CORRECTION : Utiliser groupKey au lieu de groupUniqueId
+                response = service.members().list(groupKey=group_email).execute()
                 members = response.get('members', [])
                 group_results[group_email] = [m['email'].strip().lower() for m in members if 'email' in m]
             except Exception as group_err:
