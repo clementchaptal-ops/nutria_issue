@@ -977,6 +977,24 @@ def system_cleanup():
             # Pas besoin de supprimer à la main link et attachment car CASCADE est configuré dans ta BDD,
             # mais on le fait proprement si PostgreSQL n'est strict :
             cursor.execute(f"DELETE FROM c_issue_regroupment WHERE id_regroupment IN ({r_format})", r_tuple)
+        
+        # =========================================================
+        # 3.bis NETTOYAGE DES SUGGESTIONS IA REJETÉES (> 1 mois)
+        # =========================================================
+        cursor.execute("""
+            SELECT id_regroupment FROM c_issue_regroupment 
+            WHERE status = 'REJECTED' 
+              AND changed_on < CURRENT_TIMESTAMP - INTERVAL '1 month'
+        """)
+        rejected_regroupements = [row[0] for row in cursor.fetchall()]
+        deleted_rejected_count = len(rejected_regroupements)
+
+        if deleted_rejected_count > 0:
+            for r_id in rejected_regroupements:
+                delete_gcs_regroupement_folder(r_id)
+            r_format = ','.join(['%s'] * deleted_rejected_count)
+            r_tuple = tuple(rejected_regroupements)
+            cursor.execute(f"DELETE FROM c_issue_regroupment WHERE id_regroupment IN ({r_format})", r_tuple)
 
         # =========================================================
         # 4. NETTOYAGE DES TICKETS FERMÉS ORPHELINS (> 6 mois)
