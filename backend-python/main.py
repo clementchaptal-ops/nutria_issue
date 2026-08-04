@@ -319,7 +319,7 @@ def nutria_api(request):
             # POST /regroupements/suggest-ai (Launch AI Clustering)
             elif path == "regroupements/suggest-ai" and request.method == "POST":
                 from routers.ai_clustering import generate_suggested_regroupements
-                data, http_code = generate_suggested_regroupements()
+                data, http_code = generate_suggested_regroupements(current_user.get("sub"))
                 return jsonify(data), http_code, headers
 
             # PUT /regroupements/{id}/validate-suggestion (IT Validation)

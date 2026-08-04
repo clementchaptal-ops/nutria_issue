@@ -16,7 +16,7 @@ STATE_FILE_PATH = "system/active_issues_state.json"  # <-- NOUVEAU CHEMIN DU FIC
 client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
 
 
-def generate_suggested_regroupements():
+def generate_suggested_regroupements(creator_id: str):
     """
     1. Récupère le JSON global des issues actives DIRECTEMENT depuis Google Cloud Storage.
     2. Gemini l'analyse, détecte les anomalies communes et crée les regroupements suggérés.
@@ -95,10 +95,11 @@ def generate_suggested_regroupements():
             # Création du regroupement avec status = 'SUGGESTED'
             insert_reg_qry = """
                 INSERT INTO c_issue_regroupment (title, description, ai_reasoning, status, created_by, created_on, changed_on)
-                VALUES (%s, %s, %s, 'SUGGESTED', 'SYSTEM_AI', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                VALUES (%s, %s, %s, 'SUGGESTED', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 RETURNING id_regroupment
             """
-            cursor.execute(insert_reg_qry, (group.get("title"), group.get("reasoning"), group.get("reasoning")))
+            # On passe le creator_id comme 4ème paramètre
+            cursor.execute(insert_reg_qry, (group.get("title"), group.get("reasoning"), group.get("reasoning"), creator_id))
             reg_id = cursor.fetchone()[0]
 
             # Liaisons avec link_status = 'AI_SUGGESTION'
