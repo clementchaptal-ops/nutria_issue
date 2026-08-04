@@ -1,9 +1,10 @@
 import os
 import jwt
 
-JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "your_super_secret_key_change_this_in_production")
+# On récupère les variables d'environnement sans valeur secrète codée en dur
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
 JWT_ALGORITHM = "HS256"
-SYSTEM_API_KEY = os.environ.get("SYSTEM_API_KEY", "Nutria_Citrix_Secret_2026_XYZ")
+SYSTEM_API_KEY = os.environ.get("SYSTEM_API_KEY")
 
 def verify_token(auth_header=None, request_headers=None):
     """
@@ -12,7 +13,7 @@ def verify_token(auth_header=None, request_headers=None):
     or the Citrix API key (X-System-Key: ...).
     """
     # 1. If full headers are provided, check for Citrix key first
-    if request_headers:
+    if request_headers and SYSTEM_API_KEY:
         system_key = request_headers.get("X-System-Key")
         if system_key and system_key == SYSTEM_API_KEY:
             return {"sub": "CITRIX_SYSTEM", "role": "IT_TEAM", "location": "GLOBAL"}, None
@@ -26,6 +27,10 @@ def verify_token(auth_header=None, request_headers=None):
         return None, "Missing or malformed authentication token."
 
     token = auth_header.split(" ")[1]
+
+    # Vérification que la clé de signature JWT est bien définie sur le serveur
+    if not JWT_SECRET_KEY:
+        return None, "Server configuration error: JWT_SECRET_KEY is missing."
 
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])

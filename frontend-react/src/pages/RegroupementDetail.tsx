@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
+import { openSafeUrl } from '../utils/security';
 import FileUploader from '../components/FileUploader'
 import { 
   fetchRegroupement, 
@@ -386,7 +387,7 @@ function RegroupementDetail() {
                             if (isImg || file.attachment_type === 'VIDEO') {
                               setLightboxMedia({ url: fileUrl, type: isImg ? 'IMAGE' : 'VIDEO' })
                             } else {
-                              window.open(fileUrl, '_blank')
+                              openSafeUrl(fileUrl);
                             }
                           }}>
                             {isImg ? '🖼️' : file.attachment_type === 'VIDEO' ? '🎥' : '📄'} 

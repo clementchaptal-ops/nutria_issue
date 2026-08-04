@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import FileUploader from '../components/FileUploader'
 import toast from 'react-hot-toast'
 import styles from './IssueForm.module.css'
+import { openSafeUrl } from '../utils/security';
 
 const getDecodedToken = () => {
   const token = localStorage.getItem('nutria_token');
@@ -830,7 +831,7 @@ function IssueForm() {
                             if (isImg || file.attachment_type === 'VIDEO') {
                               setLightboxMedia({ url: fileUrl, type: isImg ? 'IMAGE' : 'VIDEO' })
                             } else {
-                              window.open(fileUrl, '_blank')
+                              openSafeUrl(fileUrl);
                             }
                           }}>
                             {isImg ? '🖼️' : file.attachment_type === 'VIDEO' ? '🎥' : '📄'} 
