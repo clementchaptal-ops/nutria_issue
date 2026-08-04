@@ -211,14 +211,16 @@ function RegroupementList() {
       </div>
 
       <div className={styles.actionBar}>
-        <SearchBar 
-          columns={searchColumns} 
-          searchColumn={classicSearchColumn} 
-          onColumnChange={(val) => updateUrlParam('column', val)}
-          searchQuery={classicSearchQuery}
-          onSearchChange={(val) => updateUrlParam('search', val)}
-          placeholder={t('dashboard.search.placeholder', 'Search in classic...')}
-        />
+        <div className={styles.searchWrapper}>
+          <SearchBar 
+            columns={searchColumns} 
+            searchColumn={classicSearchColumn} 
+            onColumnChange={(val) => updateUrlParam('column', val)}
+            searchQuery={classicSearchQuery}
+            onSearchChange={(val) => updateUrlParam('search', val)}
+            placeholder={t('dashboard.search.placeholder', 'Search in classic...')}
+          />
+        </div>
         <button className={styles.createBtn} onClick={() => navigate('/regroupements/new')}>
           📁 {t('regroupements.create_manual', 'Create Manual')}
         </button>
@@ -246,14 +248,16 @@ function RegroupementList() {
       </div>
 
       <div className={styles.actionBar}>
-        <SearchBar 
-          columns={searchColumns} 
-          searchColumn={aiSearchColumn} 
-          onColumnChange={(val) => updateUrlParam('aiColumn', val)}
-          searchQuery={aiSearchQuery}
-          onSearchChange={(val) => updateUrlParam('aiSearch', val)}
-          placeholder={t('dashboard.search.placeholder_ai', 'Search in AI suggestions...')}
-        />
+        <div className={styles.searchWrapper}>
+          <SearchBar 
+            columns={searchColumns} 
+            searchColumn={aiSearchColumn} 
+            onColumnChange={(val) => updateUrlParam('aiColumn', val)}
+            searchQuery={aiSearchQuery}
+            onSearchChange={(val) => updateUrlParam('aiSearch', val)}
+            placeholder={t('dashboard.search.placeholder_ai', 'Search in AI suggestions...')}
+          />
+        </div>
         <button className={styles.aiBtn} onClick={handleTriggerAi} disabled={isAiLoading}>
           {isAiLoading ? `⏳ ${t('regroupements.ai.analyzing', 'Analysis in progress...')}` : `✨ ${t('regroupements.generate_ai', 'Generate New Suggestions')}`}
         </button>
