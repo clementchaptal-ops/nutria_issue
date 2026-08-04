@@ -1,49 +1,68 @@
-import requests
 import time
+import google.auth
+from googleapiclient.discovery import build
 
-# Configuration
-GOOGLE_APP_URL = "https://script.google.com/macros/s/AKfycbwh4FglO3vXZJKB-_WI42m8xsc5uCVH6VluFsGg0C8eBr5zVRorAlk-devE69Cf4125mw/exec"
+# Configuration des groupes
+TARGET_GROUPS = {
+    "IT_TEAM": "nutria_core_it@mxns.com",
+    "LOCAL_ADMIN": "nutria-local_admin@mxns.com"
+}
 
-# In-memory caching system
+# Cache en mémoire (1 heure)
 cache = {
     "data": None,
     "last_updated": 0
 }
-CACHE_DURATION = 3600  # Cache lifetime in seconds (1 hour here)
+CACHE_DURATION = 3600
+
+def fetch_group_members_from_google():
+    """
+    Interroge directement l'API Directory de Google Workspace 
+    via les identifiants natifs du Service Account GCP.
+    """
+    group_results = {}
+    
+    try:
+        # Récupère automatiquement les identifiants GCP du Cloud Run / Cloud Function
+        credentials, _ = google.auth.default(
+            scopes=['https://www.googleapis.com/auth/admin.directory.group.readonly']
+        )
+        service = build('admin', 'directory_v1', credentials=credentials)
+
+        for role_name, group_email in TARGET_GROUPS.items():
+            try:
+                # Appelle directement l'API Google Directory
+                response = service.members().list(groupUniqueId=group_email).execute()
+                members = response.get('members', [])
+                group_results[group_email] = [m['email'].strip().lower() for m in members if 'email' in m]
+            except Exception as group_err:
+                print(f"[GOOGLE DIRECTORY ERROR] Impossible de lire {group_email}: {group_err}")
+                group_results[group_email] = []
+
+        return group_results
+
+    except Exception as e:
+        print(f"[FATAL DIRECTORY ERROR]: {e}")
+        return None
 
 def get_google_groups():
+    """Gère le cache Python pour éviter de requêter Google à chaque milliseconde."""
     current_time = time.time()
     
-    # 1. Check if the cache is valid (data present AND less than 1 hour old)
-    if cache["data"] and (current_time - cache["last_updated"] < CACHE_DURATION):
-        print("-> Fetching data from Python CACHE")
+    # 1. Utilisation du cache s'il est valide
+    if cache["data"] is not None and (current_time - cache["last_updated"] < CACHE_DURATION):
+        print("-> Fetching group roles from Python CACHE")
         return cache["data"]
     
-    # 2. If the cache is empty or expired, query Google
-    print("-> Cache expired. Querying Google Apps Script...")
-    try:
-        # Simple request without security parameters
-        response = requests.get(GOOGLE_APP_URL)
-        response.raise_for_status() 
-        
-        result = response.json()
-        
-        # If Google responds successfully, update the cache
-        if result.get("status") in ["success", "partial_or_error"]:
-            cache["data"] = result
-            cache["last_updated"] = current_time
-            print("-> Cache successfully updated")
-            return cache["data"]
-        else:
-            print("Error returned by the API:", result)
-            return None
-            
-    except Exception as e:
-        print("Critical error during Python request:", e)
-        # In case of failure, return the old cache if it exists
+    # 2. Rafraîchissement depuis Google Directory API
+    print("-> Refreshing group roles from Google Directory API...")
+    fresh_data = fetch_group_members_from_google()
+    
+    if fresh_data is not None:
+        cache["data"] = fresh_data
+        cache["last_updated"] = current_time
+        print("-> Group cache successfully updated")
         return cache["data"]
-
-# Quick test
-if __name__ == "__main__":
-    data = get_google_groups()
-    print(data)
+    
+    # Fallback sur l'ancien cache en cas de panne
+    return cache["data"] or {}

@@ -112,22 +112,20 @@ def google_auth(request_json):
         db_fullname = selected_row[1]
         db_location = selected_row[2]
 
-        # 6. DETERMINE ROLE VIA GOOGLE APPS SCRIPT
+        # 6. DETERMINE ROLE VIA GOOGLE DIRECTORY API (Natif GCP)
         role = "USER"  
         
+        # Structure de groups_data : {"nutria_core_it@mxns.com": ["mail1@...", ...], "nutria-local_admin@mxns.com": [...]}
         groups_data = get_google_groups()
-        data_content = groups_data.get("data", {}) if groups_data else {}
         
-        it_team_emails = data_content.get("nutria_core_it@mxns.com", [])
-        local_admin_emails = data_content.get("nutria-local_admin@mxns.com", [])
+        it_team_emails = groups_data.get("nutria_core_it@mxns.com", [])
+        local_admin_emails = groups_data.get("nutria-local_admin@mxns.com", [])
 
         cleaned_user_email = user_email.strip().lower()
-        cleaned_it_list = [email.strip().lower() for email in it_team_emails]
-        cleaned_admin_list = [email.strip().lower() for email in local_admin_emails]
 
-        if cleaned_user_email in cleaned_it_list:
+        if cleaned_user_email in it_team_emails:
             role = "IT_TEAM"
-        elif cleaned_user_email in cleaned_admin_list:
+        elif cleaned_user_email in local_admin_emails:
             role = "LOCAL_ADMIN"
 
         # 7. Generate the JWT Access Token
