@@ -414,9 +414,8 @@ def update_regroupement(regroupement_id, request_json, current_user, client_ip):
     finally:
         connection.close()
 
-
 def validate_ai_suggestion(reg_id, current_user, client_ip):
-    """Transforms an AI-suggested regroupement into an official OPEN regroupement."""
+    """Transforms an AI-suggested (or previously rejected) regroupement into an official OPEN regroupement."""
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -426,11 +425,11 @@ def validate_ai_suggestion(reg_id, current_user, client_ip):
     try:
         cursor = connection.cursor()
 
-        # 1. Promote regroupement to 'OPEN'
+        # 1. Promote regroupement to 'OPEN'. On accepte SUGGESTED ou REJECTED.
         update_reg_qry = """
             UPDATE c_issue_regroupment 
             SET status = 'OPEN', changed_by = %s, changed_on = CURRENT_TIMESTAMP
-            WHERE id_regroupment = %s AND status = 'SUGGESTED'
+            WHERE id_regroupment = %s AND status IN ('SUGGESTED', 'REJECTED')
         """
         cursor.execute(update_reg_qry, (username, reg_id))
 
@@ -466,7 +465,7 @@ def validate_ai_suggestion(reg_id, current_user, client_ip):
 
 
 def reject_ai_suggestion(reg_id, current_user, client_ip):
-    """Deletes an AI-suggested regroupement if deemed irrelevant by the IT team."""
+    """Marks an AI-suggested regroupement as REJECTED instead of deleting it."""
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -476,8 +475,13 @@ def reject_ai_suggestion(reg_id, current_user, client_ip):
     try:
         cursor = connection.cursor()
 
-        delete_qry = "DELETE FROM c_issue_regroupment WHERE id_regroupment = %s AND status = 'SUGGESTED'"
-        cursor.execute(delete_qry, (reg_id,))
+        # Remplacement du DELETE par un UPDATE vers le statut REJECTED
+        update_qry = """
+            UPDATE c_issue_regroupment 
+            SET status = 'REJECTED', changed_by = %s, changed_on = CURRENT_TIMESTAMP 
+            WHERE id_regroupment = %s AND status = 'SUGGESTED'
+        """
+        cursor.execute(update_qry, (username, reg_id))
 
         if cursor.rowcount == 0:
             return {"error": "error.suggestion_not_found"}, 404
@@ -487,7 +491,7 @@ def reject_ai_suggestion(reg_id, current_user, client_ip):
         # 🚀 UPDATE DU JSON GLOBAL
         trigger_state_json_update()
 
-        log_user_action(user_name=username, action_type="REJECT_AI_REGROUPEMENT", target_id=str(reg_id), details="Rejected and deleted AI suggested regroupement.", ip_address=client_ip)
+        log_user_action(user_name=username, action_type="REJECT_AI_REGROUPEMENT", target_id=str(reg_id), details="Rejected AI suggested regroupement.", ip_address=client_ip)
 
         return {"message": "success.suggestion_rejected"}, 200
     except Exception as e:

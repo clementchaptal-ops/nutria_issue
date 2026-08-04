@@ -328,8 +328,8 @@ def nutria_api(request):
                 data, http_code = validate_ai_suggestion(int(parts[1]), current_user, client_ip)
                 return jsonify(data), http_code, headers
 
-            # DELETE /regroupements/{id}/reject-suggestion (IT Rejection)
-            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "reject-suggestion" and request.method == "DELETE":
+            # PUT /regroupements/{id}/reject-suggestion (IT Rejection)
+            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "reject-suggestion" and request.method == "PUT":
                 from routers.regroupement import reject_ai_suggestion
                 data, http_code = reject_ai_suggestion(int(parts[1]), current_user, client_ip)
                 return jsonify(data), http_code, headers

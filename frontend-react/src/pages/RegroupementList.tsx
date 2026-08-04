@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { fetchAllRegroupements, triggerAiClustering } from '../api/regroupements'
+import { fetchAllRegroupements, triggerAiClustering, validateAiSuggestion, rejectAiSuggestion } from '../api/regroupements'
 import styles from './RegroupementList.module.css'
 
 import StatCard from '../components/StatCard'
-import SearchBar from '../components/SearchBar'
 import GenericTable, { TableColumn } from '../components/GenericTable'
 
 type SortConfig = {
@@ -17,44 +16,18 @@ type SortConfig = {
 function RegroupementList() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
 
   const [regroupements, setRegroupements] = useState<any[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   
-  // --- NOUVEAUX ÉTATS POUR L'IA ---
+  // États IA
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false)
-  const [hasRunAi, setHasRunAi] = useState<boolean>(false)
-  const [aiResultCount, setAiResultCount] = useState<number | null>(null)
 
-  const searchQuery = searchParams.get('search') || ''
-  const searchColumn = searchParams.get('column') || 'ALL'
-  
-  const statusParam = searchParams.get('status')
-  // On ajoute 'SUGGESTED' par défaut si on veut les voir d'emblée
-  const activeStatuses = statusParam !== null ? (statusParam ? statusParam.split(',') : []) : ['OPEN', 'SUGGESTED']
+  // Filtres Haut (Classique) et Bas (IA)
+  const [classicStatuses, setClassicStatuses] = useState<string[]>(['OPEN'])
+  const [aiStatuses, setAiStatuses] = useState<string[]>(['SUGGESTED'])
   
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'id_regroupment', direction: 'desc' })
-
-  const updateUrlParam = (key: string, value: string) => {
-    const newParams = new URLSearchParams(searchParams)
-    if (value) {
-      newParams.set(key, value)
-    } else {
-      newParams.delete(key)
-    }
-    setSearchParams(newParams)
-  }
-
-  const toggleStatusFilter = (targetStatus: string) => {
-    let newStatuses = [...activeStatuses]
-    if (activeStatuses.includes(targetStatus)) {
-      newStatuses = newStatuses.filter(s => s !== targetStatus)
-    } else {
-      newStatuses.push(targetStatus)
-    }
-    updateUrlParam('status', newStatuses.join(','))
-  }
 
   const loadData = () => {
     setLoading(true)
@@ -73,190 +46,176 @@ function RegroupementList() {
     loadData()
   }, [t])
 
-  // --- FONCTION DE DÉCLENCHEMENT IA ---
+  // --- ACTIONS IA ---
   const handleTriggerAi = async () => {
-    if (hasRunAi || isAiLoading) return;
-    
     setIsAiLoading(true);
-    toast.loading(t('regroupements.ai.loading', 'Analyse IA en cours... cela peut prendre quelques secondes.'), { id: 'ai-toast' });
-
+    toast.loading('Analyse IA en cours...', { id: 'ai-toast' });
     try {
       const response = await triggerAiClustering();
       const createdCount = response.data.suggested_groups_created || 0;
-      
-      setAiResultCount(createdCount);
-      setHasRunAi(true); // Bloque le bouton pour cette session
-      
-      toast.success(t('regroupements.ai.success', `Terminé ! ${createdCount} regroupement(s) suggéré(s).`), { id: 'ai-toast' });
-      
-      // Si l'IA a trouvé des choses, on rafraîchit le tableau et on active le filtre "SUGGESTED"
-      if (createdCount > 0) {
-        if (!activeStatuses.includes('SUGGESTED')) {
-           toggleStatusFilter('SUGGESTED');
-        }
-        loadData();
+      toast.success(`Terminé ! ${createdCount} regroupement(s) suggéré(s).`, { id: 'ai-toast' });
+      if (createdCount > 0 && !aiStatuses.includes('SUGGESTED')) {
+        setAiStatuses([...aiStatuses, 'SUGGESTED']);
       }
+      loadData();
     } catch (err: any) {
-      toast.error(t('regroupements.ai.error', 'Erreur IA : {{message}}', { message: err.message }), { id: 'ai-toast' });
+      toast.error(`Erreur IA : ${err.message}`, { id: 'ai-toast' });
     } finally {
       setIsAiLoading(false);
     }
   }
 
+  const handleValidateSuggestion = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation(); // Empêche le clic de rediriger vers les détails
+    try {
+      await validateAiSuggestion(id);
+      toast.success(`Regroupement #${id} validé !`);
+      loadData();
+    } catch (err: any) {
+      toast.error('Erreur lors de la validation.');
+    }
+  }
+
+  const handleRejectSuggestion = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    try {
+      await rejectAiSuggestion(id);
+      toast.success(`Suggestion #${id} rejetée.`);
+      loadData();
+    } catch (err: any) {
+      toast.error('Erreur lors du rejet.');
+    }
+  }
+
   const requestSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc'
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc'
-    }
+    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'
     setSortConfig({ key, direction })
   }
 
-  // Counters for StatCards
-  const openCount = regroupements.filter(r => r.status === 'OPEN').length
-  const closedCount = regroupements.filter(r => r.status === 'CLOSED').length
-  const suggestedCount = regroupements.filter(r => r.status === 'SUGGESTED').length
+  // --- SÉPARATION DES LISTES ---
+  const classicList = regroupements.filter(r => r.status === 'OPEN' || r.status === 'CLOSED');
+  const aiList = regroupements.filter(r => r.status === 'SUGGESTED' || r.status === 'REJECTED');
 
-  // Filtering
-  let filteredList = regroupements.filter((grp) => {
-    if (!activeStatuses.includes(grp.status)) return false
-    if (!searchQuery) return true
-    
-    const query = searchQuery.toLowerCase()
-    if (searchColumn === 'ALL') {
-      return Object.values(grp).some(val => String(val).toLowerCase().includes(query))
-    } else {
-      return String(grp[searchColumn] || '').toLowerCase().includes(query)
-    }
-  })
+  // Compteurs
+  const openCount = classicList.filter(r => r.status === 'OPEN').length;
+  const closedCount = classicList.filter(r => r.status === 'CLOSED').length;
+  const suggestedCount = aiList.filter(r => r.status === 'SUGGESTED').length;
+  const rejectedCount = aiList.filter(r => r.status === 'REJECTED').length;
 
-  // Sorting
-  filteredList.sort((a, b) => {
-    const key = sortConfig.key
-    let valA = a[key]
-    let valB = b[key]
-    if (key === 'id_regroupment' || key === 'ticket_count') {
-      return sortConfig.direction === 'asc' ? (valA || 0) - (valB || 0) : (valB || 0) - (valA || 0)
-    }
-    valA = String(valA || '').toLowerCase()
-    valB = String(valB || '').toLowerCase()
-    if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
-    if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
-    return 0
-  })
+  // Filtrage final
+  const visibleClassic = classicList.filter(r => classicStatuses.includes(r.status));
+  const visibleAi = aiList.filter(r => aiStatuses.includes(r.status));
 
-  const searchColumns = [
-    { value: 'ALL', label: t('dashboard.search.all_columns', 'All Columns') },
-    { value: 'id_regroupment', label: t('regroupements.table.id', 'ID') },
-    { value: 'title', label: t('dashboard.search.title', 'Title') },
-    { value: 'ssp_ticket', label: t('regroupements.table.ssp', 'SSP Ticket') },
-    { value: 'created_by', label: t('regroupements.table.creator', 'Creator') }
+  // Tri
+  const sortData = (list: any[]) => {
+    return [...list].sort((a, b) => {
+      const key = sortConfig.key
+      let valA = a[key]
+      let valB = b[key]
+      if (key === 'id_regroupment') return sortConfig.direction === 'asc' ? (valA || 0) - (valB || 0) : (valB || 0) - (valA || 0)
+      if (String(valA || '').toLowerCase() < String(valB || '').toLowerCase()) return sortConfig.direction === 'asc' ? -1 : 1
+      if (String(valA || '').toLowerCase() > String(valB || '').toLowerCase()) return sortConfig.direction === 'asc' ? 1 : -1
+      return 0
+    })
+  }
+
+  const toggleClassicStatus = (status: string) => {
+    setClassicStatuses(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status])
+  }
+  
+  const toggleAiStatus = (status: string) => {
+    setAiStatuses(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status])
+  }
+
+  // Colonnes Communes
+  const commonColumns: TableColumn<any>[] = [
+    { key: 'id_regroupment', label: 'ID', render: (item) => <span style={{ fontWeight: 'bold', color: '#0052cc' }}>#{item.id_regroupment}</span> },
+    { key: 'title', label: 'Title', render: (item) => <strong>{item.title}</strong> },
+    { key: 'created_by', label: 'Created By' },
+    { key: 'ticket_count', label: 'Issues' }
   ]
 
-  const tableColumns: TableColumn<any>[] = [
-    { 
-      key: 'id_regroupment', 
-      label: t('regroupements.table.id', 'ID'),
-      render: (item) => <span style={{ fontWeight: 'bold', color: '#0052cc' }}>#{item.id_regroupment}</span>
-    },
-    { key: 'title', label: t('dashboard.search.title', 'Title'), render: (item) => <strong>{item.title}</strong> },
-    { 
-      key: 'status', 
-      label: t('dashboard.search.status', 'Status'),
-      render: (item) => {
-        let bg = '#deebff';
-        let color = '#0052cc';
-        if (item.status === 'CLOSED') { bg = '#dfe1e6'; color = '#42526e'; }
-        if (item.status === 'SUGGESTED') { bg = '#eae6ff'; color = '#403294'; } // Violet pour l'IA
-        
-        return (
-          <span style={{ background: bg, color: color, padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
-            {item.status}
-          </span>
-        )
-      }
-    },
-    { 
-      key: 'ssp_ticket', 
-      label: t('regroupements.table.ssp', 'SSP Ticket'),
-      render: (item) => item.ssp_ticket ? (
-        <span style={{ background: '#e3fcef', color: '#006644', padding: '2px 8px', borderRadius: '4px', fontSize: '12px' }}>
-          {item.ssp_ticket}
-        </span>
-      ) : <span style={{ color: '#a5adba' }}>-</span>
-    },
-    { key: 'created_by', label: t('regroupements.table.creator', 'Created By') },
-    { key: 'created_on', label: t('dashboard.table.date', 'Date') },
-    { key: 'ticket_count', label: t('regroupements.table.issues', 'Issues') }
+  const classicColumns: TableColumn<any>[] = [
+    ...commonColumns,
+    { key: 'status', label: 'Status', render: (item) => (
+      <span style={{ background: item.status === 'CLOSED' ? '#dfe1e6' : '#deebff', color: item.status === 'CLOSED' ? '#42526e' : '#0052cc', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
+        {item.status}
+      </span>
+    )}
   ]
 
-  if (loading) return <p style={{ padding: '40px', textAlign: 'center' }}>{t('common.loading', 'Loading data...')}</p>
+  const aiColumns: TableColumn<any>[] = [
+    ...commonColumns,
+    { key: 'status', label: 'Status', render: (item) => (
+      <span style={{ background: item.status === 'REJECTED' ? '#ffebe6' : '#eae6ff', color: item.status === 'REJECTED' ? '#bf2600' : '#403294', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
+        {item.status}
+      </span>
+    )},
+    { key: 'actions', label: 'Actions', render: (item) => (
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {item.status === 'SUGGESTED' && (
+            <>
+              <button onClick={(e) => handleValidateSuggestion(e, item.id_regroupment)} style={{ background: '#e3fcef', color: '#006644', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}>✅ Accepter</button>
+              <button onClick={(e) => handleRejectSuggestion(e, item.id_regroupment)} style={{ background: '#ffebe6', color: '#bf2600', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}>❌ Refuser</button>
+            </>
+          )}
+          {item.status === 'REJECTED' && (
+            <button onClick={(e) => handleValidateSuggestion(e, item.id_regroupment)} style={{ background: '#deebff', color: '#0052cc', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer' }}>↺ Ré-accepter</button>
+          )}
+        </div>
+      )
+    }
+  ]
+
+  if (loading) return <p style={{ padding: '40px', textAlign: 'center' }}>Loading data...</p>
 
   return (
     <div className={styles.container}>
+      {/* 1. BLOC CLASSIQUE */}
       <div className={styles.header}>
-        <h1 className={styles.title}>{t('regroupements.title', 'Regroupements Dashboard')}</h1>
-        <span className={styles.count}>
-          {filteredList.length} {t('dashboard.visible', 'visible(s)')}
-        </span>
+        <h1 className={styles.title}>Dashboard Regroupements</h1>
+        <button className={styles.createBtn} onClick={() => navigate('/regroupements/new')}>📁 Créer Manuel</button>
+      </div>
+      <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+        <StatCard label="Open" count={openCount} color="#0052cc" isActive={classicStatuses.includes('OPEN')} onClick={() => toggleClassicStatus('OPEN')} />
+        <StatCard label="Closed" count={closedCount} color="#42526e" isActive={classicStatuses.includes('CLOSED')} onClick={() => toggleClassicStatus('CLOSED')} />
+      </div>
+      <GenericTable 
+        columns={classicColumns} data={sortData(visibleClassic)} 
+        sortConfig={sortConfig} onSort={requestSort} 
+        onRowClick={(item) => navigate(`/regroupements/${item.id_regroupment}`)} 
+        rowKey={(item) => item.id_regroupment}
+      />
+
+      <hr style={{ margin: '50px 0', border: '1px solid #dfe1e6' }} />
+
+      {/* 2. BLOC IA / AIOps */}
+      <div className={styles.header} style={{ justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <h2 className={styles.title} style={{ color: '#403294' }}>✨ AIOps Suggestions</h2>
+        </div>
+        <button className={styles.aiBtn} onClick={handleTriggerAi} disabled={isAiLoading}>
+          {isAiLoading ? '⏳ Analyse en cours...' : '✨ Générer Nouvelles Suggestions'}
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-        <StatCard label={t('regroupements.status.open', 'Open')} count={openCount} color="#0052cc" isActive={activeStatuses.includes('OPEN')} onClick={() => toggleStatusFilter('OPEN')} />
-        <StatCard label={t('regroupements.status.closed', 'Closed')} count={closedCount} color="#42526e" isActive={activeStatuses.includes('CLOSED')} onClick={() => toggleStatusFilter('CLOSED')} />
-        <StatCard label="Suggested (AI)" count={suggestedCount} color="#6554C0" isActive={activeStatuses.includes('SUGGESTED')} onClick={() => toggleStatusFilter('SUGGESTED')} />
+        <StatCard label="Suggested" count={suggestedCount} color="#403294" isActive={aiStatuses.includes('SUGGESTED')} onClick={() => toggleAiStatus('SUGGESTED')} />
+        <StatCard label="Refused" count={rejectedCount} color="#bf2600" isActive={aiStatuses.includes('REJECTED')} onClick={() => toggleAiStatus('REJECTED')} />
       </div>
 
-      <div className={styles.actionBar}>
-        <SearchBar 
-          columns={searchColumns} 
-          searchColumn={searchColumn} 
-          onColumnChange={(val) => updateUrlParam('column', val)}
-          searchQuery={searchQuery}
-          onSearchChange={(val) => updateUrlParam('search', val)}
-          placeholder={t('dashboard.search.placeholder', 'Search...')}
-        />
-
-        <div style={{ display: 'flex', gap: '10px' }}>
-          {/* BOUTON IA */}
-          <button 
-            className={styles.aiBtn} 
-            onClick={handleTriggerAi}
-            disabled={isAiLoading || hasRunAi}
-          >
-            {isAiLoading ? '⏳ Analyse...' : '✨ Suggest AI'}
-          </button>
-
-          <button className={styles.createBtn} onClick={() => navigate('/regroupements/new')}>
-            📁 {t('regroupements.create_button', 'Create Regroupement')}
-          </button>
-        </div>
-      </div>
-
-      {filteredList.length === 0 ? (
+      {visibleAi.length === 0 ? (
         <div className={styles.emptyState}>
-          <h3>{t('dashboard.empty_state', 'No matching results found')}</h3>
+          <p>Aucune suggestion IA à afficher.</p>
         </div>
       ) : (
         <GenericTable 
-          columns={tableColumns} 
-          data={filteredList} 
-          sortConfig={sortConfig} 
-          onSort={requestSort} 
+          columns={aiColumns} data={sortData(visibleAi)} 
+          sortConfig={sortConfig} onSort={requestSort} 
           onRowClick={(item) => navigate(`/regroupements/${item.id_regroupment}`)} 
           rowKey={(item) => item.id_regroupment}
         />
-      )}
-
-      {/* PANNEAU DE RÉSULTAT IA AFFICHÉ EN BAS APRÈS L'EXÉCUTION */}
-      {hasRunAi && aiResultCount !== null && (
-        <div className={styles.aiResultPanel}>
-          <h3 className={styles.aiResultTitle}>✨ Analyse IA Terminée</h3>
-          {aiResultCount > 0 ? (
-            <p>L'IA a détecté <strong>{aiResultCount}</strong> nouvelle(s) corrélation(s). Les groupes ont été créés avec le statut <strong>SUGGESTED</strong> et sont visibles dans le tableau ci-dessus.</p>
-          ) : (
-            <p>L'IA a analysé les tickets ouverts mais n'a trouvé aucune forte corrélation technique à regrouper pour le moment.</p>
-          )}
-        </div>
       )}
     </div>
   )

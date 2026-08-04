@@ -72,5 +72,5 @@ export const validateAiSuggestion = async (id: number) => {
 }
 
 export const rejectAiSuggestion = async (id: number) => {
-  return await axios.delete(`${API_BASE_URL}/regroupements/${id}/reject-suggestion`, { headers: getAuthHeaders() })
+  return await axios.put(`${API_BASE_URL}/regroupements/${id}/reject-suggestion`, {}, { headers: getAuthHeaders() })
 }
