@@ -201,7 +201,7 @@ function RegroupementList() {
       {/* ======================= */}
       {/* 1. BLOC CLASSIQUE       */}
       {/* ======================= */}
-      <div className={styles.header} style={{ justifyContent: 'space-between' }}>
+      <div className={styles.header}>
         <h1 className={styles.title}>{t('regroupements.classic_dashboard', 'Classic Regroupements Dashboard')}</h1>
       </div>
 
@@ -236,11 +236,8 @@ function RegroupementList() {
       {/* ======================= */}
       {/* 2. BLOC IA / AIOps      */}
       {/* ======================= */}
-      <div className={styles.header} style={{ justifyContent: 'space-between' }}>
+      <div className={styles.header}>
         <h2 className={styles.title} style={{ color: '#403294' }}>✨ {t('regroupements.ai_dashboard', 'AIOps Suggestions')}</h2>
-        <button className={styles.aiBtn} onClick={handleTriggerAi} disabled={isAiLoading}>
-          {isAiLoading ? `⏳ ${t('regroupements.ai.analyzing', 'Analysis in progress...')}` : `✨ ${t('regroupements.generate_ai', 'Generate New Suggestions')}`}
-        </button>
       </div>
 
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
@@ -257,6 +254,9 @@ function RegroupementList() {
           onSearchChange={(val) => updateUrlParam('aiSearch', val)}
           placeholder={t('dashboard.search.placeholder_ai', 'Search in AI suggestions...')}
         />
+        <button className={styles.aiBtn} onClick={handleTriggerAi} disabled={isAiLoading}>
+          {isAiLoading ? `⏳ ${t('regroupements.ai.analyzing', 'Analysis in progress...')}` : `✨ ${t('regroupements.generate_ai', 'Generate New Suggestions')}`}
+        </button>
       </div>
 
       {visibleAi.length === 0 ? (
@@ -276,3 +276,4 @@ function RegroupementList() {
 }
 
 export default RegroupementList
+
