@@ -51,7 +51,7 @@ def generate_suggested_regroupements(creator_id: str):
         STRICT RULES:
         - A group MUST contain AT LEAST 2 tickets.
         - Only create a group if the technical correlation is strong and highly probable.
-        - The "title" and "reasoning" MUST be in French.
+        - The "title" and "reasoning" MUST be in English.
         - Do not output any markdown formatting (e.g., do not use ```json). Output RAW JSON only.
 
         MANDATORY RESPONSE FORMAT (Strict JSON):
