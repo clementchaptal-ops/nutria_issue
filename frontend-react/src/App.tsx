@@ -14,31 +14,29 @@ import RegroupementForm from './pages/RegroupementForm'
 import RegroupementDetail from './pages/RegroupementDetail'
 import { Toaster, toast } from 'react-hot-toast' 
 
-function App() {
 
-  useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (error.response && error.response.status === 401) {
-          localStorage.removeItem('nutria_token')
-          localStorage.removeItem('nutria_user')
-          
-          toast.error(
-            i18next.t('auth.session_expired', 'Your session has expired, please log in again.'), 
-            { id: 'session-expired' }
-          )
-          
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login'
-          }
-        }
-        return Promise.reject(error)
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('nutria_token')
+      localStorage.removeItem('nutria_user')
+      
+      toast.error(
+        i18next.t('auth.session_expired', 'Your session has expired, please log in again.'), 
+        { id: 'session-expired' }
+      )
+      
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
       }
-    )
+    }
+    return Promise.reject(error)
+  }
+)
 
-    return () => axios.interceptors.response.eject(interceptor)
-  }, [])
+function App() {
+  // Le useEffect a été supprimé ici car l'intercepteur est géré globalement plus haut !
 
   return (
     <BrowserRouter>

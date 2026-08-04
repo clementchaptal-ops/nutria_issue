@@ -1,5 +1,5 @@
 import React from 'react'
-import styles from '../pages/Dashboard.module.css'
+import styles from './SearchBar.module.css'
 
 type ColumnOption = { value: string; label: string }
 
