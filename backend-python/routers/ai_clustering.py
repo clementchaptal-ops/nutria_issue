@@ -68,7 +68,7 @@ def generate_suggested_regroupements():
 
         # --- 3. Appel de génération via Vertex AI en passant directement l'URI GCS ---
         parts_for_gemini = [
-            types.Part.from_uri(file_uri=gcs_uri, mime_type="application/json"),
+            types.Part.from_uri(file_uri=gcs_uri, mime_type="text/plain"), 
             types.Part.from_text(text=prompt)
         ]
 
