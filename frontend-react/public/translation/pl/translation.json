@@ -1,6 +1,9 @@
 {
   "app_title": "NUTRIA – Sfinalizuj raport",
   "loading": "Trwa bezpieczne połączenie z LabWare...",
+  "admin": {
+    "access_denied": "Odmowa dostępu: moduł zarezerwowany dla administratorów."
+  },
   "error": {
     "no_id": "Nie znaleziono identyfikatora biletu w adresie URL.",
     "not_found": "Nie można znaleźć tego biletu wstępnego",
@@ -17,7 +20,18 @@
     "description": "Opis",
     "ssp_ticket": "Numer biletu SSP (opcjonalnie)",
     "ssp_help": "Wystarczy wpisać numer, link zostanie wygenerowany automatycznie.",
-    "missing_fields": "Proszę wypełnić wszystkie wymagane pola."
+    "missing_fields": "Proszę wypełnić wszystkie wymagane pola.",
+    "attachments_label": "Załączniki (zdjęcia, filmy, dokumenty)",
+    "drag_drop_text": "Przeciągnij i upuść pliki tutaj lub kliknij, aby przeglądać",
+    "browse_files": "Przeglądaj pliki",
+    "paste_tip": "Wskazówka: możesz także wkleić zrzuty ekranu bezpośrednio, używając Ctrl+V.",
+    "files_already_saved": "📁 {{count}} plików już zapisanych:",
+    "unknown_file": "Nieznany plik",
+    "saved_badge": "(Zapisano)",
+    "files_ready_upload": "📎 {{count}} nowych plików gotowych do przesłania:",
+    "remove_file": "Usuń ten plik",
+    "size_alert": "⚠️ Pliki ({{count}}) zostały zignorowane, ponieważ przekraczają limit 50 MB.",
+    "duplicate_alert": "⚠️ {{count}} plików zignorowanych (już dołączonych lub identycznych)."
   },
   "issues": {
     "SLOW": "Powolność aplikacji (WOLNA)",
@@ -60,6 +74,7 @@
     "go_to_dashboard": "Przejdź do Panelu",
     "dashboard_btn": "Panel",
     "regroupements_btn": "Przegrupowania",
+    "audit_logs_btn": "Dzienniki audytu",
     "logout_btn": "Wyloguj się"
   },
   "login": {
@@ -67,6 +82,9 @@
     "choose_profile": "Wykryto wiele profili LIMS. Proszę wybrać jeden:",
     "back": "Z powrotem",
     "instructions": "Aby uzyskać dostęp do platformy, zaloguj się na swoje konto Mérieux NutriSciences.",
+    "loading": "Załadunek...",
+    "signin_with": "Zaloguj się za pomocą Google",
+    "success": "Witamy {{name}}!",
     "error": {
       "auth_denied": "Odmowa uwierzytelnienia",
       "server_fail": "Nie można połączyć się z serwerem Nutria.",
@@ -79,6 +97,12 @@
     "visible": "widoczne",
     "empty_state": "Nie znaleziono pasujących biletów",
     "create_button": "Utwórz bilet wstępny",
+    "status": {
+      "preticket": "Bilety wstępu",
+      "in_progress": "W toku",
+      "act_knowledge": "Działaj Wiedzę",
+      "closed": "Zamknięte"
+    },
     "search": {
       "placeholder": "Szukaj...",
       "all_columns": "Wszystkie kolumny",
@@ -88,6 +112,8 @@
       "issue_type": "Typ problemu",
       "username": "Nazwa użytkownika",
       "fullname": "Pełne imię i nazwisko",
+      "criticity": "Krytyka",
+      "env": "Środowisko",
       "location": "Lokalizacja",
       "date": "Data"
     },
@@ -99,11 +125,14 @@
     },
     "table": {
       "id": "ID",
+      "group": "Grupa",
       "title": "Tytuł",
       "status": "Status",
       "type": "Typ",
       "username": "Nazwa użytkownika",
       "fullname": "Pełne imię i nazwisko",
+      "criticity": "Krytyka",
+      "env": "Środowisko",
       "location": "Lokalizacja",
       "date": "Data"
     }
@@ -120,7 +149,10 @@
     "resolve_success": "Zgłoszenie pomyślnie rozwiązane.",
     "close_success": "Bilet został pomyślnie zamknięty.",
     "current_status": "Aktualny stan:",
+    "lims_id": "Identyfikator LIMS:",
+    "reported_by": "Zgłoszone przez",
     "resolve": "Rozstrzygać",
+    "act_knowledge": "Działaj Wiedzę",
     "close": "Zamknąć",
     "edit": "Redagować",
     "cancel": "Anuluj bilet",
@@ -130,7 +162,14 @@
     "ssp_ticket": "Link do biletu SSP (opcjonalnie)",
     "issue_type": "Typ problemu",
     "criticity": "Krytyka",
+    "criticity_low": "NISKI",
+    "criticity_medium": "ŚREDNI",
+    "criticity_high": "WYSOKI",
     "frequency": "Częstotliwość",
+    "frequency_one_time": "JEDEN_CZAS",
+    "frequency_low": "NISKI",
+    "frequency_medium": "ŚREDNI",
+    "frequency_high": "WYSOKI",
     "blocking_issue": "Problem z blokowaniem?",
     "description": "Opis",
     "attachments": "Załączniki",
@@ -139,18 +178,24 @@
     "download_logs": "Dzienniki systemowe",
     "submit_create": "Utwórz bilet",
     "submit_update": "Prześlij i zaktualizuj bilet",
+    "existing_files": "Załączniki do biletów",
+    "unknown_file": "Nieznany_plik",
+    "click_to_watch": "Kliknij, aby obejrzeć wideo",
+    "watch": "Oglądać:",
     "download_video": "Kliknij tutaj, aby pobrać wideo",
     "discussion": "Dyskusja",
     "no_comments": "Na razie bez komentarza",
     "type_comment": "Wpisz tutaj swój komentarz...",
     "button_send": "Wysłać",
-    "existing_files": "Załączniki do biletów",
+    "lightbox_preview": "Powiększony podgląd",
     "confirm_delete_file": "Czy na pewno chcesz usunąć ten plik?",
     "success": {
       "file_deleted": "Plik został pomyślnie usunięty."
     },
     "error": {
       "fetch": "Błąd podczas ładowania danych biletu.",
+      "fetch_failed": "Nie udało się pobrać biletu",
+      "download_impossible": "Pobieranie niemożliwe",
       "upload_attachments": "Tekst został zapisany, ale nie można przesłać plików.",
       "submit_failed": "Podczas przesyłania wystąpił błąd.",
       "network_cancel": "Błąd sieci podczas anulowania biletu.",
@@ -172,6 +217,8 @@
     "no_attachments": "Brak przesłanych załączników.",
     "link_issues": "Połącz istniejące problemy",
     "no_issues_available": "Brak dostępnych niepowiązanych problemów.",
+    "created_by_info": "Utworzony przez {{user}} w dniu {{date}}",
+    "group_id_badge": "GRUPA",
     "error": {
       "load_failed": "Nie udało się wczytać szczegółów przegrupowania.",
       "close_failed": "Nie udało się zamknąć przegrupowania.",
@@ -186,6 +233,7 @@
       "role": "Rola:",
       "lab": "Laboratorium:",
       "location": "Lokalizacja:",
+      "env": "Środowisko:",
       "email": "E-mail:",
       "created_on": "Utworzono:"
     },
@@ -218,6 +266,10 @@
       "details": "Bliższe dane",
       "ip": "Adres IP"
     },
-    "empty": "Nie znaleziono logów."
+    "empty": "Nie znaleziono logów.",
+    "error": {
+      "fetch_failed": "Błąd podczas pobierania dzienników kontrolnych.",
+      "invalid_format": "Nieprawidłowy format odpowiedzi z serwera."
+    }
   }
 }

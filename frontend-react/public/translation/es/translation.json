@@ -1,6 +1,9 @@
 {
   "app_title": "NUTRIA - Finalizar el informe",
   "loading": "Conexión segura con LabWare en curso...",
+  "admin": {
+    "access_denied": "Acceso denegado: Módulo reservado para administradores."
+  },
   "error": {
     "no_id": "No se encontró ningún ID de ticket en la URL.",
     "not_found": "No se puede encontrar este billete previo",
@@ -17,7 +20,18 @@
     "description": "Descripción",
     "ssp_ticket": "Número de billete SSP (opcional)",
     "ssp_help": "Simplemente ingrese el número, el enlace se generará automáticamente.",
-    "missing_fields": "Por favor complete todos los campos requeridos."
+    "missing_fields": "Por favor complete todos los campos requeridos.",
+    "attachments_label": "Adjuntos (Fotos, Videos, Documentos)",
+    "drag_drop_text": "Arrastre y suelte sus archivos aquí o haga clic para explorar",
+    "browse_files": "Explorar archivos",
+    "paste_tip": "Consejo: También puedes pegar capturas de pantalla directamente usando Ctrl+V.",
+    "files_already_saved": "📁 {{count}} archivo(s) ya guardado(s):",
+    "unknown_file": "Archivo desconocido",
+    "saved_badge": "(Guardado)",
+    "files_ready_upload": "📎 {{count}} archivo(s) nuevo(s) listo(s) para cargar:",
+    "remove_file": "Eliminar este archivo",
+    "size_alert": "⚠️ {{count}} archivo(s) ignorados porque exceden el límite de 50 MB.",
+    "duplicate_alert": "⚠️ {{count}} archivo(s) ignorados (ya adjuntos o idénticos)."
   },
   "issues": {
     "SLOW": "Lentitud de la aplicación (LENTA)",
@@ -60,6 +74,7 @@
     "go_to_dashboard": "Ir al panel",
     "dashboard_btn": "Panel",
     "regroupements_btn": "Reagrupaciones",
+    "audit_logs_btn": "Registros de auditoría",
     "logout_btn": "Cerrar sesión"
   },
   "login": {
@@ -67,6 +82,9 @@
     "choose_profile": "Se detectaron múltiples perfiles LIMS. Por favor elige uno:",
     "back": "Atrás",
     "instructions": "Inicie sesión con su cuenta de Mérieux NutriSciences para acceder a la plataforma.",
+    "loading": "Cargando...",
+    "signin_with": "Iniciar sesión con Google",
+    "success": "¡Bienvenido {{nombre}}!",
     "error": {
       "auth_denied": "Autenticación denegada",
       "server_fail": "No se puede conectar con el servidor Nutria.",
@@ -79,6 +97,12 @@
     "visible": "visibles",
     "empty_state": "No se encontraron entradas coincidentes",
     "create_button": "Crear un boleto previo",
+    "status": {
+      "preticket": "Entradas previas",
+      "in_progress": "En curso",
+      "act_knowledge": "Actuar conocimiento",
+      "closed": "Cerrado"
+    },
     "search": {
       "placeholder": "Buscar...",
       "all_columns": "Todas las columnas",
@@ -88,6 +112,8 @@
       "issue_type": "Tipo de problema",
       "username": "Nombre de usuario",
       "fullname": "Nombre completo",
+      "criticity": "Criticidad",
+      "env": "Ambiente",
       "location": "Ubicación",
       "date": "Fecha"
     },
@@ -99,11 +125,14 @@
     },
     "table": {
       "id": "IDENTIFICACIÓN",
+      "group": "Grupo",
       "title": "Título",
       "status": "Estado",
       "type": "Tipo",
       "username": "Nombre de usuario",
       "fullname": "Nombre completo",
+      "criticity": "Criticidad",
+      "env": "Ambiente",
       "location": "Ubicación",
       "date": "Fecha"
     }
@@ -120,7 +149,10 @@
     "resolve_success": "Ticket resuelto exitosamente.",
     "close_success": "Ticket cerrado exitosamente.",
     "current_status": "Estado actual:",
+    "lims_id": "ID LIMS:",
+    "reported_by": "Reportado por",
     "resolve": "Resolver",
+    "act_knowledge": "Actuar conocimiento",
     "close": "Cerca",
     "edit": "Editar",
     "cancel": "Cancelar billete",
@@ -130,7 +162,14 @@
     "ssp_ticket": "Enlace de ticket SSP (opcional)",
     "issue_type": "Tipo de problema",
     "criticity": "Criticidad",
+    "criticity_low": "BAJO",
+    "criticity_medium": "MEDIO",
+    "criticity_high": "ALTO",
     "frequency": "Frecuencia",
+    "frequency_one_time": "UNA_VEZ",
+    "frequency_low": "BAJO",
+    "frequency_medium": "MEDIO",
+    "frequency_high": "ALTO",
     "blocking_issue": "¿Problema de bloqueo?",
     "description": "Descripción",
     "attachments": "Adjuntos",
@@ -139,18 +178,24 @@
     "download_logs": "Registros del sistema",
     "submit_create": "Crear billete",
     "submit_update": "Enviar y actualizar ticket",
+    "existing_files": "Adjuntos de boletos",
+    "unknown_file": "Archivo_desconocido",
+    "click_to_watch": "Haga clic para ver el vídeo",
+    "watch": "Mirar:",
     "download_video": "Haga clic aquí para descargar el vídeo",
     "discussion": "Discusión",
     "no_comments": "Sin comentarios por el momento.",
     "type_comment": "Escribe tu comentario aquí...",
     "button_send": "Enviar",
-    "existing_files": "Adjuntos de boletos",
+    "lightbox_preview": "Vista previa ampliada",
     "confirm_delete_file": "¿Está seguro de que desea eliminar este archivo?",
     "success": {
       "file_deleted": "Archivo eliminado exitosamente."
     },
     "error": {
       "fetch": "Error al cargar los datos del ticket.",
+      "fetch_failed": "No se pudo recuperar el boleto",
+      "download_impossible": "Descargar imposible",
       "upload_attachments": "Texto guardado, pero no se pudieron cargar los archivos.",
       "submit_failed": "Se produjo un error durante el envío.",
       "network_cancel": "Error de red al cancelar el billete.",
@@ -172,6 +217,8 @@
     "no_attachments": "No se han subido archivos adjuntos.",
     "link_issues": "Vincular problemas existentes",
     "no_issues_available": "No hay problemas desvinculados disponibles.",
+    "created_by_info": "Creado por {{user}} el {{date}}",
+    "group_id_badge": "GRUPO",
     "error": {
       "load_failed": "No se pudieron cargar los detalles del reagrupamiento.",
       "close_failed": "No se pudo cerrar el reagrupamiento.",
@@ -186,6 +233,7 @@
       "role": "Role:",
       "lab": "Laboratorio:",
       "location": "Ubicación:",
+      "env": "Ambiente:",
       "email": "Correo electrónico:",
       "created_on": "Creado el:"
     },
@@ -218,6 +266,10 @@
       "details": "Detalles",
       "ip": "Dirección IP"
     },
-    "empty": "No se encontraron registros."
+    "empty": "No se encontraron registros.",
+    "error": {
+      "fetch_failed": "Error al recuperar los registros de auditoría.",
+      "invalid_format": "Formato de respuesta no válido del servidor."
+    }
   }
 }
