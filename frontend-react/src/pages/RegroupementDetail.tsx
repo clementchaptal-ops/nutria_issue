@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 import { openSafeUrl } from '../utils/security';
 import FileUploader from '../components/FileUploader'
+import { showConfirmToast } from '../components/Notifications' // <-- Nouvel import !
 import { 
   fetchRegroupement, 
   closeRegroupement, 
@@ -71,8 +72,8 @@ function RegroupementDetail() {
     loadData()
   }, [regroupementId])
 
-  const handleClose = async () => {
-    if (!window.confirm(t('regroupements.confirm_close', 'Are you sure you want to close this regroupement?'))) return
+  // --- NOUVEAU : Fermeture du regroupement avec Toast ---
+  const executeCloseRegroupement = async () => {
     try {
       await closeRegroupement(regroupementId)
       toast.success(t('regroupements.closed_success', 'Regroupement closed successfully!'))
@@ -80,6 +81,15 @@ function RegroupementDetail() {
     } catch (err) {
       toast.error(t('regroupements.error.close_failed', 'Failed to close regroupement.'))
     }
+  }
+
+  const handleClose = () => {
+    showConfirmToast({
+      message: t('regroupements.confirm_close', 'Are you sure you want to close this regroupement?'),
+      confirmText: t('common.yes_confirm', 'Yes, confirm'),
+      cancelText: t('common.no_cancel', 'No, cancel'),
+      onConfirm: executeCloseRegroupement
+    })
   }
 
   // Save changes handler
@@ -103,8 +113,8 @@ function RegroupementDetail() {
     }
   }
 
-  const handleDeleteAttachment = async (filename: string) => {
-    if (!window.confirm(t('ticket.confirm_delete_file', 'Are you sure you want to delete this file?'))) return
+  // --- NOUVEAU : Suppression de pièce jointe avec Toast ---
+  const executeDeleteAttachment = async (filename: string) => {
     try {
       await deleteRegroupementAttachment(regroupementId, filename)
       toast.success(t('ticket.success.file_deleted', 'File deleted successfully.'))
@@ -112,6 +122,15 @@ function RegroupementDetail() {
     } catch (err) {
       toast.error(t('ticket.error.network_delete', 'Error deleting file.'))
     }
+  }
+
+  const handleDeleteAttachment = (filename: string) => {
+    showConfirmToast({
+      message: t('ticket.confirm_delete_file', 'Are you sure you want to delete this file?'),
+      confirmText: t('common.yes_confirm', 'Yes, confirm'),
+      cancelText: t('common.no_cancel', 'No, cancel'),
+      onConfirm: () => executeDeleteAttachment(filename)
+    })
   }
 
   const handlePostComment = async () => {

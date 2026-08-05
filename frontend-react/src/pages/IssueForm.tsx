@@ -5,7 +5,8 @@ import FileUploader from '../components/FileUploader'
 import toast from 'react-hot-toast'
 import styles from './IssueForm.module.css'
 import axios from 'axios'
-import { openSafeUrl } from '../utils/security';
+import { openSafeUrl } from '../utils/security'
+import { showConfirmToast } from '../components/Notifications'
 
 const getDecodedToken = () => {
   const token = localStorage.getItem('nutria_token');
@@ -16,31 +17,6 @@ const getDecodedToken = () => {
     return null;
   }
 };
-
-const showConfirmToast = (message: string, confirmText: string, cancelText: string, onConfirm: () => void) => {
-  toast((t) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      <span style={{ fontSize: '14px', fontWeight: 500 }}>{message}</span>
-      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-        <button
-          onClick={() => toast.dismiss(t.id)}
-          style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid #ccc', background: '#fff', cursor: 'pointer', fontSize: '12px' }}
-        >
-          {cancelText}
-        </button>
-        <button
-          onClick={() => {
-            toast.dismiss(t.id)
-            onConfirm()
-          }}
-          style={{ padding: '4px 10px', borderRadius: '4px', border: 'none', background: '#de350b', color: '#fff', fontWeight: 'bold', cursor: 'pointer', fontSize: '12px' }}
-        >
-          {confirmText}
-        </button>
-      </div>
-    </div>
-  ), { duration: 6000 })
-}
 
 function IssueForm() {
   const { t } = useTranslation()
@@ -355,12 +331,12 @@ function IssueForm() {
   }
 
   const handleCancelTicket = () => {
-    showConfirmToast(
-      t('ticket.confirm_cancel', 'Are you sure you want to cancel this ticket? This action cannot be undone.'), 
-      t('common.yes_confirm', 'Yes, confirm'), 
-      t('common.no_cancel', 'No, cancel'), 
-      executeCancelTicket
-    )
+    showConfirmToast({
+      message: t('ticket.confirm_cancel', 'Are you sure you want to cancel this ticket? This action cannot be undone.'), 
+      confirmText: t('common.yes_confirm', 'Yes, confirm'), 
+      cancelText: t('common.no_cancel', 'No, cancel'), 
+      onConfirm: executeCancelTicket
+    })
   }
 
   const executeCloseTicket = async (targetStatus: 'ACT KNOWLEDGE' | 'CLOSED') => {
@@ -389,12 +365,12 @@ function IssueForm() {
       ? t('ticket.confirm_resolve', 'Are you sure you want to acknowledge this ticket?')
       : t('ticket.confirm_close', 'Are you sure you want to close this ticket?');
     
-    showConfirmToast(
-      confirmMessage, 
-      t('common.yes_confirm', 'Yes, confirm'), 
-      t('common.no_cancel', 'No, cancel'), 
-      () => executeCloseTicket(targetStatus)
-    )
+    showConfirmToast({
+      message: confirmMessage, 
+      confirmText: t('common.yes_confirm', 'Yes, confirm'), 
+      cancelText: t('common.no_cancel', 'No, cancel'), 
+      onConfirm: () => executeCloseTicket(targetStatus)
+    })
   }
 
   const executeDeleteAttachment = async (filename: string) => {
@@ -412,12 +388,12 @@ function IssueForm() {
   }
 
   const handleDeleteAttachment = (filename: string) => {
-    showConfirmToast(
-      t('ticket.confirm_delete_file', 'Are you sure you want to delete this file?'), 
-      t('common.yes_confirm', 'Yes, confirm'), 
-      t('common.no_cancel', 'No, cancel'), 
-      () => executeDeleteAttachment(filename)
-    )
+    showConfirmToast({
+      message: t('ticket.confirm_delete_file', 'Are you sure you want to delete this file?'), 
+      confirmText: t('common.yes_confirm', 'Yes, confirm'), 
+      cancelText: t('common.no_cancel', 'No, cancel'), 
+      onConfirm: () => executeDeleteAttachment(filename)
+    })
   };
 
   const handleCancelEdit = () => {

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import toast from 'react-hot-toast'
 
 interface FileUploaderProps {
   files?: File[]; 
@@ -37,12 +38,12 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
       }
     });
 
-    // Affichage des alertes i18n si des fichiers sont rejetés
+    // Affichage des alertes i18n si des fichiers sont rejetés (remplacement de alert par toast.error)
     if (tooLargeCount > 0) {
-      alert(t('form.size_alert', `⚠️ ${tooLargeCount} file(s) ignored because they exceed the 50 MB limit.`));
+      toast.error(t('form.size_alert', `⚠️ ${tooLargeCount} file(s) ignored because they exceed the 50 MB limit.`));
     }
     if (duplicateCount > 0) {
-      alert(t('form.duplicate_alert', `⚠️ ${duplicateCount} file(s) ignored (already attached or identical).`));
+      toast.error(t('form.duplicate_alert', `⚠️ ${duplicateCount} file(s) ignored (already attached or identical).`));
     }
 
     onFilesChange(updatedFiles);
