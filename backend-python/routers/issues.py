@@ -16,9 +16,6 @@ from .audit import log_user_action
 
 
 
-BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
-
-
 # =====================================================================
 # 1. STATIC ROUTES
 # =====================================================================
