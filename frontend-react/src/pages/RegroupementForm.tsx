@@ -13,9 +13,8 @@ function RegroupementForm() {
   const [loading, setLoading] = useState(false)
   
   const [availableIssues, setAvailableIssues] = useState<any[]>([])
-  const [searchQuery, setSearchQuery] = useState('') // NOUVEAU: État pour la recherche
+  const [searchQuery, setSearchQuery] = useState('')
   
-  // Attachments state
   const [attachments, setAttachments] = useState<File[]>([])
 
   const [formData, setFormData] = useState({
@@ -27,8 +26,9 @@ function RegroupementForm() {
 
   useEffect(() => {
     fetchAllIssues()
-      .then(res => {
-        const issuesToLink = (res.data || []).filter((i: any) => 
+      .then(data => {
+        const issueList = Array.isArray(data) ? data : (data.data || []);
+        const issuesToLink = issueList.filter((i: any) => 
           !['CLOSED', 'CANCELED'].includes(i.status) && !i.id_regroupment
         )
         setAvailableIssues(issuesToLink)
@@ -56,11 +56,9 @@ function RegroupementForm() {
 
     setLoading(true)
     try {
-      // 1. Create regroupement
       const response = await createRegroupement(formData)
       const newRegroupementId = response.data.id_regroupment
       
-      // 2. Upload attachments if present
       if (attachments.length > 0 && newRegroupementId) {
         const uploadData = new FormData()
         attachments.forEach((file) => uploadData.append('files', file))
@@ -73,7 +71,6 @@ function RegroupementForm() {
       }
 
       toast.success(t('regroupements.success_created', 'Regroupement created successfully!'))
-      // 3. Redirect to detail view
       navigate(`/regroupements/${newRegroupementId}`)
     } catch (error: any) {
       toast.error(t('common.error_detail', 'Error: {{detail}}', { detail: error.message || 'An error occurred' }))
@@ -81,7 +78,6 @@ function RegroupementForm() {
     }
   }
 
-  // NOUVEAU: Filtrage dynamique basé sur la recherche (par ID ou par titre)
   const filteredIssues = availableIssues.filter(issue => {
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
@@ -138,20 +134,17 @@ function RegroupementForm() {
           </small>
         </div>
 
-        {/* ATTACHMENTS BLOCK */}
         <div className={styles.formGroup} style={{ marginTop: '20px' }}>
           <label className={styles.label}>{t('ticket.attachments', 'Add Attachments')}</label>
           <FileUploader files={attachments} onFilesChange={(files: File[]) => setAttachments(files)} />
         </div>
 
-        {/* ISSUE SELECTION BLOCK AVEC RECHERCHE */}
         <div style={{ background: '#f4f5f7', padding: '16px', borderRadius: '6px', marginTop: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
             <label className={styles.label} style={{ margin: 0 }}>
               {t('regroupements.link_issues', 'Link existing issues')} ({formData.issue_ids.length})
             </label>
             
-            {/* BARRE DE RECHERCHE */}
             <input 
               type="text" 
               className={styles.input}
@@ -171,7 +164,6 @@ function RegroupementForm() {
               </p>
             ) : null}
             
-            {/* Utilisation de filteredIssues au lieu de availableIssues */}
             {filteredIssues.map(issue => (
               <label key={issue.id_issue} style={{ display: 'flex', alignItems: 'center', margin: '8px 0', cursor: 'pointer', fontSize: '14px' }}>
                 <input 

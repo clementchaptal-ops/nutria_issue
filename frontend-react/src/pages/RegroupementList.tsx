@@ -23,18 +23,14 @@ function RegroupementList() {
   const [loading, setLoading] = useState<boolean>(true)
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false)
 
-  // Filtres de Statuts
   const [classicStatuses, setClassicStatuses] = useState<string[]>(['OPEN'])
   const [aiStatuses, setAiStatuses] = useState<string[]>(['SUGGESTED'])
   
-  // Tri
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'id_regroupment', direction: 'desc' })
 
-  // Recherche Indépendante (Classic)
   const classicSearchQuery = searchParams.get('search') || ''
   const classicSearchColumn = searchParams.get('column') || 'ALL'
 
-  // Recherche Indépendante (IA)
   const aiSearchQuery = searchParams.get('aiSearch') || ''
   const aiSearchColumn = searchParams.get('aiColumn') || 'ALL'
 
@@ -62,7 +58,6 @@ function RegroupementList() {
     loadData()
   }, [t])
 
-  // --- ACTIONS IA ---
   const handleTriggerAi = async () => {
     setIsAiLoading(true);
     toast.loading(t('regroupements.ai.analyzing', 'AI analysis in progress...'), { id: 'ai-toast' });
@@ -109,7 +104,6 @@ function RegroupementList() {
     setSortConfig({ key, direction })
   }
 
-  // --- SEPARATION & FILTERING ---
   const classicList = regroupements.filter(r => r.status === 'OPEN' || r.status === 'CLOSED');
   const aiList = regroupements.filter(r => r.status === 'SUGGESTED' || r.status === 'REJECTED');
 
@@ -197,10 +191,6 @@ function RegroupementList() {
 
   return (
     <div className={styles.container}>
-      
-      {/* ======================= */}
-      {/* 1. BLOC CLASSIQUE       */}
-      {/* ======================= */}
       <div className={styles.header}>
         <h1 className={styles.title}>{t('regroupements.classic_dashboard', 'Classic Regroupements Dashboard')}</h1>
       </div>
@@ -235,9 +225,6 @@ function RegroupementList() {
 
       <hr style={{ margin: '50px 0', border: '1px solid #dfe1e6' }} />
 
-      {/* ======================= */}
-      {/* 2. BLOC IA / AIOps      */}
-      {/* ======================= */}
       <div className={styles.header}>
         <h2 className={styles.title} style={{ color: '#403294' }}>✨ {t('regroupements.ai_dashboard', 'AIOps Suggestions')}</h2>
       </div>
@@ -280,4 +267,3 @@ function RegroupementList() {
 }
 
 export default RegroupementList
-

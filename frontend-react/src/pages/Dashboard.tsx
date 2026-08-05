@@ -62,8 +62,9 @@ function Dashboard() {
 
   useEffect(() => {
     fetchAllIssues()
-      .then((response) => {
-        const issueList = response.data || [];
+      .then((data) => {
+        // fetchAllIssues renvoie directement le tableau des tickets depuis apiClient
+        const issueList = Array.isArray(data) ? data : (data.data || []);
         setIssues(issueList);
         setLoading(false);
       })
@@ -81,7 +82,6 @@ function Dashboard() {
     setSortConfig({ key, direction })
   }
 
-  // Calculate issue counts for all 4 status categories
   const preticketCount = issues.filter(i => i.status === 'PRETICKET').length
   const inProgressCount = issues.filter(i => i.status === 'IN PROGRESS').length
   const actKnowledgeCount = issues.filter(i => i.status === 'ACT KNOWLEDGE').length
