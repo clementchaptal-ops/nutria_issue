@@ -7,7 +7,7 @@ from google.cloud import storage
 
 from config.database import get_db_connection
 from pydantic import ValidationError
-from utils.storage import make_signed_url, BUCKET_NAME
+from config.storage import make_signed_url, BUCKET_NAME
 from services.state_manager import trigger_state_json_update
 
 # Local file imports
@@ -19,41 +19,6 @@ from .attachments import trigger_state_json_update
 
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 
-def make_signed_url(public_url: str) -> str:
-    """Generates a temporary signed URL (15 min) compatible with Cloud Run and GCP IAM Credentials."""
-    if not public_url or "storage.googleapis.com" not in public_url:
-        return public_url
-
-    parts = public_url.replace("https://storage.googleapis.com/", "").split("/", 1)
-    if len(parts) != 2:
-        return public_url
-
-    bucket_name, blob_name = parts[0], parts[1]
-
-    try:
-        # Fetch default service account credentials from Cloud Run environment
-        credentials, _ = google.auth.default()
-        
-        # Refresh the short-lived OAuth access token
-        auth_request = requests.Request()
-        credentials.refresh(auth_request)
-
-        client = storage.Client(credentials=credentials)
-        bucket = client.bucket(bucket_name)
-        blob = bucket.blob(blob_name)
-
-        # Generate signed URL using IAM SignBlob API via access token
-        return blob.generate_signed_url(
-            version="v4",
-            expiration=datetime.timedelta(minutes=15),
-            method="GET",
-            service_account_email=credentials.service_account_email,
-            access_token=credentials.token
-        )
-    except Exception as e:
-        # Exception caught silently to avoid log pollution, returning fallback URL
-        print(f"[STORAGE ERROR - make_signed_url]: {str(e)}")
-        return public_url
 
 # =====================================================================
 # 1. STATIC ROUTES
@@ -415,7 +380,7 @@ def upload_comment_attachments(issue_id, comment_id, files_data, current_user):
 
         # --- 🤖 AI INTEGRATION: UPDATE ISSUE FINGERPRINT ---
         try:
-            from routers.ai_extractor import analyze_issue_attachments_and_save
+            from services.ai_extractor import analyze_issue_attachments_and_save
             analyze_issue_attachments_and_save(issue_id)
         except Exception as ai_error:
             print(f"[WARNING] AI Analysis failed for issue {issue_id} (via comment): {ai_error}")

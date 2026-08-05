@@ -3,8 +3,7 @@ import threading
 from config.database import get_db_connection
 from .audit import log_user_action
 
-# NOUVEAUX IMPORTS
-from utils.storage import upload_to_gcs, get_oracle_attachment_type, BUCKET_NAME
+from config.storage import upload_to_gcs, get_oracle_attachment_type, BUCKET_NAME
 from services.state_manager import trigger_state_json_update
 
 USE_MOCK_DATA = os.environ.get("USE_MOCK_DATA", "True") == "True"
@@ -56,7 +55,7 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
 
                 def run_ai_in_background(target_issue_id):
                     try:
-                        from services.ai.ai_extractor import analyze_issue_attachments_and_save
+                        from services.ai_extractor import analyze_issue_attachments_and_save
                         print(f"[ASYNC AI] Starting analysis for issue #{target_issue_id}...")
                         analyze_issue_attachments_and_save(target_issue_id)
                     except Exception as ai_error:

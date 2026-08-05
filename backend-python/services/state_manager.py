@@ -2,7 +2,7 @@ import json
 import threading
 from google.cloud import storage
 from config.database import get_db_connection
-from utils.storage import BUCKET_NAME
+from config.storage import BUCKET_NAME
 
 STATE_FILE_PATH = "system/active_issues_state.json"
 
