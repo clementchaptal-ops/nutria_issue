@@ -9,7 +9,7 @@ from google.cloud import storage
 from config.database import get_db_connection
 
 # 🚀 IMPORT DU GESTIONNAIRE D'ÉTAT JSON GLOBAL
-from routers.attachments import trigger_state_json_update
+from services.state_manager import trigger_state_json_update
 
 # --- CONFIGURATION GCP & VERTEX AI ---
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
