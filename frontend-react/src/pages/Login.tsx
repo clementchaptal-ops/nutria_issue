@@ -1,196 +1,101 @@
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useState, useEffect } from 'react'
-import toast from 'react-hot-toast'
-import styles from './Login.module.css'
-import axios from 'axios'
+import ErrorMessage from '../components/ErrorMessage'
+import apiClient from '../api/client'
 
-interface LimsProfile {
-  user_name: string
-  full_name: string
-  location: string
-}
-
-function Login() {
+function AuditLogs() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const location = useLocation() 
+  const [logs, setLogs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const [profiles, setProfiles] = useState<LimsProfile[]>([])
-  const [googleToken, setGoogleToken] = useState<string | null>(null)
-  const [requireSelection, setRequireSelection] = useState<boolean>(false)
-  
-  // LOADING STATE
-  const [loading, setLoading] = useState<boolean>(false)
-
-  const GOOGLE_CLIENT_ID = "549394697229-tvgof9to9fcu4um4260vnigbtt57o9fo.apps.googleusercontent.com"
-  const from = location.state?.from || '/dashboard'
-
-  // --- LABWARE URL ANALYSIS ---
-  let searchString = from.includes('?') ? from.substring(from.indexOf('?')) : ''
-  if (!searchString && location.search) {
-    searchString = location.search
-  }
-  const searchParams = new URLSearchParams(searchString)
-  const preselectedProfile = searchParams.get('user_name') || undefined
-
-  const loginToServer = async (token: string, selectedProfile?: string) => {
-    setLoading(true) 
-    
-    try {
-      const response = await axios.post('https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/auth', { 
-        credential: token,
-        selected_profile: selectedProfile 
-      })
-
-      const data = response.data
-
-      if (data.require_selection) {
-        setGoogleToken(token)
-        setProfiles(data.profiles)
-        setRequireSelection(true)
-        setLoading(false) 
-        return
-      }
-
-      localStorage.setItem('nutria_token', data.access_token)
-      localStorage.setItem('nutria_user', JSON.stringify({
-        user_name: data.user_name,
-        full_name: data.full_name,
-        role: data.role,         
-        location: data.location  
-      }))
-      
-      const savedTarget = localStorage.getItem('nutria_redirect_target')
-      const finalDestination = savedTarget || from
-      localStorage.removeItem('nutria_redirect_target')
-      
-      toast.success(t('login.success', `Welcome ${data.full_name || data.user_name}!`))
-      navigate(finalDestination, { replace: true })
-      
-    } catch (err: any) {
-      if (selectedProfile) {
-        loginToServer(token, undefined)
-      } else {
-        // Axios stocke le corps de l'erreur dans err.response.data
-        const errorMsg = err.response?.data?.detail || err.response?.data?.error || t('login.error.server_fail', 'Unable to connect to the Nutria server.')
-        toast.error(errorMsg)
-      }
-    } finally {
-      setLoading(false) 
-    }
-  }
-
-  // --- CORE SOLUTION: TOKEN RETRIEVAL WITHOUT POP-UP ---
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.includes('id_token=')) {
-      const params = new URLSearchParams(hash.replace('#', '?'));
-      const idToken = params.get('id_token');
-      
-      if (idToken) {
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
-        loginToServer(idToken, preselectedProfile);
+    const fetchLogs = async () => {
+      try {
+        // apiClient s'occupe de l'URL de base et d'attacher le token !
+        const response = await apiClient.get('/issues/audit/logs')
+
+        const data = response.data
+
+        if (Array.isArray(data)) {
+          setLogs(data)
+        } else {
+          setError(data.error || t('audit.error.invalid_format', 'Invalid response format from server.'))
+          setLogs([]) 
+        }
+      } catch (err: any) {
+        // La redirection 401 est gérée par apiClient, on gère juste le 403 ici
+        if (err.response && err.response.status === 403) {
+          navigate('/dashboard') 
+          return
+        }
+        setError(err.response?.data?.error || err.message)
+        setLogs([]) 
+      } finally {
+        setLoading(false)
       }
     }
-  }, []);
 
-  // --- GOOGLE REDIRECTION ---
-  const handleGoogleRedirect = () => {
-    setLoading(true) // Enable loading before Google redirect
-    
-    localStorage.setItem('nutria_redirect_target', from)
-    
-    const REDIRECT_URI = window.location.origin + window.location.pathname;
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=id_token&scope=email profile openid&nonce=nutria123&prompt=select_account`;
-    window.location.href = authUrl;
-  }
+    fetchLogs()
+  }, [navigate, t])
 
-  const handleProfileSelect = (profileName: string) => {
-    if (googleToken) {
-      loginToServer(googleToken, profileName)
-    }
-  }
-    
+  if (loading) return <p style={{ padding: '40px', textAlign: 'center' }}>{t('common.loading', 'Loading data...')}</p>
+
   return (
-    <div className={styles.layout}>
-      <header className={styles.header}>
-        <div className={styles.logoArea}>
-          <span className={styles.logoText}>NUTRIA</span>
-        </div>
-      </header>
+    <div style={{ padding: '20px 40px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2>{t('audit.title', '🛡️ Audit Trail (Admin)')}</h2>
+      </div>
 
-      <main className={styles.mainContent}>
-        <div className={styles.loginCard}>
-          <div className={styles.cardHeader}>
-            <span className={styles.subtitle}>{t('login.subtitle', 'NUTRIA ISSUE REPORT')}</span>
-          </div>
-          <div className={styles.divider}></div>
-          
-          {requireSelection ? (
-            <div className={styles.profileSelectionContainer}>
-              <h3 className={styles.selectionTitle}>
-                {t('login.choose_profile', 'Multiple LIMS profiles detected.')}
-              </h3>
-              <div className={styles.profileList}>
-                {profiles.map((prof: { user_name: string; location: any }) => (
-                  <button 
-                    key={prof.user_name} 
-                    onClick={() => handleProfileSelect(prof.user_name)} 
-                    className={styles.profileButton}
-                    disabled={loading} // Block if loading
-                    style={{ opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
-                  >
-                    <span className={styles.profileIcon}>👤</span>
-                    <div className={styles.profileInfo}>
-                      <span className={styles.profileName}>{prof.user_name}</span>
-                      <span className={styles.profileLocation}>{prof.location}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => setRequireSelection(false)} className={styles.backButton} disabled={loading}>
-                ← {t('login.back', 'Back')}
-              </button>
-            </div>
-          ) : (
-            <>
-              <p className={styles.instructions}>
-                {t('login.instructions', 'Please log in with your Mérieux NutriSciences account.')}
-              </p>
-              <div className={styles.buttonWrapper}>
-                <button 
-                  onClick={handleGoogleRedirect}
-                  disabled={loading} // Disable click
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
-                    width: '100%', padding: '10px 24px', backgroundColor: '#ffffff', color: '#3c4043',
-                    border: '1px solid #dadce0', borderRadius: '24px', fontSize: '14px', fontWeight: '500',
-                    fontFamily: '"Google Sans", Roboto, Arial, sans-serif', 
-                    cursor: loading ? 'not-allowed' : 'pointer', // Change cursor
-                    opacity: loading ? 0.7 : 1, // Lower opacity
-                    transition: 'background-color 0.2s', boxShadow: '0 1px 2px 0 rgba(60,64,67,0.3)'
-                  }}
-                  onMouseOver={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#f8f9fa' }}
-                  onMouseOut={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#ffffff' }}
-                >
-                  {!loading && (
-                    <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                    </svg>
-                  )}
-                  {loading ? t('login.loading', 'Loading...') : t('login.signin_with', 'Sign in with Google')}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </main>
+      <ErrorMessage message={error} />
+
+      <div style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <thead style={{ background: '#f4f5f7', borderBottom: '2px solid #dfe1e6' }}>
+            <tr>
+              <th style={{ padding: '12px' }}>{t('audit.table.date', 'Date')}</th>
+              <th style={{ padding: '12px' }}>{t('audit.table.user', 'User')}</th>
+              <th style={{ padding: '12px' }}>{t('audit.table.action', 'Action')}</th>
+              <th style={{ padding: '12px' }}>{t('audit.table.ticket_id', 'Ticket ID')}</th>
+              <th style={{ padding: '12px' }}>{t('audit.table.details', 'Details')}</th>
+              <th style={{ padding: '12px' }}>{t('audit.table.ip', 'IP Address')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {logs.map((log) => (
+              <tr key={log.id_log} style={{ borderBottom: '1px solid #dfe1e6' }}>
+                <td style={{ padding: '12px', fontSize: '14px', whiteSpace: 'nowrap' }}>{log.created_at}</td>
+                <td style={{ padding: '12px', fontSize: '14px', fontWeight: 'bold' }}>{log.user_name}</td>
+                <td style={{ padding: '12px', fontSize: '14px' }}>
+                  <span style={{ background: '#e3fcef', color: '#006644', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
+                    {log.action_type}
+                  </span>
+                </td>
+                <td style={{ padding: '12px', fontSize: '14px' }}>
+                  {log.target_id !== '-' ? (
+                    <a href={`/?id=${log.target_id}`} style={{ color: '#0052cc', textDecoration: 'none', fontWeight: 'bold' }}>
+                      #{log.target_id}
+                    </a>
+                  ) : '-'}
+                </td>
+                <td style={{ padding: '12px', fontSize: '14px', color: '#42526e' }}>{log.details}</td>
+                <td style={{ padding: '12px', fontSize: '14px', color: '#7a869a' }}>{log.ip_address}</td>
+              </tr>
+            ))}
+            {logs.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: '#7a869a' }}>
+                  {t('audit.empty', 'No logs found.')}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
 
-export default Login
+export default AuditLogs

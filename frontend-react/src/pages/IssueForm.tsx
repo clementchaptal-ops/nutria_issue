@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import FileUploader from '../components/FileUploader'
 import toast from 'react-hot-toast'
 import styles from './IssueForm.module.css'
-import axios from 'axios'
 import { openSafeUrl } from '../utils/security'
 import { showConfirmToast } from '../components/Notifications'
+import { 
+  fetchIssueById, fetchUserMe, createIssue, validateIssue, 
+  cancelTicket, closeTicket, fetchIssueComments, addIssueComment, 
+  uploadIssueAttachments, uploadCommentAttachments, deleteIssueAttachment, downloadIssueFile 
+} from '../api/issues' // <-- Imports centralisés de l'API
 
 const getDecodedToken = () => {
   const token = localStorage.getItem('nutria_token');
@@ -69,176 +73,163 @@ function IssueForm() {
     ip_adress: '', ip_config: '', current_pc: '', ping: '',
   })
 
-  const workingDirUrl = `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/download/working_dir`
-  const logsUrl = `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/download/logs`
-
-  const fetchComments = async () => {
+  // ==========================================
+  // FONCTIONS DE CHARGEMENT DES DONNÉES
+  // ==========================================
+  const loadComments = useCallback(async () => {
     if (!ticketId) return
     try {
-      const response = await axios.get(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/comments`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
-      })
-      const data = response.data
+      const data = await fetchIssueComments(ticketId)
       if (Array.isArray(data)) setComments(data)
       else if (data && Array.isArray(data.comments)) setComments(data.comments)
       else setComments([]) 
     } catch (error) {
       setComments([]) 
     }
-  }
+  }, [ticketId])
 
-  useEffect(() => {
-    if (ticketId && !isNewTicket) fetchComments()
-  }, [ticketId, isNewTicket])
-
-  useEffect(() => {
-    const fetchTicketData = async () => {
-      if (isNewTicket) {
-        setIsEditing(true)
-        setCanEdit(true)
-        setStatus('IN PROGRESS') 
-        setIsCreatedFromWeb(true) 
-        
-        const currentUser = getDecodedToken()
-        const backupUser = {
-          user_name: currentUser?.sub || '',
-          full_name: currentUser?.sub || '', 
-          user_email: currentUser?.email || '',
-          created_on: t('common.na', 'N/A'),
-          current_role: currentUser?.role || 'USER',
-          lab: t('common.na', 'N/A'), 
-          location: currentUser?.location || t('common.na', 'N/A'),
-          env: currentUser?.env || currentUser?.environment || t('common.na', 'N/A')
-        }
-        
-        setUserInfo(backupUser)
-
-        try {
-          const response = await axios.get('https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/users/me', {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
-          })
-          
-          const profile = response.data
-          setUserInfo({
-            user_name: profile.user_name || backupUser.user_name,
-            full_name: profile.full_name || backupUser.full_name, 
-            user_email: profile.user_email || backupUser.user_email,
-            created_on: t('common.na', 'N/A'),
-            current_role: profile.current_role || backupUser.current_role, 
-            lab: profile.lab || backupUser.lab,
-            location: profile.location || backupUser.location,
-            env: profile.env || profile.environment || backupUser.env
-          })
-        } catch (error) {
-          // Silent catch for profile load
-        } finally {
-          setIsLoading(false)
-        }
-        return 
+  const loadTicketData = useCallback(async () => {
+    setIsLoading(true)
+    if (isNewTicket) {
+      setIsEditing(true)
+      setCanEdit(true)
+      setStatus('IN PROGRESS') 
+      setIsCreatedFromWeb(true) 
+      
+      const currentUser = getDecodedToken()
+      const backupUser = {
+        user_name: currentUser?.sub || '',
+        full_name: currentUser?.sub || '', 
+        user_email: currentUser?.email || '',
+        created_on: t('common.na', 'N/A'),
+        current_role: currentUser?.role || 'USER',
+        lab: t('common.na', 'N/A'), 
+        location: currentUser?.location || t('common.na', 'N/A'),
+        env: currentUser?.env || currentUser?.environment || t('common.na', 'N/A')
       }
-
-      if (!ticketId) {
-        setIsLoading(false)
-        return
-      }
+      
+      setUserInfo(backupUser)
 
       try {
-        const response = await axios.get(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
-        })
-        
-        const data = response.data
-        const currentStatus = data.status || 'PRETICKET'
-        setStatus(currentStatus)
-        
-        setTitle(data.title || '')
-        setIssueType(data.issue_type || '')
-        setCriticity(data.criticity || '')
-        setFrequency(data.frequency || '')
-        setBlockingIssue(data.blocking_issue || 'F')
-        setDescription(data.description || '')
-
-        if (data.attachments) setExistingFiles(data.attachments)
-
-        const fromWeb = !data.workstation && !data.ip_adress
-        setIsCreatedFromWeb(fromWeb)
-
+        const profile = await fetchUserMe()
         setUserInfo({
-          user_name: data.user_name || '',
-          full_name: data.full_name || '', 
-          user_email: data.user_email || '',
-          created_on: data.created_on ? new Date(data.created_on).toLocaleString() : '',
-          current_role: data.current_active_role || data.current_role || '',
-          lab: data.creator_lab || '',
-          location: data.creator_location || '',
-          env: data.env || data.environment || 'N/A'
+          user_name: profile.user_name || backupUser.user_name,
+          full_name: profile.full_name || backupUser.full_name, 
+          user_email: profile.user_email || backupUser.user_email,
+          created_on: t('common.na', 'N/A'),
+          current_role: profile.current_role || backupUser.current_role, 
+          lab: profile.lab || backupUser.lab,
+          location: profile.location || backupUser.location,
+          env: profile.env || profile.environment || backupUser.env
         })
-
-        setCurrentContext({
-          current_project: data.current_project || '',
-          current_batch: data.current_batch || '',
-          current_sample: data.current_sample || '',
-          current_analysis: data.current_analysis || '',
-          current_analysis_variation: data.current_analysis_variation || '',
-          current_customer: data.current_customer || '',
-          citrix_session: data.citrix_session || ''
-        })
-
-        setNetworkInfo({
-          ip_adress: data.ip_adress || '',
-          ip_config: data.ip_config || '',
-          current_pc: data.current_pc || '',
-          ping: data.ping || ''
-        })
-
-        const currentUser = getDecodedToken()
-        if (currentUser && currentStatus !== 'CANCELED' && currentStatus !== 'CLOSED' && currentStatus !== 'ACT KNOWLEDGE') {
-          const userRole = currentUser.role
-          const userLoc = currentUser.location
-          const userEmail = currentUser.email?.toLowerCase()
-          const userTrigram = currentUser.sub?.toLowerCase()
-          
-          const ticketLoc = data.creator_location
-          const ticketEmail = data.user_email?.toLowerCase()
-          const ticketUserName = data.user_name?.toLowerCase()
-
-          let hasRights = false
-          if (userRole === 'IT_TEAM') hasRights = true
-          else if (userRole === 'LOCAL_ADMIN' && userLoc === ticketLoc) hasRights = true
-          else if (userRole === 'USER' && (userEmail === ticketEmail || userTrigram === ticketUserName)) hasRights = true
-          
-          setCanEdit(hasRights)
-          setIsEditing(hasRights && currentStatus === 'PRETICKET')
-        }
-
-      } catch (err: any) {
-        if (err.response && (err.response.status === 404 || err.response.status === 403)) {
-          toast.error(t('ticket.not_found', 'Ticket not found or access denied.'))
-          navigate('/dashboard', { replace: true })
-        } else {
-          toast.error(t('ticket.error.fetch', 'Error loading ticket data.'))
-        }
+      } catch (error) {
+        // Silent catch
       } finally {
         setIsLoading(false)
       }
+      return 
     }
 
-    fetchTicketData()
+    if (!ticketId) {
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      const data = await fetchIssueById(ticketId)
+      const currentStatus = data.status || 'PRETICKET'
+      setStatus(currentStatus)
+      
+      setTitle(data.title || '')
+      setIssueType(data.issue_type || '')
+      setCriticity(data.criticity || '')
+      setFrequency(data.frequency || '')
+      setBlockingIssue(data.blocking_issue || 'F')
+      setDescription(data.description || '')
+
+      if (data.attachments) setExistingFiles(data.attachments)
+
+      const fromWeb = !data.workstation && !data.ip_adress
+      setIsCreatedFromWeb(fromWeb)
+
+      setUserInfo({
+        user_name: data.user_name || '',
+        full_name: data.full_name || '', 
+        user_email: data.user_email || '',
+        created_on: data.created_on ? new Date(data.created_on).toLocaleString() : '',
+        current_role: data.current_active_role || data.current_role || '',
+        lab: data.creator_lab || '',
+        location: data.creator_location || '',
+        env: data.env || data.environment || 'N/A'
+      })
+
+      setCurrentContext({
+        current_project: data.current_project || '',
+        current_batch: data.current_batch || '',
+        current_sample: data.current_sample || '',
+        current_analysis: data.current_analysis || '',
+        current_analysis_variation: data.current_analysis_variation || '',
+        current_customer: data.current_customer || '',
+        citrix_session: data.citrix_session || ''
+      })
+
+      setNetworkInfo({
+        ip_adress: data.ip_adress || '',
+        ip_config: data.ip_config || '',
+        current_pc: data.current_pc || '',
+        ping: data.ping || ''
+      })
+
+      const currentUser = getDecodedToken()
+      if (currentUser && currentStatus !== 'CANCELED' && currentStatus !== 'CLOSED' && currentStatus !== 'ACT KNOWLEDGE') {
+        const userRole = currentUser.role
+        const userLoc = currentUser.location
+        const userEmail = currentUser.email?.toLowerCase()
+        const userTrigram = currentUser.sub?.toLowerCase()
+        
+        const ticketLoc = data.creator_location
+        const ticketEmail = data.user_email?.toLowerCase()
+        const ticketUserName = data.user_name?.toLowerCase()
+
+        let hasRights = false
+        if (userRole === 'IT_TEAM') hasRights = true
+        else if (userRole === 'LOCAL_ADMIN' && userLoc === ticketLoc) hasRights = true
+        else if (userRole === 'USER' && (userEmail === ticketEmail || userTrigram === ticketUserName)) hasRights = true
+        
+        setCanEdit(hasRights)
+        setIsEditing(hasRights && currentStatus === 'PRETICKET')
+      }
+
+    } catch (err: any) {
+      if (err.response && (err.response.status === 404 || err.response.status === 403)) {
+        toast.error(t('ticket.not_found', 'Ticket not found or access denied.'))
+        navigate('/dashboard', { replace: true })
+      } else {
+        toast.error(t('ticket.error.fetch', 'Error loading ticket data.'))
+      }
+    } finally {
+      setIsLoading(false)
+    }
   }, [ticketId, isNewTicket, navigate, t])
 
-  const handleFileDownload = async (url: string, defaultFilename: string) => {
-    try {
-      const response = await axios.get(url, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
-      })
-      const data = response.data
+  useEffect(() => {
+    loadTicketData()
+    if (ticketId && !isNewTicket) loadComments()
+  }, [loadTicketData, loadComments, ticketId, isNewTicket])
 
+
+  // ==========================================
+  // ACTIONS ET SOUMISSIONS
+  // ==========================================
+  const handleFileDownload = async (type: 'working_dir' | 'logs', defaultFilename: string) => {
+    if (!ticketId) return
+    try {
+      const data = await downloadIssueFile(ticketId, type)
       if (data.file_path) {
         const link = document.createElement('a')
         link.href = data.file_path
         link.setAttribute('download', data.file_name || defaultFilename)
         link.target = '_blank'
-        
         document.body.appendChild(link)
         link.click()
         link.remove()
@@ -267,28 +258,19 @@ function IssueForm() {
     }
 
     try {
-      const url = isNewTicket 
-        ? `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/create` 
-        : `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/validate`
-
-      const response = await axios({
-        method: isNewTicket ? 'POST' : 'PUT',
-        url: url,
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`, 'Content-Type': 'application/json' },
-        data: payloadData
-      })
-
-      const responseData = response.data
-      const targetTicketId = isNewTicket ? responseData.id_issue : ticketId
+      let targetTicketId = ticketId;
+      if (isNewTicket) {
+        const responseData = await createIssue(payloadData)
+        targetTicketId = responseData.id_issue
+      } else {
+        await validateIssue(ticketId!, payloadData)
+      }
 
       if (attachments.length > 0 && targetTicketId) {
         const formData = new FormData()
         attachments.forEach((file) => formData.append('file', file))
-
         try {
-          await axios.post(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${targetTicketId}/attachments`, formData, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
-          })
+          await uploadIssueAttachments(targetTicketId, formData)
         } catch (uploadError) {
           toast.error(t('ticket.error.upload_attachments', 'Text saved, but files could not be uploaded.'))
         }
@@ -303,9 +285,13 @@ function IssueForm() {
         : t('ticket.success_msg_update', 'Ticket successfully updated!')
       toast.success(successMsg)
       
-      if (isNewTicket) navigate('/dashboard')
-      else window.location.reload()
-      
+      if (isNewTicket) {
+        navigate('/dashboard')
+      } else {
+        // NOUVEAU : Remplace le window.location.reload()
+        loadTicketData()
+        loadComments()
+      }
     } catch (err: any) {
       const errorDetail = err.response?.data?.detail || t('ticket.error.submit_failed', 'An error occurred during submission.')
       toast.error(t('common.error_detail', 'Error: {{detail}}', { detail: errorDetail }))
@@ -315,11 +301,9 @@ function IssueForm() {
   }
 
   const executeCancelTicket = async () => {
+    if (!ticketId) return
     try {
-      await axios.put(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/cancel`, {}, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
-      })
-      
+      await cancelTicket(ticketId)
       setStatus('CANCELED')
       setIsEditing(false)
       setCanEdit(false) 
@@ -340,12 +324,9 @@ function IssueForm() {
   }
 
   const executeCloseTicket = async (targetStatus: 'ACT KNOWLEDGE' | 'CLOSED') => {
+    if (!ticketId) return
     try {
-      await axios.put(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/close`, 
-        { new_status: targetStatus },
-        { headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` } }
-      )
-
+      await closeTicket(ticketId, targetStatus)
       setStatus(targetStatus)
       setIsEditing(false)
       setCanEdit(false)
@@ -374,11 +355,9 @@ function IssueForm() {
   }
 
   const executeDeleteAttachment = async (filename: string) => {
+    if (!ticketId) return
     try {
-      await axios.delete(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/attachments/${filename}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
-      })
-
+      await deleteIssueAttachment(ticketId, filename)
       setExistingFiles(prev => prev.filter(f => f.attachment_name !== filename));
       toast.success(t('ticket.success.file_deleted', 'File deleted successfully.'));
     } catch (err: any) {
@@ -400,44 +379,38 @@ function IssueForm() {
     if (isNewTicket) navigate('/dashboard');
     else {
       setIsEditing(false);
-      window.location.reload();
+      // NOUVEAU : Remplace le window.location.reload()
+      loadTicketData();
     }
   };
 
-  if (isLoading) {
-    return <div className={styles.loading}>{t('common.loading', 'Loading ticket data...')}</div>
-  }
-  
   const handlePostComment = async () => {
-    if (!newComment.trim() || isPostingComment) return
+    if (!newComment.trim() || isPostingComment || !ticketId) return
     setIsPostingComment(true)
 
     try {
-      const response = await axios.post(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/comments`, 
-        { comment_text: newComment },
-        { headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` } }
-      )
-
-      const data = response.data
+      const data = await addIssueComment(ticketId, newComment)
       const newCommentId = data.id_comment
 
       if (commentFiles.length > 0 && newCommentId) {
         const formData = new FormData()
         commentFiles.forEach((file) => formData.append('file', file))
-        await axios.post(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/comments/${newCommentId}/attachments`, formData, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
-        })
+        await uploadCommentAttachments(ticketId, newCommentId, formData)
       }
 
       setNewComment('') 
       setCommentFiles([]) 
-      fetchComments()   
+      loadComments()   
     } catch (err: any) {
       const detail = err.response?.data?.detail || t('ticket.error.network_comment', 'Network error while posting comment.')
       toast.error(t('common.error_detail', 'Error: {{detail}}', { detail }))
     } finally {
       setIsPostingComment(false)
     }
+  }
+
+  if (isLoading) {
+    return <div className={styles.loading}>{t('common.loading', 'Loading ticket data...')}</div>
   }
   
   return (
@@ -592,7 +565,8 @@ function IssueForm() {
                   })
                   .map((file, index) => {
                     const displayName = file.attachment_name || t('ticket.unknown_file', 'Unknown_File');
-                    const fileUrl = file.url_path || `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/attachments/${file.attachment_name}`;
+                    // Plus d'URL en dur ici, on utilise l'URL renvoyée par le backend
+                    const fileUrl = file.url_path;
                     const fileType = file.attachment_type;
                   
                     return (
@@ -638,13 +612,13 @@ function IssueForm() {
             <div className={styles.autoFilesSection} style={{ marginTop: '30px' }}>
               <h4 className={styles.autoFilesTitle}>{t('ticket.auto_collected', 'Auto-collected Context Files:')}</h4>
               <div className={styles.downloadLinksContainer}>
-                <div onClick={() => handleFileDownload(workingDirUrl, `Issue_${ticketId}_WorkingDir.zip`)} className={styles.downloadCard} style={{ cursor: 'pointer' }}>
+                <div onClick={() => handleFileDownload('working_dir', `Issue_${ticketId}_WorkingDir.zip`)} className={styles.downloadCard} style={{ cursor: 'pointer' }}>
                   <span className={styles.downloadIcon}>📂</span>
                   <div className={styles.downloadText}>
                     <strong>{t('ticket.download_workdir', 'Working Directory')}</strong>
                   </div>
                 </div>
-                <div onClick={() => handleFileDownload(logsUrl, `Issue_${ticketId}_Logs.zip`)} className={styles.downloadCard} style={{ cursor: 'pointer' }}>
+                <div onClick={() => handleFileDownload('logs', `Issue_${ticketId}_Logs.zip`)} className={styles.downloadCard} style={{ cursor: 'pointer' }}>
                   <span className={styles.downloadIcon}>📄</span>
                   <div className={styles.downloadText}>
                     <strong>{t('ticket.download_logs', 'System Logs')}</strong>

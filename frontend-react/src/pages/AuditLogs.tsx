@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import ErrorMessage from '../components/ErrorMessage'
-import axios from 'axios'
+import apiClient from '../api/client'
 
 function AuditLogs() {
   const { t } = useTranslation()
@@ -14,9 +14,8 @@ function AuditLogs() {
   useEffect(() => {
     const fetchLogs = async () => {
       try {
-        const response = await axios.get('https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/audit/logs', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
-        })
+        // apiClient s'occupe de l'URL de base et d'attacher le token !
+        const response = await apiClient.get('/issues/audit/logs')
 
         const data = response.data
 
@@ -27,6 +26,7 @@ function AuditLogs() {
           setLogs([]) 
         }
       } catch (err: any) {
+        // La redirection 401 est gérée par apiClient, on gère juste le 403 ici
         if (err.response && err.response.status === 403) {
           navigate('/dashboard') 
           return

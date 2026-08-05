@@ -1,45 +1,75 @@
-import axios from 'axios';
-
-// Base URL pointant vers GCP Cloud Functions / Cloud Run
-const API_BASE_URL = import.meta.env.VITE_API_URL || "https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api";
-const API_URL = `${API_BASE_URL}/issues`;
-
-// --- Helper function to get the security headers ---
-const getAuthHeaders = () => {
-    const token = localStorage.getItem('nutria_token');
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-    };
-    
-    // On ajoute le token uniquement s'il existe
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    return headers;
-};
+import apiClient from './client';
 
 // ---------------------------------------------------------
-// 1. Fetch ALL tickets (For the Dashboard)
+// TICKETS (ISSUES)
 // ---------------------------------------------------------
 export const fetchAllIssues = async () => {
-    // En renvoyant res.data, le composant Dashboard recevra exactement le même format JSON qu'avant avec fetch()
-    const res = await axios.get(API_URL, { headers: getAuthHeaders() });
+    const res = await apiClient.get('/issues');
+    return res.data;
+};
+
+export const fetchIssueById = async (issueId: string | number) => {
+    const res = await apiClient.get(`/issues/${issueId}`);
+    return res.data;
+};
+
+export const createIssue = async (issueData: any) => {
+    const res = await apiClient.post(`/issues/create`, issueData);
+    return res.data;
+};
+
+export const validateIssue = async (issueId: string | number, updateData: any) => {
+    const res = await apiClient.put(`/issues/${issueId}/validate`, updateData);
+    return res.data;
+};
+
+export const cancelTicket = async (issueId: string | number) => {
+    const res = await apiClient.put(`/issues/${issueId}/cancel`, {});
+    return res.data;
+};
+
+export const closeTicket = async (issueId: string | number, new_status: string) => {
+    const res = await apiClient.put(`/issues/${issueId}/close`, { new_status });
     return res.data;
 };
 
 // ---------------------------------------------------------
-// 2. Fetch a SINGLE ticket (For the Ticket Form)
+// UTILISATEURS
 // ---------------------------------------------------------
-export const fetchIssueById = async (issueId: number) => {
-    const res = await axios.get(`${API_URL}/${issueId}`, { headers: getAuthHeaders() });
+export const fetchUserMe = async () => {
+    const res = await apiClient.get(`/issues/users/me`);
     return res.data;
 };
 
 // ---------------------------------------------------------
-// 3. Update/Validate a ticket
+// COMMENTAIRES & PIÈCES JOINTES
 // ---------------------------------------------------------
-export const validateIssue = async (issueId: number, updateData: any) => {
-    const res = await axios.put(`${API_URL}/${issueId}/validate`, updateData, { headers: getAuthHeaders() });
+export const fetchIssueComments = async (issueId: string | number) => {
+    const res = await apiClient.get(`/issues/${issueId}/comments`);
+    return res.data;
+};
+
+export const addIssueComment = async (issueId: string | number, comment_text: string) => {
+    const res = await apiClient.post(`/issues/${issueId}/comments`, { comment_text });
+    return res.data;
+};
+
+export const uploadIssueAttachments = async (issueId: string | number, formData: FormData) => {
+    const res = await apiClient.post(`/issues/${issueId}/attachments`, formData);
+    return res.data;
+};
+
+export const uploadCommentAttachments = async (issueId: string | number, commentId: string | number, formData: FormData) => {
+    const res = await apiClient.post(`/issues/${issueId}/comments/${commentId}/attachments`, formData);
+    return res.data;
+};
+
+export const deleteIssueAttachment = async (issueId: string | number, filename: string) => {
+    const res = await apiClient.delete(`/issues/${issueId}/attachments/${filename}`);
+    return res.data;
+};
+
+export const downloadIssueFile = async (issueId: string | number, type: 'working_dir' | 'logs') => {
+    const res = await apiClient.get(`/issues/${issueId}/download/${type}`);
     return res.data;
 };
