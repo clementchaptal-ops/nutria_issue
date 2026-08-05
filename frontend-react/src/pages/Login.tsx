@@ -62,7 +62,7 @@ function Login() {
       const finalDestination = savedTarget || from
       localStorage.removeItem('nutria_redirect_target')
       
-      toast.success(t('login.success', `Welcome ${data.full_name || data.user_name}!`))
+      toast.success(t('login.success', { name: data.full_name || data.user_name }))
       navigate(finalDestination, { replace: true })
       
     } catch (err: any) {
