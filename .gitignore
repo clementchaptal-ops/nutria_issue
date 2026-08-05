@@ -9,21 +9,21 @@
 *.sln
 *.sw?
 
-# Dépendances Node / React
+# Node / React dependencies
 node_modules/
 dist/
 build/
 dist-ssr/
 .pnpm-store/
 
-# Environnement Python & Cache
+# Python environment & caches
 .venv/
 venv/
 ENV/
 **/__pycache__/
 **/*.pyc
 
-# Fichiers secrets / Configuration locale
+# Secret files / Local configuration
 .env
 .env.local
 *.local
@@ -37,20 +37,8 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Fichiers lourds / Pièces jointes (Vidéos, captures, zips...)
+# Heavy files / Attachments (Videos, screenshots, zips...)
 backend-python/stored_attachments/
 **/*.mp4
 **/*.png
 **/*.zip
-
-# Cache et Environnement Python
-.env
-**/__pycache__/
-**/*.pyc
-
-# Fichiers lourds
-backend-python/stored_attachments/
-
-# Dépendances React
-node_modules/
-dist/

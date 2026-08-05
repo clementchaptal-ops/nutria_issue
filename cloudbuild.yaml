@@ -1,13 +1,13 @@
 steps:
-  # 1. On active l'API Cloud Functions
+  # 1. Enable the Cloud Functions API
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args: ['gcloud', 'services', 'enable', 'cloudfunctions.googleapis.com']
 
-  # 2. On active l'API Cloud Resource Manager
+  # 2. Enable the Cloud Resource Manager API
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args: ['gcloud', 'services', 'enable', 'cloudresourcemanager.googleapis.com']
 
-  # 3. Étape de déploiement (sans la ligne allow-unauthenticated)
+  # 3. Deployment step (restricted access, 'allow-unauthenticated' is purposely omitted)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args:
       - 'gcloud'

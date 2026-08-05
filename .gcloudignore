@@ -4,6 +4,8 @@
 frontend-react/
 .vscode/
 
+# Ignore local files and caches
+python-commenter.mjs
 backend-python/stored_attachments/
-backend-pyhon/__pycache__/
-backend-python/config/translator.py/
+backend-python/**/__pycache__/
+backend-python/config/translator.py
