@@ -6,7 +6,6 @@ from flask import jsonify
 from routers.security import verify_token
 from routers.auth import google_auth
 from routers.issues import get_all_issues
-from routers import regroupement
 
 @functions_framework.http
 def nutria_api(request):
@@ -81,86 +80,70 @@ def nutria_api(request):
                 is_cleanup = (path == "issues/cleanup" and request.method == "POST")  
                 is_audit_log = (path == "issues/audit/logs" and request.method == "POST")
                 
-                # Block immediately if token tries unauthorized routes
                 if not (is_preticket or is_attachment or is_environment or is_cleanup or is_audit_log):
                     print(f"[SECURITY ALERT] Attempt to use LIMS token for unauthorized route: {request.method} {path} from IP {client_ip}")
-                    return jsonify({
-                        "error": "error.forbidden", 
-                        "details": "error.lims_token_restricted"
-                    }), 403, headers
+                    return jsonify({"error": "error.forbidden", "details": "error.lims_token_restricted"}), 403, headers
             # =========================================================================
             
-            # GET /issues
             if path == "issues" and request.method == "GET":
                 data, http_code = get_all_issues(current_user)
                 return jsonify({"status": "success.data_retrieved", "data": data}), http_code, headers
                 
-            # GET /issues/audit/logs
             elif path == "issues/audit/logs" and request.method == "GET":
                 from routers.audit import get_audit_logs
                 data, http_code = get_audit_logs(current_user)
                 return jsonify(data), http_code, headers
                 
-            # POST /issues/audit/logs
             elif path == "issues/audit/logs" and request.method == "POST":
                 from routers.audit import add_audit_log
                 request_json = request.get_json(silent=True) or {}
                 data, http_code = add_audit_log(request_json)
                 return jsonify(data), http_code, headers
                 
-            # GET /issues/users/me
             elif path == "issues/users/me" and request.method == "GET":
                 from routers.issues import get_my_profile
                 data, http_code = get_my_profile(current_user)
                 return jsonify(data), http_code, headers
                 
-            # POST /issues/create
             elif path == "issues/create" and request.method == "POST":
                 from routers.issues import create_issue
                 request_json = request.get_json(silent=True) or {}
                 data, http_code = create_issue(request_json, current_user, client_ip)
                 return jsonify(data), http_code, headers
                 
-            # GET /issues/{id}
             elif len(parts) == 2 and parts[1].isdigit() and request.method == "GET":
                 from routers.issues import get_issue
                 data, http_code = get_issue(int(parts[1]), current_user)
                 return jsonify(data), http_code, headers
 
-            # PUT /issues/{id}/validate
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "validate" and request.method == "PUT":
                 from routers.issues import validate_issue
                 request_json = request.get_json(silent=True) or {}
                 data, http_code = validate_issue(int(parts[1]), request_json, current_user, client_ip)
                 return jsonify(data), http_code, headers
 
-            # PUT /issues/{id}/cancel
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "cancel" and request.method == "PUT":
                 from routers.issues import cancel_issue
                 data, http_code = cancel_issue(int(parts[1]), current_user, client_ip)
                 return jsonify(data), http_code, headers
 
-            # PUT /issues/{id}/close
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "close" and request.method == "PUT":
                 from routers.issues import close_ticket
                 request_json = request.get_json(silent=True) or {}
                 data, http_code = close_ticket(int(parts[1]), request_json, current_user, client_ip)
                 return jsonify(data), http_code, headers
 
-            # GET /issues/{id}/comments
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "comments" and request.method == "GET":
                 from routers.issues import get_issue_comments
                 data, http_code = get_issue_comments(int(parts[1]), current_user)
                 return jsonify(data), http_code, headers
 
-            # POST /issues/{id}/comments
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "comments" and request.method == "POST":
                 from routers.issues import add_issue_comment
                 request_json = request.get_json(silent=True) or {}
                 data, http_code = add_issue_comment(int(parts[1]), request_json, current_user, client_ip)
                 return jsonify(data), http_code, headers
 
-            # POST /issues/{id}/comments/{comment_id}/attachments (Comment attachments)
             elif len(parts) == 5 and parts[1].isdigit() and parts[2] == "comments" and parts[3].isdigit() and parts[4] == "attachments" and request.method == "POST":
                 from routers.issues import upload_comment_attachments
                 issue_id, comment_id = int(parts[1]), int(parts[3])
@@ -168,28 +151,24 @@ def nutria_api(request):
                 data, http_code = upload_comment_attachments(issue_id, comment_id, files_data, current_user)
                 return jsonify(data), http_code, headers
 
-            # POST /issues/{id}/attachments (Ticket image/file upload)
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "attachments" and request.method == "POST":
                 from routers.attachments import upload_attachments
                 files_data = [{"filename": f.filename, "content_type": f.content_type, "bytes": f.read()} for k in request.files for f in request.files.getlist(k)]
                 data, http_code = upload_attachments(int(parts[1]), files_data, current_user, client_ip)
                 return jsonify(data), http_code, headers
 
-            # GET /issues/{id}/attachments/{filename} (Display images/files via redirection)
             elif len(parts) >= 4 and parts[1].isdigit() and parts[2] == "attachments" and request.method == "GET":
                 from routers.attachments import get_attachment_file
                 issue_id = int(parts[1])
                 filename = "/".join(parts[3:])
                 data, http_code = get_attachment_file(issue_id, filename)
                 
-                # Direct redirection to Google Storage
                 if http_code == 200 and "public_url" in data:
                     headers_redirect = headers.copy()
                     headers_redirect["Location"] = data["public_url"]
                     return ('', 302, headers_redirect)
                 return jsonify(data), http_code, headers
 
-            # DELETE /issues/{id}/attachments/{filename}
             elif len(parts) >= 4 and parts[1].isdigit() and parts[2] == "attachments" and request.method == "DELETE":
                 from routers.attachments import delete_attachment
                 issue_id = int(parts[1])
@@ -197,26 +176,22 @@ def nutria_api(request):
                 data, http_code = delete_attachment(issue_id, filename, current_user, client_ip)
                 return jsonify(data), http_code, headers
 
-            # GET /issues/{id}/download/{file_type}
             elif len(parts) == 4 and parts[1].isdigit() and parts[2] == "download" and request.method == "GET":
                 from routers.issues import download_file_path
                 data, http_code = download_file_path(int(parts[1]), parts[3], current_user, client_ip)
                 return jsonify(data), http_code, headers
             
-            # POST /issues/preticket (For LabWare)
             elif path == "issues/preticket" and request.method == "POST":
                 from routers.issues import create_preticket
                 request_json = request.get_json(silent=True) or {}
                 data, http_code = create_preticket(request_json, current_user, client_ip)
                 return jsonify(data), http_code, headers
             
-            # POST /issues/cleanup (Automated Cleanup)
             elif path == "issues/cleanup" and request.method == "POST":
                 from routers.issues import system_cleanup
                 data, http_code = system_cleanup()
                 return jsonify(data), http_code, headers
             
-            # PUT /issues/{id}/environment
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "environment" and request.method == "PUT":
                 from routers.issues import update_issue_environment
                 request_json = request.get_json(silent=True) or {}
@@ -240,52 +215,44 @@ def nutria_api(request):
             client_ip = request.remote_addr or "Unknown"
             parts = path.split("/")
 
-            # GET /regroupements
             if path == "regroupements" and request.method == "GET":
                 from routers.regroupement import get_all_regroupements
                 data, http_code = get_all_regroupements(current_user)
                 return jsonify(data), http_code, headers
                 
-            # POST /regroupements
             elif path == "regroupements" and request.method == "POST":
                 from routers.regroupement import create_regroupement
                 request_json = request.get_json(silent=True) or {}
                 data, http_code = create_regroupement(request_json, current_user, client_ip)
                 return jsonify(data), http_code, headers
                 
-            # GET /regroupements/{id}
             elif len(parts) == 2 and parts[1].isdigit() and request.method == "GET":
                 from routers.regroupement import get_regroupement
                 data, http_code = get_regroupement(int(parts[1]), current_user)
                 return jsonify(data), http_code, headers
 
-            # PUT /regroupements/{id} (MODIFICATION)
             elif len(parts) == 2 and parts[1].isdigit() and request.method == "PUT":
                 from routers.regroupement import update_regroupement
                 request_json = request.get_json(silent=True) or {}
                 data, http_code = update_regroupement(int(parts[1]), request_json, current_user, client_ip)
                 return jsonify(data), http_code, headers
 
-            # PUT /regroupements/{id}/close
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "close" and request.method == "PUT":
                 from routers.regroupement import close_regroupement
                 data, http_code = close_regroupement(int(parts[1]), current_user, client_ip)
                 return jsonify(data), http_code, headers
 
-            # GET /regroupements/{id}/comments
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "comments" and request.method == "GET":
                 from routers.regroupement import get_regroupement_comments
                 data, http_code = get_regroupement_comments(int(parts[1]), current_user)
                 return jsonify(data), http_code, headers
 
-            # POST /regroupements/{id}/comments
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "comments" and request.method == "POST":
                 from routers.regroupement import add_regroupement_comment
                 request_json = request.get_json(silent=True) or {}
                 data, http_code = add_regroupement_comment(int(parts[1]), request_json, current_user, client_ip)
                 return jsonify(data), http_code, headers
 
-            # POST /regroupements/{id}/comments/{comment_id}/attachments
             elif len(parts) == 5 and parts[1].isdigit() and parts[2] == "comments" and parts[3].isdigit() and parts[4] == "attachments" and request.method == "POST":
                 from routers.regroupement import upload_regroupement_comment_attachments
                 reg_id, comment_id = int(parts[1]), int(parts[3])
@@ -293,14 +260,12 @@ def nutria_api(request):
                 data, http_code = upload_regroupement_comment_attachments(reg_id, comment_id, files_data, current_user)
                 return jsonify(data), http_code, headers
 
-            # POST /regroupements/{id}/attachments
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "attachments" and request.method == "POST":
                 from routers.regroupement import upload_regroupement_attachments
                 files_data = [{"filename": f.filename, "content_type": f.content_type, "bytes": f.read()} for k in request.files for f in request.files.getlist(k)]
                 data, http_code = upload_regroupement_attachments(int(parts[1]), files_data, current_user)
                 return jsonify(data), http_code, headers
 
-            # DELETE /regroupements/{id}/attachments/{filename}
             elif len(parts) >= 4 and parts[1].isdigit() and parts[2] == "attachments" and request.method == "DELETE":
                 from routers.regroupement import delete_regroupement_attachment
                 reg_id = int(parts[1])
@@ -308,21 +273,16 @@ def nutria_api(request):
                 data, http_code = delete_regroupement_attachment(reg_id, filename, current_user, client_ip)
                 return jsonify(data), http_code, headers
             
-            # --- AI CLUSTERING ROUTES ---
-
-            # POST /regroupements/suggest-ai (Launch AI Clustering)
             elif path == "regroupements/suggest-ai" and request.method == "POST":
-                from services.ai_clustering import generate_suggested_regroupements # NOUVEAU CHEMIN
+                from services.ai_clustering import generate_suggested_regroupements
                 data, http_code = generate_suggested_regroupements(current_user.get("sub"))
                 return jsonify(data), http_code, headers
 
-            # PUT /regroupements/{id}/validate-suggestion (IT Validation)
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "validate-suggestion" and request.method == "PUT":
                 from routers.regroupement import validate_ai_suggestion
                 data, http_code = validate_ai_suggestion(int(parts[1]), current_user, client_ip)
                 return jsonify(data), http_code, headers
 
-            # PUT /regroupements/{id}/reject-suggestion (IT Rejection)
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "reject-suggestion" and request.method == "PUT":
                 from routers.regroupement import reject_ai_suggestion
                 data, http_code = reject_ai_suggestion(int(parts[1]), current_user, client_ip)
