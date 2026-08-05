@@ -9,8 +9,7 @@ from .audit import log_user_action
 from .issues import make_signed_url
 from config.storage import make_signed_url, BUCKET_NAME
 from services.state_manager import trigger_state_json_update
-# 🚀 IMPORT DU TRIGGER POUR METTRE A JOUR LE JSON GLOBAL
-from .attachments import trigger_state_json_update
+
 
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 

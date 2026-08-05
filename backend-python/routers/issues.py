@@ -14,8 +14,7 @@ from services.state_manager import trigger_state_json_update
 from .schemas import IssueCreate, IssueUpdate, StatusUpdate
 from .audit import log_user_action
 
-# 🚀 IMPORT DU GESTIONNAIRE D'ÉTAT JSON GLOBAL
-from .attachments import trigger_state_json_update
+
 
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 
