@@ -1,4 +1,8 @@
-/* Main page layout structure */
+/* ==========================================================================
+   Main Page Layout Structure
+   Handles the overall viewport wrapping and navigation bar.
+   ========================================================================== */
+
 .layout {
     display: flex;
     flex-direction: column;
@@ -38,7 +42,11 @@
     padding: 20px;
   }
   
-  /* Login and profile selection card styles */
+/* ==========================================================================
+   Login & Interaction Card Styles
+   Encapsulates the visual state of the centered access form/card.
+   ========================================================================== */
+  
   .loginCard {
     background: #ffffff;
     padding: 32px;
@@ -79,7 +87,11 @@
     width: 100%;
   }
   
-  /* Profile selection controls and animations */
+/* ==========================================================================
+   Profile Selection View
+   Styles for switching between multiple available user profiles.
+   ========================================================================== */
+  
   .profileSelectionContainer {
     display: flex;
     flex-direction: column;
@@ -168,6 +180,11 @@
     color: #0369a1;
     text-decoration: underline;
   }
+  
+/* ==========================================================================
+   Animations
+   Keyframe definitions for smooth user transitions.
+   ========================================================================== */
   
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(5px); }

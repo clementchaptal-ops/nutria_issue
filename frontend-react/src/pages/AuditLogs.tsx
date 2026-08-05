@@ -4,14 +4,23 @@ import { useTranslation } from 'react-i18next'
 import ErrorMessage from '../components/ErrorMessage'
 import apiClient from '../api/client'
 
-/** Component for displaying system audit logs. */
+/**
+ * AuditLogs component.
+ * Fetches and displays a system-level security and modification audit log.
+ * Restricted to administrative users; redirects to dashboard if unauthorized.
+ *
+ * @component
+ */
 function AuditLogs() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+
+  // State initialization for administrative audit logs data, load state, and error messages.
   const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Side-effect hook to retrieve system logs once the component is mounted.
   useEffect(() => {
     const fetchLogs = async () => {
       try {
@@ -19,6 +28,7 @@ function AuditLogs() {
 
         const data = response.data
 
+        // Validate payload structure from backend
         if (Array.isArray(data)) {
           setLogs(data)
         } else {
@@ -26,6 +36,7 @@ function AuditLogs() {
           setLogs([]) 
         }
       } catch (err: any) {
+        // Automatically redirect unauthorized users (HTTP 403) back to dashboard
         if (err.response && err.response.status === 403) {
           navigate('/dashboard') 
           return
@@ -40,6 +51,7 @@ function AuditLogs() {
     fetchLogs()
   }, [navigate, t])
 
+  // Display centered loader during API call resolution
   if (loading) return <p style={{ padding: '40px', textAlign: 'center' }}>{t('common.loading', 'Loading data...')}</p>
 
   return (
@@ -97,5 +109,4 @@ function AuditLogs() {
   )
 }
 
-/** Default export for the AuditLogs component. */
 export default AuditLogs

@@ -1,11 +1,11 @@
-/* Main layout container for the regrouping list. */
+/* Main layout container for the view */
 .container {
   padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
 }
 
-/* Header section containing title and count badges. */
+/* Header section containing page title and item counter badges */
 .header {
   display: flex;
   align-items: center;
@@ -28,7 +28,7 @@
   font-weight: bold;
 }
 
-/* Action bar for main controls and search input. */
+/* Navigation control bar including search input and action buttons */
 .actionBar {
   display: flex;
   align-items: center;
@@ -49,7 +49,7 @@
   display: flex;
 }
 
-/* Primary action and automation buttons with standardized dimensions. */
+/* Interactive control buttons and action triggers */
 .createBtn, 
 .aiBtn {
   height: 40px; 
@@ -93,7 +93,7 @@
   opacity: 0.8;
 }
 
-/* State panels for empty results and intelligence outputs. */
+/* Informational placeholders, feedback panels, and state messages */
 .emptyState {
   text-align: center;
   padding: 40px;

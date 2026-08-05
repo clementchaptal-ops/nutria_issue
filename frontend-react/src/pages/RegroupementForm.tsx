@@ -7,7 +7,13 @@ import { fetchAllIssues } from '../api/issues'
 import FileUploader from '../components/FileUploader'
 import styles from './IssueForm.module.css' 
 
-/** Form component for creating and managing issue regroupements with attachments. */
+/**
+ * RegroupementForm component provides a user interface to group multiple related issues.
+ * It allows creating a new regroupement with a title, description, an optional SSP ticket,
+ * associated file attachments, and a list of linked issues filtered by status and availability.
+ *
+ * @returns {JSX.Element} The rendered creation form component.
+ */
 function RegroupementForm() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -26,9 +32,11 @@ function RegroupementForm() {
   })
 
   useEffect(() => {
+    // Fetch all issues to find active, unassigned ones that can be linked
     fetchAllIssues()
       .then(data => {
         const issueList = Array.isArray(data) ? data : (data.data || []);
+        // Filter out closed/canceled issues and issues that are already linked to another regroupement
         const issuesToLink = issueList.filter((i: any) => 
           !['CLOSED', 'CANCELED'].includes(i.status) && !i.id_regroupment
         )
@@ -39,6 +47,11 @@ function RegroupementForm() {
       })
   }, [t])
 
+  /**
+   * Toggles the selection state of a specific issue ID in the form data.
+   *
+   * @param {number} id - The unique identifier of the issue to toggle.
+   */
   const toggleIssue = (id: number) => {
     setFormData(prev => ({
       ...prev,
@@ -48,8 +61,14 @@ function RegroupementForm() {
     }))
   }
 
+  /**
+   * Handles form submission, including regroupement creation and optional file uploads.
+   *
+   * @param {React.FormEvent} e - The form submission event.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    // Enforce basic validation before making API requests
     if (!formData.title.trim() || !formData.description.trim()) {
       toast.error(t('form.missing_fields', 'Please fill all required fields.'))
       return
@@ -57,9 +76,11 @@ function RegroupementForm() {
 
     setLoading(true)
     try {
+      // Create the regroupement record
       const response = await createRegroupement(formData)
       const newRegroupementId = response.data.id_regroupment
       
+      // Upload files if any have been attached
       if (attachments.length > 0 && newRegroupementId) {
         const uploadData = new FormData()
         attachments.forEach((file) => uploadData.append('files', file))
@@ -79,6 +100,7 @@ function RegroupementForm() {
     }
   }
 
+  // Filter available issues dynamically by search query (id or title)
   const filteredIssues = availableIssues.filter(issue => {
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()

@@ -1,61 +1,81 @@
-/* Main container layout. */
+/* ==========================================================================
+   Main Layout Structure
+   ========================================================================== */
+
+/* Page layout wrapper setting full viewport height and vertical stacking */
 .layout {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-  }
-  
-  /* Top navigation header. */
-  .header {
+}
+
+/* Main content body designed to scale and fill remaining vertical space */
+.mainContent {
+    flex: 1;
+    background-color: var(--bg-app);
+}
+
+/* ==========================================================================
+   Top Navigation Header
+   ========================================================================== */
+
+/* Top header container providing structural alignment for branding and actions */
+.header {
     background-color: #ffffff;
     border-bottom: 1px solid var(--border-color);
     padding: 15px 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-  }
-  
-  /* Container for logo and branding elements. */
-  .logoArea {
+}
+
+/* Layout container grouping the logo and primary brand typography */
+.logoArea {
     display: flex;
     align-items: center;
     gap: 24px;
-  }
+}
 
-  /* Typography styles for the logo text. */
-  .logoText {
+/* Brand logo text typography styling */
+.logoText {
     font-size: 20px;
     font-weight: bold;
     color: var(--primary-color);
     letter-spacing: 0.5px;
-  }
-  
-  /* Main content body container. */
-  .mainContent {
-    flex: 1;
-    background-color: var(--bg-app);
-  }
+}
 
-  /* Button for logging out of the application. */
-  .logoutBtn {
-    background-color: transparent;
-    color: var(--error-color);
-    border: 1px solid var(--error-color);
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 500;
+/* ==========================================================================
+   User Navigation & Action Controls
+   ========================================================================== */
+
+/* Right-aligned container for secondary actions and user profile information */
+.headerRight {
+    display: flex;
+    align-items: center;
+}
+
+/* Profile indicator box highlighting user details and context */
+.userInfo {
     font-size: 14px;
-    transition: all 0.2s ease;
-    white-space: nowrap; 
-  }
-  
-  .logoutBtn:hover {
-    background-color: var(--error-bg);
-  }
+    color: #666666;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: #f8f9fa;
+    padding: 6px 14px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    margin-right: 40px;
+}
 
-  /* Button for navigating to the dashboard. */
-  .dashboardBtn {
+/* Visual highlights for user location indicators */
+.userLocation {
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+/* Dashboard navigation shortcut control button */
+.dashboardBtn {
   background-color: transparent;
   border: 1px solid var(--border-color);
   color: #333333;
@@ -71,33 +91,25 @@
   margin-left: 10px; 
 }
 
-  .dashboardBtn:hover {
-    background-color: #f4f5f7;
-    border-color: var(--primary-color);
-  }
+.dashboardBtn:hover {
+  background-color: #f4f5f7;
+  border-color: var(--primary-color);
+}
 
-  /* Container for components aligned to the right side of the header. */
-  .headerRight {
-    display: flex;
-    align-items: center;
-  }
-
-  /* Box displaying information about the logged-in user. */
-  .userInfo {
-    font-size: 14px;
-    color: #666666;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background-color: #f8f9fa;
-    padding: 6px 14px;
+/* Destructive action button designated for ending sessions */
+.logoutBtn {
+    background-color: transparent;
+    color: var(--error-color);
+    border: 1px solid var(--error-color);
+    padding: 6px 12px;
     border-radius: 4px;
-    border: 1px solid var(--border-color);
-    margin-right: 40px;
-  }
-  
-  /* Style for displaying the user's location. */
-  .userLocation {
-    font-weight: bold;
-    color: var(--primary-color);
-  }
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    white-space: nowrap; 
+}
+
+.logoutBtn:hover {
+    background-color: var(--error-bg);
+}

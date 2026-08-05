@@ -9,13 +9,20 @@ import StatCard from '../components/StatCard'
 import SearchBar from '../components/SearchBar'
 import GenericTable, { TableColumn } from '../components/GenericTable'
 
-/** Configuration properties for sorting tabular issue data. */
+/**
+ * Configuration options for sorting tabular issue data.
+ */
 type SortConfig = {
   key: string;
   direction: 'asc' | 'desc';
 }
 
-/** Computes background colors, text colors, and labels for group badge styling. */
+/**
+ * Computes background colors, text colors, and display labels for group badges.
+ *
+ * @param groupId - The ID of the group, or null/undefined if none exists.
+ * @returns An object containing the CSS background color, text color, and formatted text label.
+ */
 const getGroupBadgeStyle = (groupId: number | null | undefined) => {
   if (!groupId) return { background: 'transparent', color: '#a5adba', text: '-' };
   const colors = ['#0052cc', '#36b37e', '#ff991f', '#ff5630', '#6554c0', '#00b8d9', '#ff7452', '#2684ff'];
@@ -23,26 +30,43 @@ const getGroupBadgeStyle = (groupId: number | null | undefined) => {
   return { background: bgColor, color: 'white', text: `G-${groupId}` };
 }
 
-/** Main dashboard component displaying issue statistics, search controls, and a detailed table layout. */
+/**
+ * Main dashboard component displaying issue metrics, search/filtering options,
+ * and a detailed interactive table.
+ */
 function Dashboard() {
+  // Localization hook for multi-language UI support.
   const { t } = useTranslation()
+  
+  // Router hook for navigating to issue details or issue creation views.
   const navigate = useNavigate()
 
+  // Manage filtering states dynamically via URL query parameters.
   const [searchParams, setSearchParams] = useSearchParams()
 
+  // Component state for storing fetched issue records and tracking load status.
   const [issues, setIssues] = useState<any[]>([])
   const [loading, setLoading] = useState<boolean>(true)
 
+  // Retrieve searching constraints directly from URL search parameters.
   const searchQuery = searchParams.get('search') || ''
   const searchColumn = searchParams.get('column') || 'ALL'
   
+  // Parse visible status filters from URL parameter, defaulting to 'IN PROGRESS'.
   const statusParam = searchParams.get('status')
   const activeStatuses = statusParam !== null 
     ? (statusParam ? statusParam.split(',') : []) 
     : ['IN PROGRESS'] 
 
+  // Local state representing the current sorting configuration for the table.
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'id_issue', direction: 'desc' })
 
+  /**
+   * Updates or removes a query parameter in the current URL.
+   *
+   * @param key - The query parameter key to modify.
+   * @param value - The value to associate with the key. If empty, the parameter is deleted.
+   */
   const updateUrlParam = (key: string, value: string) => {
     const newParams = new URLSearchParams(searchParams)
     if (value) {
@@ -53,6 +77,11 @@ function Dashboard() {
     setSearchParams(newParams)
   }
 
+  /**
+   * Toggles a status filter on or off and updates the URL state.
+   *
+   * @param targetStatus - The issue status string to toggle in the active filter list.
+   */
   const toggleStatusFilter = (targetStatus: string) => {
     let newStatuses = [...activeStatuses]
     if (activeStatuses.includes(targetStatus)) {
@@ -63,6 +92,7 @@ function Dashboard() {
     updateUrlParam('status', newStatuses.join(','))
   }
 
+  // Trigger API query to retrieve issues on mount.
   useEffect(() => {
     fetchAllIssues()
       .then((data) => {
@@ -76,6 +106,11 @@ function Dashboard() {
       })
   }, [t])
 
+  /**
+   * Updates sorting state, alternating directions if the same key is clicked sequentially.
+   *
+   * @param key - The column key used for ordering.
+   */
   const requestSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc'
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -84,11 +119,13 @@ function Dashboard() {
     setSortConfig({ key, direction })
   }
 
+  // Calculate issue count totals for all statuses regardless of active UI filters.
   const preticketCount = issues.filter(i => i.status === 'PRETICKET').length
   const inProgressCount = issues.filter(i => i.status === 'IN PROGRESS').length
   const actKnowledgeCount = issues.filter(i => i.status === 'ACT KNOWLEDGE').length
   const closedCount = issues.filter(i => i.status === 'CLOSED').length
 
+  // Filter issues based on active status filters and the current search term query.
   let filteredIssues = issues.filter((issue) => {
     const status = issue.status ? issue.status.toUpperCase() : ''
     if (!activeStatuses.includes(status)) return false
@@ -103,6 +140,7 @@ function Dashboard() {
     }
   })
 
+  // Sort filtered issues dynamically. Supporting numeric ID, nested array max value (regroupements), and case-insensitive strings.
   filteredIssues.sort((a, b) => {
     const key = sortConfig.key
     let valA = a[key]
@@ -125,6 +163,7 @@ function Dashboard() {
     return 0
   })
 
+  // Set configuration parameters for target search columns.
   const searchColumns = [
     { value: 'ALL', label: t('dashboard.search.all_columns', 'All Columns') },
     { value: 'id_issue', label: t('dashboard.search.id', 'ID') },
@@ -138,6 +177,7 @@ function Dashboard() {
     { value: 'country', label: t('dashboard.search.location', 'Location') }
   ]
 
+  // Setup the list columns schema and custom cell render functions for the GenericTable component.
   const tableColumns: TableColumn<any>[] = [
     { key: 'id_issue', label: t('dashboard.table.id', 'ID'), render: (item) => <span className={styles.tdId}>#{item.id_issue}</span> },
     { 
@@ -195,12 +235,14 @@ function Dashboard() {
     { key: 'creation_date', label: t('dashboard.table.date', 'Date'), render: (item) => <span className={styles.tdDate}>{item.creation_date}</span> }
   ]
 
+  // Conditional loading state render.
   if (loading) {
     return <p style={{ padding: '40px', textAlign: 'center' }}>{t('dashboard.loading', 'Loading dashboard data...')}</p>
   }
 
   return (
     <div className={styles.container}>
+      {/* Header element highlighting the view title and the count of matched/visible issues */}
       <div className={styles.header}>
         <h1 className={styles.title}>{t('dashboard.title', 'Issues Dashboard')}</h1>
         <span className={styles.ticketCount}>
@@ -208,6 +250,7 @@ function Dashboard() {
         </span>
       </div>
 
+      {/* Numerical summary metrics widgets linking to specific status toggle logic */}
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
         <StatCard label={t('dashboard.status.preticket', 'Pretickets')} count={preticketCount} color="#ffab00" isActive={activeStatuses.includes('PRETICKET')} onClick={() => toggleStatusFilter('PRETICKET')} />
         <StatCard label={t('dashboard.status.in_progress', 'In Progress')} count={inProgressCount} color="#0052cc" isActive={activeStatuses.includes('IN PROGRESS')} onClick={() => toggleStatusFilter('IN PROGRESS')} />
@@ -215,6 +258,7 @@ function Dashboard() {
         <StatCard label={t('dashboard.status.closed', 'Closed')} count={closedCount} color="#42526e" isActive={activeStatuses.includes('CLOSED')} onClick={() => toggleStatusFilter('CLOSED')} />
       </div>
 
+      {/* Action panel with text filter fields and issue creator initialization button */}
       <div className={styles.actionBar}>
         <div className={styles.searchWrapper}>
           <SearchBar 
@@ -232,6 +276,7 @@ function Dashboard() {
         </button>
       </div>
 
+      {/* Conditional list state render fallback if filtering returns empty collections */}
       {filteredIssues.length === 0 ? (
         <div className={styles.emptyState}>
           <h3>{t('dashboard.empty_state', 'No matching issues found')}</h3>

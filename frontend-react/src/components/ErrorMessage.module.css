@@ -1,4 +1,4 @@
-/* Style for the error alert container. */
+/* Error Alert Layout and Color Theme */
 .alert {
     background-color: var(--error-bg);
     color: var(--error-color);

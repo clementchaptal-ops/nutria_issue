@@ -1,4 +1,4 @@
-/* Container styling for the issue card and its interactive states. */
+/* Card Container and Interactive States */
 .card {
     background-color: var(--bg-container);
     border: 1px solid var(--border-color);
@@ -17,7 +17,7 @@
     border-color: var(--primary-color);
   }
   
-/* Content area for issue title, ID, and metadata. */
+/* Main Content and Typography */
   .mainInfo {
     display: flex;
     flex-direction: column;
@@ -42,7 +42,7 @@
     color: var(--text-muted);
   }
   
-/* Badge element styling for type and status indicators. */
+/* Categorization and Status Badges */
   .badges {
     display: flex;
     align-items: center;

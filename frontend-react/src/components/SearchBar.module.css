@@ -1,13 +1,17 @@
-/* Main container for the search bar elements. */
+/* ==========================================================================
+   SearchBar Component Styles
+   ========================================================================== */
+
+/* Main flex container for horizontal layout alignment */
 .searchBar {
     display: flex;
     align-items: center;
     gap: 12px;
     width: 100%;
-  }
-  
-  /* Dropdown selection menu styling. */
-  .select {
+}
+
+/* Category selection dropdown and interactive focus states */
+.select {
     height: 40px;
     padding: 0 12px;
     border: 1px solid #dfe1e6;
@@ -19,14 +23,14 @@
     cursor: pointer;
     box-sizing: border-box;
     transition: border-color 0.2s;
-  }
-  
-  .select:focus {
+}
+
+.select:focus {
     border-color: #0052cc;
-  }
-  
-  /* Text input search field styling. */
-  .inputSearch {
+}
+
+/* Query text input field and interactive focus states */
+.inputSearch {
     height: 40px;
     flex: 1;
     padding: 0 12px;
@@ -38,8 +42,8 @@
     outline: none;
     box-sizing: border-box;
     transition: border-color 0.2s;
-  }
-  
-  .inputSearch:focus {
+}
+
+.inputSearch:focus {
     border-color: #0052cc;
-  }
+}

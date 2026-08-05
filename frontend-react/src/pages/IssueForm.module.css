@@ -1,4 +1,4 @@
-/* Main layout container and general state indicators */
+/* Page Layout & Core Loading States */
 .pageContainer {
   display: flex;
   flex-direction: column;
@@ -17,7 +17,7 @@
   color: #64748b;
 }
 
-/* Global issue status banner styles representing different workflow states */
+/* Workflow Status Banner & Dynamic State Indicators */
 .statusBanner {
   display: flex;
   justify-content: space-between;
@@ -49,7 +49,7 @@
 }
 .ticketIdText { font-family: monospace; font-weight: 700; font-size: 14px; }
 
-/* Main two-column dashboard grid layout */
+/* Dashboard Layout Grid System */
 .gridContainer {
   display: grid;
   grid-template-columns: 2fr 1fr;
@@ -57,7 +57,7 @@
   align-items: stretch; 
 }
 
-/* Form inputs, structure, and interactive fields within the primary column */
+/* Left Column: Form Controls & Field Inputs */
 .leftColumn {
   background-color: #ffffff;
   padding: 24px;
@@ -120,7 +120,7 @@
   box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
 }
 
-/* Downloads section containing auto-generated dynamic logs and configuration files */
+/* Automatic System Logs & Config Downloads Section */
 .autoFilesSection {
   background-color: #f8fafc;
   border: 1px dashed #cbd5e1;
@@ -162,7 +162,7 @@
 .downloadIcon { font-size: 24px; }
 .downloadText strong { font-size: 13px; color: #1e293b; }
 
-/* Submit actions and validation states */
+/* Submit Action Button & Validation States */
 .actionContainer { margin-top: 10px; }
 .submitBtn {
   width: 100%;
@@ -178,7 +178,7 @@
 .submitBtn.active:hover { background-color: #0369a1; }
 .submitBtn.disabled { background-color: #e2e8f0; color: #94a3b8; cursor: not-allowed; }
 
-/* Right side-panel cards for read-only metadata and diagnostic settings */
+/* Right Column: Sidebar & Meta Info Cards */
 .rightColumn {
   display: flex;
   flex-direction: column;
@@ -228,10 +228,12 @@
   color: #1e293b;
 }
 
+/* Responsive Breakpoints & Viewport Adapters */
 @media (max-width: 1024px) {
   .gridContainer { grid-template-columns: 1fr; }
 }
 
+/* Code Monitors & Diagnostic Info Panels */
 .infoBlock {
   display: flex;
   flex-direction: column;
@@ -256,7 +258,7 @@
   color: #166534;
 }
 
-/* Modal lightbox overlay for media file expansion */
+/* Lightbox Modal & Media Zoom Overlays */
 .lightboxOverlay {
   position: fixed;
   top: 0;
@@ -288,7 +290,7 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
 }
 
-/* Document and media attachment gallery layout */
+/* File Attachment Galleries & Preview Grids */
 .attachmentsContainer {
   margin-top: 30px;
   padding: 24px;
@@ -416,7 +418,7 @@
   transform: scale(1.1);
 }
 
-/* User discussion thread and dynamic comment input controls */
+/* Comments & Interactive Discussion Threads */
 .commentsSection {
   margin-top: 30px;
   padding-top: 20px;

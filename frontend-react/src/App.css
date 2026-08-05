@@ -1,4 +1,6 @@
-/* Root container layout and alignment */
+/* ==========================================================================
+   Root Layout Container
+   ========================================================================== */
 #root {
   max-width: 1280px;
   margin: 0 auto;
@@ -6,7 +8,9 @@
   text-align: center;
 }
 
-/* Logo styling, hover transitions, and animations */
+/* ==========================================================================
+   Logo Components & Hover Transitions
+   ========================================================================== */
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -20,6 +24,7 @@
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
 
+/* Infinite rotation keyframes for the React logo */
 @keyframes logo-spin {
   from {
     transform: rotate(0deg);
@@ -29,18 +34,23 @@
   }
 }
 
+/* Apply rotation animation only if user has not requested reduced motion */
 @media (prefers-reduced-motion: no-preference) {
   a:nth-of-type(2) .logo {
     animation: logo-spin infinite 20s linear;
   }
 }
 
-/* Card container padding */
+/* ==========================================================================
+   Card Component Styles
+   ========================================================================== */
 .card {
   padding: 2em;
 }
 
-/* Helper class for informational text */
+/* ==========================================================================
+   Utility Classes
+   ========================================================================== */
 .read-the-docs {
   color: #888;
 }

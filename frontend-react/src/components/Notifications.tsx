@@ -1,6 +1,8 @@
 import toast from 'react-hot-toast'
 
-/** Properties required for the confirmation toast. */
+/**
+ * Props configuration for the custom confirmation toast notification.
+ */
 interface ShowConfirmToastProps {
   message: string
   confirmText: string
@@ -8,13 +10,19 @@ interface ShowConfirmToastProps {
   onConfirm: () => void
 }
 
-/** Displays a toast notification requiring user confirmation before proceeding. */
+/**
+ * Triggers a customizable confirmation toast utilizing react-hot-toast.
+ * Displays an explicit message and action buttons for confirmation or cancellation.
+ *
+ * @param props - The properties configuration object for the toast.
+ */
 export const showConfirmToast = ({
   message,
   confirmText,
   cancelText,
   onConfirm
 }: ShowConfirmToastProps) => {
+  // Render a custom interactive toast layout containing the message and action triggers
   toast((t) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <span style={{ fontSize: '14px', fontWeight: 500 }}>{message}</span>
@@ -34,6 +42,7 @@ export const showConfirmToast = ({
         </button>
         <button
           onClick={() => {
+            // Dismiss the active toast immediately and invoke the confirmation callback
             toast.dismiss(t.id)
             onConfirm()
           }}
@@ -52,5 +61,5 @@ export const showConfirmToast = ({
         </button>
       </div>
     </div>
-  ), { duration: 6000 })
+  ), { duration: 6000 }) // Keep the toast visible for a sufficient grace period
 }

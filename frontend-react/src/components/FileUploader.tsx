@@ -2,32 +2,49 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 
-/** Props for the FileUploader component. */
+/**
+ * Props for the FileUploader component.
+ */
 interface FileUploaderProps {
+  /** List of files currently selected for upload. */
   files?: File[]; 
+  /** Callback function triggered when the selection of files changes. */
   onFilesChange: (files: File[]) => void;
+  /** List of files that have already been saved or uploaded previously. */
   existingFiles?: any[]; 
 }
 
-/** The maximum allowable size for individual uploaded files. */
+/**
+ * Maximum allowable file size limit in bytes.
+ * Set to 50 Megabytes.
+ */
 const MAX_FILE_SIZE = 50 * 1024 * 1024; 
 
-/** Component for uploading files via selection, drag-and-drop, or clipboard pasting. */
+/**
+ * FileUploader Component.
+ * Supports drag-and-drop operations, manual file browser selection, 
+ * and direct clipboard pasting (Ctrl+V) of screenshots.
+ */
 const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, existingFiles = [] }) => {
   const { t } = useTranslation()
+  
+  // Tracks drag-and-drop state to conditionally update style interfaces
   const [isDragging, setIsDragging] = useState<boolean>(false)
 
+  // Evaluates, validates size, and filters out duplicates before adding incoming files
   const addFilesWithCheck = useCallback((newFiles: File[]) => {
     let updatedFiles = [...files];
     let duplicateCount = 0;
     let tooLargeCount = 0; 
 
     newFiles.forEach((newFile) => {
+      // Validate file size limit
       if (newFile.size > MAX_FILE_SIZE) {
         tooLargeCount++;
         return; 
       }
 
+      // Check if file duplicates an already selected file by name and size criteria
       const isDuplicate = updatedFiles.some(f => f.name === newFile.name || f.size === newFile.size);
 
       if (isDuplicate) {
@@ -37,6 +54,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
       }
     });
 
+    // Display validation feedback alerts to the user
     if (tooLargeCount > 0) {
       toast.error(t('form.size_alert', `⚠️ ${tooLargeCount} file(s) ignored because they exceed the 50 MB limit.`));
     }
@@ -47,6 +65,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
     onFilesChange(updatedFiles);
   }, [files, onFilesChange, t]);
 
+  // Intercepts clipboard events, extracting and transforming image data into files
   const handlePaste = useCallback((event: ClipboardEvent) => {
     const items = event.clipboardData?.items;
     if (!items) return;
@@ -67,6 +86,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
     }
   }, [addFilesWithCheck]);
 
+  // Registers global document listener for paste events on mount, and cleans up on unmount
   useEffect(() => {
     document.addEventListener('paste', handlePaste);
     return () => {
@@ -74,16 +94,19 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
     };
   }, [handlePaste]);
 
+  // Activates drag interface styles when a file is dragged over the component
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
+  // Deactivates drag interface styles when a file leaves the component boundaries
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
   };
 
+  // Processes files dropped into the zone, adding them after passing validation rules
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
@@ -95,6 +118,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
     }
   };
 
+  // Processes manually browsed and selected files through the standard file input dialog
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
@@ -103,6 +127,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
     }
   };
 
+  // Removes a pending upload file from the current list using its position index
   const removeFile = (indexToRemove: number) => {
     onFilesChange(files.filter((_, index) => index !== indexToRemove));
   };
@@ -141,6 +166,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
         💡 {t('form.paste_tip', 'Tip: You can also paste screenshots directly using Ctrl+V.')}
       </p>
       
+      {/* Existing Files List Section */}
       {existingFiles.length > 0 && (
         <div style={{ marginTop: '20px', borderTop: '1px solid #dfe1e6', paddingTop: '15px', textAlign: 'left' }}>
           <p style={{ fontSize: '14px', color: '#00875a', fontWeight: 'bold', margin: '0 0 10px 0' }}>
@@ -159,6 +185,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
         </div>
       )}
 
+      {/* New Pending Uploads List Section */}
       {files.length > 0 && (
         <div style={{ marginTop: '20px', borderTop: '1px solid #dfe1e6', paddingTop: '15px', textAlign: 'left' }}>
           <p style={{ fontSize: '14px', color: '#0052cc', fontWeight: 'bold', margin: '0 0 10px 0' }}>

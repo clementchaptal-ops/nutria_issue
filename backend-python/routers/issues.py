@@ -7,6 +7,8 @@ from google.cloud import storage
 
 from config.database import get_db_connection
 from pydantic import ValidationError
+from utils.storage import make_signed_url, BUCKET_NAME
+from services.state_manager import trigger_state_json_update
 
 # Local file imports
 from .schemas import IssueCreate, IssueUpdate, StatusUpdate

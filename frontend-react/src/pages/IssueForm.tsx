@@ -1,4 +1,8 @@
-/** Decodes the stored JWT token to retrieve the user payload. */
+/**
+ * Decodes the stored JWT token from localStorage to extract user payload information.
+ * 
+ * @returns {any | null} The decoded token payload containing user details, or null if invalid or missing.
+ */
 const getDecodedToken = () => {
   const token = localStorage.getItem('nutria_token');
   if (!token) return null;
@@ -23,7 +27,13 @@ import {
   uploadIssueAttachments, uploadCommentAttachments, deleteIssueAttachment, downloadIssueFile 
 } from '../api/issues'
 
-/** A form component for creating, viewing, updating, and managing issue tickets. */
+/**
+ * IssueForm component provides a comprehensive interface for creating new support tickets,
+ * viewing existing ticket details, updating contextual LIMS data, and managing conversations
+ * through comments and file attachments.
+ * 
+ * @returns {JSX.Element} The rendered issue management form.
+ */
 function IssueForm() {
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
@@ -32,12 +42,14 @@ function IssueForm() {
   
   const navigate = useNavigate()
 
+  // Redirect invalid configurations back to the central dashboard
   useEffect(() => {
     if (!ticketId && !isNewTicket) {
       navigate('/dashboard', { replace: true })
     }
   }, [ticketId, isNewTicket, navigate])
 
+  // UI state and view permissions management
   const [isLoading, setIsLoading] = useState(true)
   const [status, setStatus] = useState('PRETICKET') 
   const [isEditing, setIsEditing] = useState(false) 
@@ -45,6 +57,7 @@ function IssueForm() {
   
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Primary ticket detail form field state hooks
   const [title, setTitle] = useState('')
   const [issueType, setIssueType] = useState('')     
   const [criticity, setCriticity] = useState('')     
@@ -52,10 +65,12 @@ function IssueForm() {
   const [blockingIssue, setBlockingIssue] = useState('F') 
   const [description, setDescription] = useState('')
   
+  // File attachments state tracking
   const [attachments, setAttachments] = useState<File[]>([])         
   const [existingFiles, setExistingFiles] = useState<any[]>([])   
   const [isCreatedFromWeb, setIsCreatedFromWeb] = useState(false)  
   
+  // Discussion thread and comment states
   const [comments, setComments] = useState<any[]>([])
   const [newComment, setNewComment] = useState('')
   const [isPostingComment, setIsPostingComment] = useState(false)
@@ -63,18 +78,24 @@ function IssueForm() {
   const [commentFiles, setCommentFiles] = useState<File[]>([])
   const [lightboxMedia, setLightboxMedia] = useState<{url: string, type: string} | null>(null)
   
+  // Target user and workspace environment attributes
   const [userInfo, setUserInfo] = useState({
     user_name: '', full_name: '', user_email: '', created_on: '', current_role: '', lab: '', location: '', env: ''
   })
 
+  // LIMS workflow contextual properties
   const [currentContext, setCurrentContext] = useState({
     current_project: '', current_batch: '', current_sample: '', current_analysis: '', current_analysis_variation: '', current_customer: '', citrix_session: ''
   })
 
+  // Network metrics and local client identity
   const [networkInfo, setNetworkInfo] = useState({
     ip_adress: '', ip_config: '', current_pc: '', ping: '',
   })
 
+  /**
+   * Fetches comment history associated with the current ticket.
+   */
   const loadComments = useCallback(async () => {
     if (!ticketId) return
     try {
@@ -87,9 +108,13 @@ function IssueForm() {
     }
   }, [ticketId])
 
+  /**
+   * Orchestrates population of core ticket data, fallback profiles, or creates basic details for a new ticket.
+   */
   const loadTicketData = useCallback(async () => {
     setIsLoading(true)
     if (isNewTicket) {
+      // Setup edit configuration defaults for target workflow
       setIsEditing(true)
       setCanEdit(true)
       setStatus('IN PROGRESS') 
@@ -178,6 +203,7 @@ function IssueForm() {
         ping: data.ping || ''
       })
 
+      // Evaluate role capabilities and locate ownership matches for modification actions
       const currentUser = getDecodedToken()
       if (currentUser && currentStatus !== 'CANCELED' && currentStatus !== 'CLOSED' && currentStatus !== 'ACT KNOWLEDGE') {
         const userRole = currentUser.role
@@ -210,11 +236,18 @@ function IssueForm() {
     }
   }, [ticketId, isNewTicket, navigate, t])
 
+  // Triggers initial lookup for ticket state metadata and chat history
   useEffect(() => {
     loadTicketData()
     if (ticketId && !isNewTicket) loadComments()
   }, [loadTicketData, loadComments, ticketId, isNewTicket])
 
+  /**
+   * Downloads context log files or working directories related to diagnostics.
+   * 
+   * @param {'working_dir' | 'logs'} type The file target type.
+   * @param {string} defaultFilename Fallback filename for downloading.
+   */
   const handleFileDownload = async (type: 'working_dir' | 'logs', defaultFilename: string) => {
     if (!ticketId) return
     try {
@@ -237,6 +270,9 @@ function IssueForm() {
 
   const isFormValid = title.trim() !== '' && issueType !== '' && criticity !== '' && frequency !== '' && description.trim() !== ''
 
+  /**
+   * Event handler that submits completed fields to update an existing issue or register a new ticket.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!isFormValid || isSubmitting) return
@@ -260,6 +296,7 @@ function IssueForm() {
         await validateIssue(ticketId!, payloadData)
       }
 
+      // Handle raw secondary attachment uploads if added during view interaction
       if (attachments.length > 0 && targetTicketId) {
         const formData = new FormData()
         attachments.forEach((file) => formData.append('file', file))
@@ -293,6 +330,9 @@ function IssueForm() {
     }
   }
 
+  /**
+   * Submits request to set ticket status configuration to canceled state.
+   */
   const executeCancelTicket = async () => {
     if (!ticketId) return
     try {
@@ -307,6 +347,9 @@ function IssueForm() {
     }
   }
 
+  /**
+   * Prompts user with a configuration alert before executing the ticket cancellation request.
+   */
   const handleCancelTicket = () => {
     showConfirmToast({
       message: t('ticket.confirm_cancel', 'Are you sure you want to cancel this ticket? This action cannot be undone.'), 
@@ -316,6 +359,9 @@ function IssueForm() {
     })
   }
 
+  /**
+   * Submits state validation changes for resolution tracking or formal closure.
+   */
   const executeCloseTicket = async (targetStatus: 'ACT KNOWLEDGE' | 'CLOSED') => {
     if (!ticketId) return
     try {
@@ -334,6 +380,9 @@ function IssueForm() {
     }
   }
 
+  /**
+   * Standardized status handler wrapping status change requests with a safety check dialog.
+   */
   const handleCloseTicket = (targetStatus: 'ACT KNOWLEDGE' | 'CLOSED') => {
     const confirmMessage = targetStatus === 'ACT KNOWLEDGE' 
       ? t('ticket.confirm_resolve', 'Are you sure you want to acknowledge this ticket?')
@@ -347,6 +396,9 @@ function IssueForm() {
     })
   }
 
+  /**
+   * Instructs LIMS storage interface to discard a specific media or document file.
+   */
   const executeDeleteAttachment = async (filename: string) => {
     if (!ticketId) return
     try {
@@ -359,6 +411,9 @@ function IssueForm() {
     }
   }
 
+  /**
+   * Intercepts media removal click sequence with structured warning alerts.
+   */
   const handleDeleteAttachment = (filename: string) => {
     showConfirmToast({
       message: t('ticket.confirm_delete_file', 'Are you sure you want to delete this file?'), 
@@ -368,6 +423,9 @@ function IssueForm() {
     })
   };
 
+  /**
+   * Resets active configurations and toggles the dynamic editing mode off.
+   */
   const handleCancelEdit = () => {
     if (isNewTicket) navigate('/dashboard');
     else {
@@ -376,6 +434,9 @@ function IssueForm() {
     }
   };
 
+  /**
+   * Commits the composed discussion thread comment, linking pending file binaries where configured.
+   */
   const handlePostComment = async () => {
     if (!newComment.trim() || isPostingComment || !ticketId) return
     setIsPostingComment(true)
@@ -401,6 +462,7 @@ function IssueForm() {
     }
   }
 
+  // Render initial standard loader overlay
   if (isLoading) {
     return <div className={styles.loading}>{t('common.loading', 'Loading ticket data...')}</div>
   }
@@ -408,6 +470,7 @@ function IssueForm() {
   return (
     <div className={styles.pageContainer}>
       
+      {/* Top action layout containing dynamic flow settings, states and state actions */}
       <div className={`${styles.statusBanner} ${styles[status.toLowerCase().replace(' ', '_')]}`} style={{ display: 'flex', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div className={styles.statusInfo}>
@@ -448,8 +511,10 @@ function IssueForm() {
         )}
       </div>
 
+      {/* Main split viewport split between primary form fields and secondary sidebar details */}
       <div className={styles.gridContainer}>
         
+        {/* Left container displaying description input structures and file lists */}
         <div className={styles.leftColumn}>
           <form onSubmit={handleSubmit}>
             <fieldset disabled={!isEditing} style={{ border: 'none', padding: 0, margin: 0 }}>
@@ -535,6 +600,7 @@ function IssueForm() {
             </fieldset>
           </form>
 
+          {/* Existing uploaded media and diagnostics preview blocks */}
           {existingFiles && existingFiles.some(f => {
             const name = (f.attachment_name || '').toLowerCase();
             const path = (f.url_path || '').toLowerCase();
@@ -595,6 +661,7 @@ function IssueForm() {
             </div>
           )}
           
+          {/* Automated diagnostic data card sections */}
           {!isNewTicket && !isCreatedFromWeb && (
             <div className={styles.autoFilesSection} style={{ marginTop: '30px' }}>
               <h4 className={styles.autoFilesTitle}>{t('ticket.auto_collected', 'Auto-collected Context Files:')}</h4>
@@ -616,6 +683,7 @@ function IssueForm() {
           )}
         </div>
         
+        {/* Right sidebar tracking organizational identity parameters */}
         <div className={styles.rightColumn}>
           <div className={`${styles.sidebarCard} ${styles.readOnlyCard}`}>
             <h3 className={styles.cardTitle}>👤 {t('sidebar.user_title', 'User Information')}</h3>
@@ -664,6 +732,7 @@ function IssueForm() {
             </div>
           </div>
           
+          {/* Diagnostic diagnostic lists regarding routing nodes */}
           {!isNewTicket && !isCreatedFromWeb && (
             <div className={`${styles.sidebarCard} ${styles.readOnlyCard}`}>
               <h3 className={styles.cardTitle}>🌐 {t('sidebar.network_title', 'Network & Infrastructure')}</h3>
@@ -691,6 +760,7 @@ function IssueForm() {
         </div>
       </div> 
 
+      {/* Structured dialog discussion flow interface */}
       {!isNewTicket && !isEditing && (
         <div className={styles.commentsSection} style={{ width: '100%', marginTop: '30px' }}>
           <h3 className={styles.commentsTitle}>💬 {t('ticket.discussion', 'Discussion')}</h3>
@@ -766,6 +836,7 @@ function IssueForm() {
         </div>
       )}
 
+      {/* Lightbox asset preview modal rendering layer */}
       {lightboxMedia && (
         <div 
           className={styles.lightboxOverlay}

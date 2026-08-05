@@ -17,7 +17,15 @@ import {
 } from '../api/regroupements'
 import styles from './IssueForm.module.css'
 
-/** Displays and manages the detailed view, attachments, and discussion of a grouped ticket. */
+/**
+ * RegroupementDetail Component
+ * 
+ * Displays the detailed view of a grouped ticket (regroupement), allowing users to
+ * view metadata, edit details, manage attachments, view linked issues, and participate
+ * in a discussion board with multi-media file uploads.
+ * 
+ * @returns {React.ReactElement} The detailed regroupement view.
+ */
 function RegroupementDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -38,6 +46,12 @@ function RegroupementDetail() {
   const [isPostingComment, setIsPostingComment] = useState(false)
   const [lightboxMedia, setLightboxMedia] = useState<{url: string, type: string} | null>(null)
 
+  /**
+   * Fetches the regroupement detail data from the server and populates the edit form.
+   * Also triggers the loading of related comments.
+   * 
+   * @returns {Promise<void>}
+   */
   const loadData = async () => {
     if (!regroupementId) return
     try {
@@ -56,6 +70,11 @@ function RegroupementDetail() {
     }
   }
 
+  /**
+   * Fetches comment list specifically associated with this regroupement.
+   * 
+   * @returns {Promise<void>}
+   */
   const fetchComments = async () => {
     if (!regroupementId) return
     try {
@@ -67,10 +86,16 @@ function RegroupementDetail() {
     }
   }
 
+  // Trigger data load on mount or when the ID parameter changes
   useEffect(() => {
     loadData()
   }, [regroupementId])
 
+  /**
+   * Performs the API operation to close the current regroupement.
+   * 
+   * @returns {Promise<void>}
+   */
   const executeCloseRegroupement = async () => {
     try {
       await closeRegroupement(regroupementId)
@@ -81,6 +106,9 @@ function RegroupementDetail() {
     }
   }
 
+  /**
+   * Displays a confirmation dialog before closing the regroupement.
+   */
   const handleClose = () => {
     showConfirmToast({
       message: t('regroupements.confirm_close', 'Are you sure you want to close this regroupement?'),
@@ -90,10 +118,17 @@ function RegroupementDetail() {
     })
   }
 
+  /**
+   * Handles saving changes made to regroupement details,
+   * including optionally uploading new general attachments.
+   * 
+   * @returns {Promise<void>}
+   */
   const handleSaveChanges = async () => {
     try {
       await updateRegroupement(regroupementId, editFormData)
       
+      // Upload files if any have been added in the uploader
       if (attachments.length > 0) {
         const formData = new FormData()
         attachments.forEach((file) => formData.append('files', file))
@@ -109,6 +144,12 @@ function RegroupementDetail() {
     }
   }
 
+  /**
+   * Requests API to delete a specific attachment file from this regroupement.
+   * 
+   * @param {string} filename Name of the file to be deleted.
+   * @returns {Promise<void>}
+   */
   const executeDeleteAttachment = async (filename: string) => {
     try {
       await deleteRegroupementAttachment(regroupementId, filename)
@@ -119,6 +160,11 @@ function RegroupementDetail() {
     }
   }
 
+  /**
+   * Prompts the user to confirm attachment deletion.
+   * 
+   * @param {string} filename Name of the file to be deleted.
+   */
   const handleDeleteAttachment = (filename: string) => {
     showConfirmToast({
       message: t('ticket.confirm_delete_file', 'Are you sure you want to delete this file?'),
@@ -128,6 +174,11 @@ function RegroupementDetail() {
     })
   }
 
+  /**
+   * Posts a discussion comment, with support for optional multi-file attachments.
+   * 
+   * @returns {Promise<void>}
+   */
   const handlePostComment = async () => {
     if (!newComment.trim() || isPostingComment) return
     setIsPostingComment(true)
@@ -135,6 +186,7 @@ function RegroupementDetail() {
       const res = await addRegroupementComment(regroupementId, newComment)
       const commentId = res.data.id_comment
 
+      // If text post succeeds, upload files associated with the comment
       if (commentFiles.length > 0 && commentId) {
         const formData = new FormData()
         commentFiles.forEach((f) => formData.append('files', f))
@@ -151,10 +203,12 @@ function RegroupementDetail() {
     }
   }
 
+  // Render a full-page loading message during active load states
   if (loading) {
     return <div className={styles.loading}>{t('common.loading', 'Loading regroupement data...')}</div>
   }
 
+  // Render fallback if regroupement data is unavailable
   if (!regroupement) {
     return <div className={styles.pageContainer}><p>{t('regroupements.not_found', 'Regroupement not found.')}</p></div>
   }
@@ -164,6 +218,7 @@ function RegroupementDetail() {
   return (
     <div className={styles.pageContainer}>
       
+      {/* Top Banner: Navigation back, status info, and action buttons */}
       <div className={`${styles.statusBanner} ${regroupement.status === 'CLOSED' ? styles.closed : styles.in_progress}`} style={{ display: 'flex', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <button onClick={() => navigate('/regroupements')} style={{ background: 'none', border: 'none', color: '#0052cc', cursor: 'pointer', fontWeight: 'bold' }}>
@@ -177,6 +232,7 @@ function RegroupementDetail() {
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
+          {/* Action buttons visible only when not editing and the regroupement is active */}
           {!isEditing && regroupement.status !== 'CLOSED' && (
             <>
               <button type="button" onClick={() => setIsEditing(true)} style={{ padding: '6px 16px', borderRadius: '4px', border: '1px solid #0052cc', background: '#fff', color: '#0052cc', cursor: 'pointer', fontWeight: 'bold' }}>
@@ -188,6 +244,7 @@ function RegroupementDetail() {
             </>
           )}
 
+          {/* Action buttons visible in edit mode */}
           {isEditing && (
             <>
               <button type="button" onClick={() => { setIsEditing(false); setAttachments([]); }} style={{ padding: '6px 16px', borderRadius: '4px', border: '1px solid #42526e', background: '#fff', color: '#42526e', cursor: 'pointer', fontWeight: 'bold' }}>
@@ -201,10 +258,12 @@ function RegroupementDetail() {
         </div>
       </div>
 
+      {/* Main Grid: Left side for details/attachments, right side for sidebar details */}
       <div className={styles.gridContainer}>
         <div className={styles.leftColumn}>
           <div style={{ background: '#fff', padding: '24px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
             
+            {/* Title display or edit text field */}
             {isEditing ? (
               <div className={styles.formGroup} style={{ marginBottom: '15px' }}>
                 <label className={styles.label}>{t('form.title', 'Title')} <span className={styles.required}>*</span></label>
@@ -223,6 +282,7 @@ function RegroupementDetail() {
               {t('regroupements.created_by_info', 'Created by {{user}} on {{date}}', { user: regroupement.created_by, date: regroupement.created_on })}
             </p>
 
+            {/* Description section */}
             <div className={styles.formGroup}>
               <label className={styles.label}>{t('form.description', 'Description')}</label>
               {isEditing ? (
@@ -239,6 +299,7 @@ function RegroupementDetail() {
               )}
             </div>
 
+            {/* SSP Ticket reference block */}
             <div className={styles.formGroup} style={{ marginTop: '15px' }}>
               <label className={styles.label}>{t('form.ssp_ticket', 'SSP Ticket')}</label>
               {isEditing ? (
@@ -258,6 +319,7 @@ function RegroupementDetail() {
             </div>
           </div>
 
+          {/* Regroupement Attachments block */}
           <div className={styles.attachmentsContainer} style={{ marginTop: '20px' }}>
             <h3 className={styles.attachmentsTitle}>📁 {t('ticket.existing_files', 'Regroupement Attachments')}</h3>
 
@@ -271,6 +333,7 @@ function RegroupementDetail() {
 
                   return (
                     <div key={index} className={styles.attachmentItem}>
+                      {/* Image Preview attachment renderer */}
                       {isImg && (
                         <div className={styles.imagePreviewContainer}>
                           <img 
@@ -283,6 +346,7 @@ function RegroupementDetail() {
                         </div>
                       )}
 
+                      {/* Video Preview attachment renderer */}
                       {fileType === 'VIDEO' && (
                         <div className={styles.fileItemContainer}>
                           <div className={styles.videoPreviewBox} onClick={() => setLightboxMedia({ url: fileUrl, type: 'VIDEO' })}>▶️</div>
@@ -290,6 +354,7 @@ function RegroupementDetail() {
                         </div>
                       )}
 
+                      {/* Non-media fallback file attachment renderer */}
                       {!isImg && fileType !== 'VIDEO' && (
                         <div className={styles.fileItemContainer}>
                           <div className={styles.filePreviewBox}>📄</div>
@@ -297,6 +362,7 @@ function RegroupementDetail() {
                         </div>
                       )}
 
+                      {/* Delete icon visible only in edit mode */}
                       {isEditing && (
                         <button type="button" onClick={() => handleDeleteAttachment(file.attachment_name)} className={styles.deleteBtn}>🗑️</button>
                       )}
@@ -308,6 +374,7 @@ function RegroupementDetail() {
               <p style={{ color: '#7a869a', fontSize: '13px', marginLeft: '10px' }}>{t('regroupements.no_attachments', 'No attachments uploaded.')}</p>
             )}
 
+            {/* File upload prompt shown when edit mode is active */}
             {isEditing && (
               <div style={{ marginTop: '20px', padding: '15px', border: '1px dashed #0052cc', borderRadius: '4px', background: '#e9f2ff' }}>
                 <label className={styles.label} style={{ color: '#0052cc' }}>➕ {t('ticket.attachments', 'Add New Attachments')}</label>
@@ -320,6 +387,7 @@ function RegroupementDetail() {
           </div>
         </div>
 
+        {/* Sidebar displaying links to grouped issues */}
         <div className={styles.rightColumn}>
           <div className={`${styles.sidebarCard} ${styles.readOnlyCard}`}>
             <h3 className={styles.cardTitle}>📋 {t('regroupements.linked_issues', 'Linked Issues')} ({regroupement.linked_issues?.length || 0})</h3>
@@ -350,6 +418,7 @@ function RegroupementDetail() {
         </div>
       </div>
 
+      {/* Discussion / Comments Section - rendered only when not in active edit mode */}
       {!isEditing && (
         <div className={styles.commentsSection} style={{ width: '100%', marginTop: '30px' }}>
           <h3 className={styles.commentsTitle}>💬 {t('ticket.discussion', 'Discussion')}</h3>
@@ -372,6 +441,7 @@ function RegroupementDetail() {
                     ))}
                   </div>
 
+                  {/* Comment-specific attachments */}
                   {comment.attachments && comment.attachments.length > 0 && (
                     <div className={styles.commentAttachmentsRow}>
                       {comment.attachments.map((file: any, i: number) => {
@@ -397,6 +467,7 @@ function RegroupementDetail() {
             )}
           </div>
 
+          {/* Comment submission form - disabled if the regroupement is closed */}
           {regroupement.status !== 'CLOSED' && (
             <div className={styles.commentInputArea}>
               <textarea 
@@ -425,6 +496,7 @@ function RegroupementDetail() {
         </div>
       )}
 
+      {/* Media Lightbox overlay block for viewing zoomed images/videos */}
       {lightboxMedia && (
         <div className={styles.lightboxOverlay} onClick={() => setLightboxMedia(null)}>
           <span className={styles.lightboxClose}>&times;</span>

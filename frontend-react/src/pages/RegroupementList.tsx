@@ -9,33 +9,46 @@ import StatCard from '../components/StatCard'
 import SearchBar from '../components/SearchBar'
 import GenericTable, { TableColumn } from '../components/GenericTable'
 
-/** Represents the sorting configuration for the regroupements tables. */
+/**
+ * Represents the configuration settings for table column sorting.
+ */
 type SortConfig = {
   key: string;
   direction: 'asc' | 'desc';
 }
 
-/** Dashboard component for managing classic and AI-suggested regroupements. */
+/**
+ * Dashboard component for managing classic and AI-suggested regroupements.
+ * Provides views for searching, sorting, and filtering manually created groups 
+ * as well as accepting, rejecting, or triggering automatic AIOps suggestions.
+ */
 function RegroupementList() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
+  // State definitions for raw regroupement records and loading indicators
   const [regroupements, setRegroupements] = useState<any[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false)
 
+  // Filter state arrays containing selected status filters
   const [classicStatuses, setClassicStatuses] = useState<string[]>(['OPEN'])
   const [aiStatuses, setAiStatuses] = useState<string[]>(['SUGGESTED'])
   
+  // Sort state defaults to sorting by regroupement ID descending
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'id_regroupment', direction: 'desc' })
 
+  // Synchronized search criteria extracted from URL query parameters
   const classicSearchQuery = searchParams.get('search') || ''
   const classicSearchColumn = searchParams.get('column') || 'ALL'
 
   const aiSearchQuery = searchParams.get('aiSearch') || ''
   const aiSearchColumn = searchParams.get('aiColumn') || 'ALL'
 
+  /**
+   * Updates specific URL query parameters to maintain application state on refresh.
+   */
   const updateUrlParam = (key: string, value: string) => {
     const newParams = new URLSearchParams(searchParams)
     if (value) newParams.set(key, value)
@@ -43,6 +56,9 @@ function RegroupementList() {
     setSearchParams(newParams)
   }
 
+  /**
+   * Retrieves all regroupement records from the api service.
+   */
   const loadData = () => {
     setLoading(true)
     fetchAllRegroupements()
@@ -56,10 +72,14 @@ function RegroupementList() {
       })
   }
 
+  // Trigger data load when component mounts or locale changes
   useEffect(() => {
     loadData()
   }, [t])
 
+  /**
+   * Invokes the backend AI clustering workflow to create new suggestions.
+   */
   const handleTriggerAi = async () => {
     setIsAiLoading(true);
     toast.loading(t('regroupements.ai.analyzing', 'AI analysis in progress...'), { id: 'ai-toast' });
@@ -78,6 +98,9 @@ function RegroupementList() {
     }
   }
 
+  /**
+   * Marks a suggested AI regroupement as accepted/validated.
+   */
   const handleValidateSuggestion = async (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
     try {
@@ -89,6 +112,9 @@ function RegroupementList() {
     }
   }
 
+  /**
+   * Rejects an AI regroupement suggestion.
+   */
   const handleRejectSuggestion = async (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
     try {
@@ -100,20 +126,28 @@ function RegroupementList() {
     }
   }
 
+  /**
+   * Configures the sorting parameters for table data presentation.
+   */
   const requestSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc'
     if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'
     setSortConfig({ key, direction })
   }
 
+  // Segment regroupements based on category types
   const classicList = regroupements.filter(r => r.status === 'OPEN' || r.status === 'CLOSED');
   const aiList = regroupements.filter(r => r.status === 'SUGGESTED' || r.status === 'REJECTED');
 
+  // Compute occurrences for stats badge rendering
   const openCount = classicList.filter(r => r.status === 'OPEN').length;
   const closedCount = classicList.filter(r => r.status === 'CLOSED').length;
   const suggestedCount = aiList.filter(r => r.status === 'SUGGESTED').length;
   const rejectedCount = aiList.filter(r => r.status === 'REJECTED').length;
 
+  /**
+   * Filters lists based on a specific column or across all attributes.
+   */
   const filterBySearch = (list: any[], query: string, column: string) => {
     if (!query) return list;
     const q = query.toLowerCase();
@@ -125,9 +159,13 @@ function RegroupementList() {
     });
   }
 
+  // Prepare and filter data subsets for table view displaying
   const visibleClassic = filterBySearch(classicList.filter(r => classicStatuses.includes(r.status)), classicSearchQuery, classicSearchColumn);
   const visibleAi = filterBySearch(aiList.filter(r => aiStatuses.includes(r.status)), aiSearchQuery, aiSearchColumn);
 
+  /**
+   * Custom client-side sorting function supporting alphanumeric values and ID integers.
+   */
   const sortData = (list: any[]) => {
     return [...list].sort((a, b) => {
       const key = sortConfig.key
@@ -140,10 +178,13 @@ function RegroupementList() {
     })
   }
 
+  // Toggles filter status updates for the classic regroupements list
   const toggleClassicStatus = (status: string) => setClassicStatuses(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]);
   
+  // Toggles filter status updates for the AI suggestions list
   const toggleAiStatus = (status: string) => setAiStatuses(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]);
 
+  // Options configuration for the search column dropdown selections
   const searchColumns = [
     { value: 'ALL', label: t('dashboard.search.all_columns', 'All Columns') },
     { value: 'id_regroupment', label: t('regroupements.table.id', 'ID') },
@@ -151,6 +192,7 @@ function RegroupementList() {
     { value: 'created_by', label: t('regroupements.table.creator', 'Creator') }
   ]
 
+  // Shared table columns configurations across both visual lists
   const commonColumns: TableColumn<any>[] = [
     { key: 'id_regroupment', label: t('regroupements.table.id', 'ID'), render: (item) => <span style={{ fontWeight: 'bold', color: '#0052cc' }}>#{item.id_regroupment}</span> },
     { key: 'title', label: t('dashboard.search.title', 'Title'), render: (item) => <strong>{item.title}</strong> },
@@ -158,6 +200,7 @@ function RegroupementList() {
     { key: 'ticket_count', label: t('regroupements.table.issues', 'Issues') }
   ]
 
+  // Columns layout specific to the classic manual regroupement lists
   const classicColumns: TableColumn<any>[] = [
     ...commonColumns,
     { key: 'status', label: t('dashboard.search.status', 'Status'), render: (item) => (
@@ -167,6 +210,7 @@ function RegroupementList() {
     )}
   ]
 
+  // Columns layout specific to the AI suggestions list, rendering interactive workflow actions
   const aiColumns: TableColumn<any>[] = [
     ...commonColumns,
     { key: 'status', label: t('dashboard.search.status', 'Status'), render: (item) => (
@@ -190,6 +234,7 @@ function RegroupementList() {
     }
   ]
 
+  // Render full page loader while retrieving api response data
   if (loading) return <p style={{ padding: '40px', textAlign: 'center' }}>{t('common.loading', 'Loading data...')}</p>
 
   return (

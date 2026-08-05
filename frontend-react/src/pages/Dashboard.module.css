@@ -1,4 +1,6 @@
-/* Main layout container and header styles */
+/* ==========================================================================
+   Main Layout & Header Component Styles
+   ========================================================================== */
 .container {
   padding: 40px;
   max-width: 1400px;
@@ -28,7 +30,9 @@
   font-weight: bold;
 }
 
-/* Action bar controls and query filtering styles */
+/* ==========================================================================
+   Action Bar & Filter Controls (Search and Primary CTA)
+   ========================================================================== */
 .actionBar {
   display: flex;
   justify-content: space-between;
@@ -74,7 +78,9 @@
   transform: scale(0.98);
 }
 
-/* Table layout and data rows styling */
+/* ==========================================================================
+   Data Table Layout, Headers, and Row Interactive Styles
+   ========================================================================== */
 .tableWrapper {
   overflow-x: auto;
   background: var(--bg-container);
@@ -125,7 +131,9 @@
   border-bottom: none;
 }
 
-/* Column specific spacing and alignment overrides */
+/* ==========================================================================
+   Column-Specific Formatting & Overflow Rules
+   ========================================================================== */
 .tdId {
   font-weight: bold;
   color: var(--text-muted);
@@ -150,7 +158,9 @@
   font-size: 13px;
 }
 
-/* Status, priority, and type categorization badges */
+/* ==========================================================================
+   Dynamic Badges (Types, Statuses, and Criticality Levels)
+   ========================================================================== */
 .badge {
   padding: 4px 10px;
   border-radius: 12px;
@@ -193,7 +203,9 @@
   color: #006644;
 }
 
-/* Fallback view for empty dashboard data */
+/* ==========================================================================
+   Empty State View Container
+   ========================================================================== */
 .emptyState {
   text-align: center;
   padding: 50px;

@@ -203,12 +203,6 @@ def nutria_api(request):
                 data, http_code = download_file_path(int(parts[1]), parts[3], current_user, client_ip)
                 return jsonify(data), http_code, headers
             
-            # POST /issues/{id}/ai-analysis (AI ANALYSIS)
-            elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "ai-analysis" and request.method == "POST":
-                from routers.issues import trigger_ai_analysis
-                data, http_code = trigger_ai_analysis(int(parts[1]), current_user, client_ip)
-                return jsonify(data), http_code, headers
-            
             # POST /issues/preticket (For LabWare)
             elif path == "issues/preticket" and request.method == "POST":
                 from routers.issues import create_preticket
@@ -318,7 +312,7 @@ def nutria_api(request):
 
             # POST /regroupements/suggest-ai (Launch AI Clustering)
             elif path == "regroupements/suggest-ai" and request.method == "POST":
-                from routers.ai_clustering import generate_suggested_regroupements
+                from services.ai_clustering import generate_suggested_regroupements # NOUVEAU CHEMIN
                 data, http_code = generate_suggested_regroupements(current_user.get("sub"))
                 return jsonify(data), http_code, headers
 

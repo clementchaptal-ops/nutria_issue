@@ -5,19 +5,26 @@ import toast from 'react-hot-toast'
 import styles from './Login.module.css'
 import apiClient from '../api/client'
 
-/** Represents the LIMS user profile structure. */
+/**
+ * Represents the structured profile information retrieved for a LIMS user.
+ */
 interface LimsProfile {
   user_name: string
   full_name: string
   location: string
 }
 
-/** Handles user authentication via Google OAuth and multiple LIMS profile selection. */
+/**
+ * Login component that handles Google OAuth 2.0 authentication and routes
+ * users to the correct dashboard. If the user's account is associated with
+ * multiple LIMS profiles, it renders a list to prompt specific profile selection.
+ */
 function Login() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation() 
 
+  // Component state management
   const [profiles, setProfiles] = useState<LimsProfile[]>([])
   const [googleToken, setGoogleToken] = useState<string | null>(null)
   const [requireSelection, setRequireSelection] = useState<boolean>(false)
@@ -26,6 +33,7 @@ function Login() {
   const GOOGLE_CLIENT_ID = "549394697229-tvgof9to9fcu4um4260vnigbtt57o9fo.apps.googleusercontent.com"
   const from = location.state?.from || '/dashboard'
 
+  // Extract query parameters to handle potential profile preselection
   let searchString = from.includes('?') ? from.substring(from.indexOf('?')) : ''
   if (!searchString && location.search) {
     searchString = location.search
@@ -33,10 +41,18 @@ function Login() {
   const searchParams = new URLSearchParams(searchString)
   const preselectedProfile = searchParams.get('user_name') || undefined
 
+  /**
+   * Authenticates the Google OAuth token against the backend api server.
+   * Prompts profile selection if multiple associated profiles exist.
+   * 
+   * @param token - The id_token returned from Google OAuth 2.0.
+   * @param selectedProfile - The specific LIMS username selected by the user.
+   */
   const loginToServer = async (token: string, selectedProfile?: string) => {
     setLoading(true) 
     
     try {
+      // Execute authentication request
       const response = await apiClient.post('/auth', { 
         credential: token,
         selected_profile: selectedProfile 
@@ -44,6 +60,7 @@ function Login() {
 
       const data = response.data
 
+      // If multiple profiles exist, switch UI to selection mode and wait for choice
       if (data.require_selection) {
         setGoogleToken(token)
         setProfiles(data.profiles)
@@ -52,6 +69,7 @@ function Login() {
         return
       }
 
+      // Persist auth and user details locally
       localStorage.setItem('nutria_token', data.access_token)
       localStorage.setItem('nutria_user', JSON.stringify({
         user_name: data.user_name,
@@ -60,6 +78,7 @@ function Login() {
         location: data.location  
       }))
       
+      // Determine the final route destination and redirect
       const savedTarget = localStorage.getItem('nutria_redirect_target')
       const finalDestination = savedTarget || from
       localStorage.removeItem('nutria_redirect_target')
@@ -68,6 +87,7 @@ function Login() {
       navigate(finalDestination, { replace: true })
       
     } catch (err: any) {
+      // If profile selection failed, attempt fallback authentication process
       if (selectedProfile) {
         loginToServer(token, undefined)
       } else {
@@ -79,6 +99,7 @@ function Login() {
     }
   }
 
+  // Intercept incoming OAuth redirect callback URL containing authorization hash
   useEffect(() => {
     const hash = window.location.hash;
     if (hash.includes('id_token=')) {
@@ -86,12 +107,16 @@ function Login() {
       const idToken = params.get('id_token');
       
       if (idToken) {
+        // Clean URL address bar and trigger server verification
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
         loginToServer(idToken, preselectedProfile);
       }
     }
   }, []);
 
+  /**
+   * Initiates redirect sequence to the Google OAuth consent screen.
+   */
   const handleGoogleRedirect = () => {
     setLoading(true) 
     localStorage.setItem('nutria_redirect_target', from)
@@ -101,6 +126,11 @@ function Login() {
     window.location.href = authUrl;
   }
 
+  /**
+   * Proceeds with authentication using the selected user profile.
+   * 
+   * @param profileName - Selected profile's specific user_name.
+   */
   const handleProfileSelect = (profileName: string) => {
     if (googleToken) {
       loginToServer(googleToken, profileName)
@@ -122,6 +152,7 @@ function Login() {
           </div>
           <div className={styles.divider}></div>
           
+          {/* Render profile selection if multiple accounts found; otherwise, render primary login button */}
           {requireSelection ? (
             <div className={styles.profileSelectionContainer}>
               <h3 className={styles.selectionTitle}>

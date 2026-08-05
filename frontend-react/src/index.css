@@ -1,4 +1,4 @@
-/* Global design tokens and color variables. */
+/* CSS Custom Properties & Design Tokens */
 :root {
     --primary-color: #0052cc;      
     --primary-hover: #0065ff;
@@ -14,7 +14,7 @@
     --border-color: #dfe1e6;       
   }
   
-  /* Global reset and base application styles. */
+  /* Global Reset and Base Document Rules */
   * {
     box-sizing: border-box;
     margin: 0;
@@ -29,7 +29,7 @@
     -moz-osx-font-smoothing: grayscale;
   }
   
-  /* Utility classes for accessibility. */
+  /* Accessibility Utilities */
   .sr-only {
     position: absolute;
     width: 1px;
