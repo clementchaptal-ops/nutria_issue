@@ -12,12 +12,10 @@ from config.database import get_db_connection
 from config.admin_role import get_google_groups
 
 # --- LOCAL FILE IMPORTS ---
-from .schemas import GoogleTokenRequest 
+from routers.schemas import GoogleTokenRequest 
 
 # --- CONFIGURATION ---
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "549394697229-tvgof9to9fcu4um4260vnigbtt57o9fo.apps.googleusercontent.com") 
-
-# CORRECTION AIKIDO : Suppression de la valeur en clair
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 120
@@ -76,7 +74,6 @@ def google_auth(request_json):
                 
             cursor = connection.cursor()
 
-            # PostgreSQL syntax: %s placeholder instead of :1
             query = """
                 SELECT user_name, full_name, location 
                 FROM lims_users 
@@ -117,10 +114,9 @@ def google_auth(request_json):
         db_fullname = selected_row[1]
         db_location = selected_row[2]
 
-        # 6. DETERMINE ROLE VIA GOOGLE DIRECTORY (OR APPS SCRIPT TEMPORARILY)
+        # 6. DETERMINE ROLE VIA GOOGLE APPS SCRIPT
         role = "USER"  
         
-        # Structure de groups_data : {"nutria_core_it@mxns.com": ["mail1@...", ...], "nutria-local_admin@mxns.com": [...]}
         groups_data = get_google_groups()
         
         it_team_emails = groups_data.get("nutria_core_it@mxns.com", [])
