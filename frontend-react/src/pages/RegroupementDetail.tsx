@@ -160,7 +160,7 @@ function RegroupementDetail() {
             <span className={styles.statusLabel}>{t('ticket.current_status', 'Current Status:')}</span>
             <span className={styles.statusBadge}>{regroupement.status}</span>
           </div>
-          <span className={styles.ticketIdText}>REGROUPEMENT #{regroupement.id_regroupment}</span>
+          <span className={styles.ticketIdText}>{t('regroupements.group_id_badge', 'GROUP')} #{regroupement.id_regroupment}</span>
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -213,7 +213,7 @@ function RegroupementDetail() {
             )}
             
             <p style={{ color: '#7a869a', fontSize: '13px', marginBottom: '20px' }}>
-              Created by <strong>{regroupement.created_by}</strong> on {regroupement.created_on}
+              {t('regroupements.created_by_info', 'Created by {{user}} on {{date}}', { user: regroupement.created_by, date: regroupement.created_on })}
             </p>
 
             {/* DESCRIPTION */}
@@ -438,7 +438,7 @@ function RegroupementDetail() {
           <span className={styles.lightboxClose}>&times;</span>
           <div onClick={(e) => e.stopPropagation()}>
             {lightboxMedia.type === 'IMAGE' ? (
-              <img src={lightboxMedia.url} alt="Enlarged preview" className={styles.lightboxMedia} />
+              <img src={lightboxMedia.url} alt={t('ticket.lightbox_preview', 'Enlarged preview')} className={styles.lightboxMedia} />
             ) : (
               <video src={lightboxMedia.url} controls autoPlay className={styles.lightboxMedia} />
             )}
