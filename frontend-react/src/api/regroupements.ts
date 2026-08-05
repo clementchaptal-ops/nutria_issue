@@ -4,10 +4,15 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://europe-west1-nutri
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('nutria_token')
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
   }
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  
+  return headers
 }
 
 export const fetchAllRegroupements = async () => {
@@ -43,14 +48,14 @@ export const addRegroupementComment = async (id: number, comment_text: string) =
 export const uploadRegroupementCommentAttachments = async (regId: number, commentId: number, formData: FormData) => {
   const token = localStorage.getItem('nutria_token')
   return await axios.post(`${API_BASE_URL}/regroupements/${regId}/comments/${commentId}/attachments`, formData, {
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+    headers: { 'Authorization': token ? `Bearer ${token}` : '' }
   })
 }
 
 export const uploadRegroupementAttachments = async (id: number, formData: FormData) => {
   const token = localStorage.getItem('nutria_token')
   return await axios.post(`${API_BASE_URL}/regroupements/${id}/attachments`, formData, {
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+    headers: { 'Authorization': token ? `Bearer ${token}` : '' }
   })
 }
 
@@ -61,7 +66,6 @@ export const updateRegroupement = async (id: number, data: { title: string, desc
 export const deleteRegroupementAttachment = async (id: number, filename: string) => {
   return await axios.delete(`${API_BASE_URL}/regroupements/${id}/attachments/${filename}`, { headers: getAuthHeaders() })
 }
-
 
 export const triggerAiClustering = async () => {
   return await axios.post(`${API_BASE_URL}/regroupements/suggest-ai`, {}, { headers: getAuthHeaders() })

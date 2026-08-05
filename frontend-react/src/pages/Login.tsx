@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import styles from './Login.module.css'
+import axios from 'axios'
 
 interface LimsProfile {
   user_name: string
@@ -34,30 +35,21 @@ function Login() {
   const preselectedProfile = searchParams.get('user_name') || undefined
 
   const loginToServer = async (token: string, selectedProfile?: string) => {
-    setLoading(true) // Enable loading at start
+    setLoading(true) 
     
     try {
-      const response = await fetch('https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          credential: token,
-          selected_profile: selectedProfile 
-        }) 
+      const response = await axios.post('https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/auth', { 
+        credential: token,
+        selected_profile: selectedProfile 
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || t('login.error.auth_denied', 'Authentication denied'))
-      }
-
-      const data = await response.json()
+      const data = response.data
 
       if (data.require_selection) {
         setGoogleToken(token)
         setProfiles(data.profiles)
         setRequireSelection(true)
-        setLoading(false) // Stop loading if profile selection is needed
+        setLoading(false) 
         return
       }
 
@@ -69,25 +61,23 @@ function Login() {
         location: data.location  
       }))
       
-      // 🚨 NOUVEAU : On récupère la destination sauvegardée avant la redirection Google
       const savedTarget = localStorage.getItem('nutria_redirect_target')
       const finalDestination = savedTarget || from
-      
-      // On nettoie la mémoire
       localStorage.removeItem('nutria_redirect_target')
       
       toast.success(t('login.success', `Welcome ${data.full_name || data.user_name}!`))
-      
       navigate(finalDestination, { replace: true })
       
     } catch (err: any) {
       if (selectedProfile) {
         loginToServer(token, undefined)
       } else {
-        toast.error(err.message || t('login.error.server_fail', 'Unable to connect to the Nutria server.'))
+        // Axios stocke le corps de l'erreur dans err.response.data
+        const errorMsg = err.response?.data?.detail || err.response?.data?.error || t('login.error.server_fail', 'Unable to connect to the Nutria server.')
+        toast.error(errorMsg)
       }
     } finally {
-      setLoading(false) // Disable loading in all cases
+      setLoading(false) 
     }
   }
 

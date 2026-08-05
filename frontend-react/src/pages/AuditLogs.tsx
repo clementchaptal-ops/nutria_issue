@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import ErrorMessage from '../components/ErrorMessage'
+import axios from 'axios'
 
 function AuditLogs() {
   const { t } = useTranslation()
@@ -13,32 +14,25 @@ function AuditLogs() {
   useEffect(() => {
     const fetchLogs = async () => {
       try {
-        const response = await fetch('https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/audit/logs', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`
-          }
+        const response = await axios.get('https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/audit/logs', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
         })
 
-        if (!response.ok) {
-          if (response.status === 403) {
-            navigate('/dashboard') // Kicks out non-admins
-            return
-          }
-          throw new Error(t('audit.error.fetch_failed', 'Error while fetching audit logs.'))
-        }
+        const data = response.data
 
-        const data = await response.json()
-
-        // Security check: Ensure data is an array before setting logs
         if (Array.isArray(data)) {
           setLogs(data)
         } else {
           setError(data.error || t('audit.error.invalid_format', 'Invalid response format from server.'))
-          setLogs([]) // Keep an empty array to prevent .map() crashes
+          setLogs([]) 
         }
       } catch (err: any) {
-        setError(err.message)
-        setLogs([]) // Additional fallback safety
+        if (err.response && err.response.status === 403) {
+          navigate('/dashboard') 
+          return
+        }
+        setError(err.response?.data?.error || err.message)
+        setLogs([]) 
       } finally {
         setLoading(false)
       }

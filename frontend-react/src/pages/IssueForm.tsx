@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import FileUploader from '../components/FileUploader'
 import toast from 'react-hot-toast'
 import styles from './IssueForm.module.css'
+import axios from 'axios'
 import { openSafeUrl } from '../utils/security';
 
 const getDecodedToken = () => {
@@ -98,15 +99,13 @@ function IssueForm() {
   const fetchComments = async () => {
     if (!ticketId) return
     try {
-      const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/comments`, {
+      const response = await axios.get(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/comments`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
       })
-      if (response.ok) {
-        const data = await response.json()
-        if (Array.isArray(data)) setComments(data)
-        else if (data && Array.isArray(data.comments)) setComments(data.comments)
-        else setComments([]) 
-      }
+      const data = response.data
+      if (Array.isArray(data)) setComments(data)
+      else if (data && Array.isArray(data.comments)) setComments(data.comments)
+      else setComments([]) 
     } catch (error) {
       setComments([]) 
     }
@@ -139,24 +138,23 @@ function IssueForm() {
         setUserInfo(backupUser)
 
         try {
-          const response = await fetch('https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/users/me', {
+          const response = await axios.get('https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/users/me', {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
           })
           
-          if (response.ok) {
-            const profile = await response.json()
-            setUserInfo({
-              user_name: profile.user_name || backupUser.user_name,
-              full_name: profile.full_name || backupUser.full_name, 
-              user_email: profile.user_email || backupUser.user_email,
-              created_on: t('common.na', 'N/A'),
-              current_role: profile.current_role || backupUser.current_role, 
-              lab: profile.lab || backupUser.lab,
-              location: profile.location || backupUser.location,
-              env: profile.env || profile.environment || backupUser.env
-            })
-          }
+          const profile = response.data
+          setUserInfo({
+            user_name: profile.user_name || backupUser.user_name,
+            full_name: profile.full_name || backupUser.full_name, 
+            user_email: profile.user_email || backupUser.user_email,
+            created_on: t('common.na', 'N/A'),
+            current_role: profile.current_role || backupUser.current_role, 
+            lab: profile.lab || backupUser.lab,
+            location: profile.location || backupUser.location,
+            env: profile.env || profile.environment || backupUser.env
+          })
         } catch (error) {
+          // Silent catch for profile load
         } finally {
           setIsLoading(false)
         }
@@ -169,20 +167,11 @@ function IssueForm() {
       }
 
       try {
-        const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}`, {
+        const response = await axios.get(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
         })
         
-        if (!response.ok) {
-          if (response.status === 404 || response.status === 403) {
-            toast.error(t('ticket.not_found', 'Ticket not found or access denied.'))
-            navigate('/dashboard', { replace: true })
-            return
-          }
-          throw new Error(t('ticket.error.fetch_failed', 'Failed to fetch ticket'))
-        }
-        
-        const data = await response.json()
+        const data = response.data
         const currentStatus = data.status || 'PRETICKET'
         setStatus(currentStatus)
         
@@ -246,8 +235,13 @@ function IssueForm() {
           setIsEditing(hasRights && currentStatus === 'PRETICKET')
         }
 
-      } catch (error) {
-        toast.error(t('ticket.error.fetch', 'Error loading ticket data.'))
+      } catch (err: any) {
+        if (err.response && (err.response.status === 404 || err.response.status === 403)) {
+          toast.error(t('ticket.not_found', 'Ticket not found or access denied.'))
+          navigate('/dashboard', { replace: true })
+        } else {
+          toast.error(t('ticket.error.fetch', 'Error loading ticket data.'))
+        }
       } finally {
         setIsLoading(false)
       }
@@ -258,12 +252,10 @@ function IssueForm() {
 
   const handleFileDownload = async (url: string, defaultFilename: string) => {
     try {
-      const response = await fetch(url, {
+      const response = await axios.get(url, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
       })
-      if (!response.ok) throw new Error(t('ticket.error.download_impossible', 'Download impossible'))
-
-      const data = await response.json()
+      const data = response.data
 
       if (data.file_path) {
         const link = document.createElement('a')
@@ -302,52 +294,45 @@ function IssueForm() {
       const url = isNewTicket 
         ? `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/create` 
         : `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/validate`
-        
-      const httpMethod = isNewTicket ? 'POST' : 'PUT'
 
-      const response = await fetch(url, {
-        method: httpMethod,
+      const response = await axios({
+        method: isNewTicket ? 'POST' : 'PUT',
+        url: url,
         headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloadData)
+        data: payloadData
       })
 
-      if (response.ok) {
-        const responseData = await response.json()
-        const targetTicketId = isNewTicket ? responseData.id_issue : ticketId
+      const responseData = response.data
+      const targetTicketId = isNewTicket ? responseData.id_issue : ticketId
 
-        if (attachments.length > 0 && targetTicketId) {
-          const formData = new FormData()
-          attachments.forEach((file) => formData.append('file', file))
+      if (attachments.length > 0 && targetTicketId) {
+        const formData = new FormData()
+        attachments.forEach((file) => formData.append('file', file))
 
-          const attachmentsResponse = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${targetTicketId}/attachments`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` },
-            body: formData
+        try {
+          await axios.post(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${targetTicketId}/attachments`, formData, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
           })
-
-          if (!attachmentsResponse.ok) {
-            toast.error(t('ticket.error.upload_attachments', 'Text saved, but files could not be uploaded.'))
-          }
+        } catch (uploadError) {
+          toast.error(t('ticket.error.upload_attachments', 'Text saved, but files could not be uploaded.'))
         }
-
-        setStatus('IN PROGRESS')
-        setIsEditing(false) 
-        setAttachments([])
-        
-        const successMsg = isNewTicket 
-          ? t('ticket.success_msg_create', 'Ticket successfully created!') 
-          : t('ticket.success_msg_update', 'Ticket successfully updated!')
-        
-        toast.success(successMsg)
-        
-        if (isNewTicket) navigate('/dashboard')
-        else window.location.reload()
-      } else {
-        const errorData = await response.json()
-        toast.error(t('common.error_detail', 'Error: {{detail}}', { detail: errorData.detail }))
       }
-    } catch (error) {
-      toast.error(t('ticket.error.submit_failed', 'An error occurred during submission.'))
+
+      setStatus('IN PROGRESS')
+      setIsEditing(false) 
+      setAttachments([])
+      
+      const successMsg = isNewTicket 
+        ? t('ticket.success_msg_create', 'Ticket successfully created!') 
+        : t('ticket.success_msg_update', 'Ticket successfully updated!')
+      toast.success(successMsg)
+      
+      if (isNewTicket) navigate('/dashboard')
+      else window.location.reload()
+      
+    } catch (err: any) {
+      const errorDetail = err.response?.data?.detail || t('ticket.error.submit_failed', 'An error occurred during submission.')
+      toast.error(t('common.error_detail', 'Error: {{detail}}', { detail: errorDetail }))
     } finally {
       setIsSubmitting(false) 
     }
@@ -355,22 +340,17 @@ function IssueForm() {
 
   const executeCancelTicket = async () => {
     try {
-      const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/cancel`, {
-        method: 'PUT',
+      await axios.put(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/cancel`, {}, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
-      });
-
-      if (response.ok) {
-        setStatus('CANCELED')
-        setIsEditing(false)
-        setCanEdit(false) 
-        toast.success(t('ticket.cancel_success', 'Ticket successfully canceled.'))
-      } else {
-        const errorData = await response.json()
-        toast.error(t('common.error_detail', 'Error: {{detail}}', { detail: errorData.detail }))
-      }
-    } catch (error) {
-      toast.error(t('ticket.error.network_cancel', 'Network error while canceling ticket.'))
+      })
+      
+      setStatus('CANCELED')
+      setIsEditing(false)
+      setCanEdit(false) 
+      toast.success(t('ticket.cancel_success', 'Ticket successfully canceled.'))
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || t('ticket.error.network_cancel', 'Network error while canceling ticket.')
+      toast.error(t('common.error_detail', 'Error: {{detail}}', { detail }))
     }
   }
 
@@ -385,27 +365,22 @@ function IssueForm() {
 
   const executeCloseTicket = async (targetStatus: 'ACT KNOWLEDGE' | 'CLOSED') => {
     try {
-      const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/close`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ new_status: targetStatus })
-      });
+      await axios.put(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/close`, 
+        { new_status: targetStatus },
+        { headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` } }
+      )
 
-      if (response.ok) {
-        setStatus(targetStatus)
-        setIsEditing(false)
-        setCanEdit(false)
-        
-        const successMessage = targetStatus === 'ACT KNOWLEDGE'
-          ? t('ticket.resolve_success', 'Ticket successfully acknowledged.')
-          : t('ticket.close_success', 'Ticket successfully closed.')
-        toast.success(successMessage)
-      } else {
-        const errorData = await response.json()
-        toast.error(t('common.error_detail', 'Error: {{detail}}', { detail: errorData.detail }))
-      }
-    } catch (error) {
-      toast.error(t('ticket.error.network_status', 'Network error while changing status.'))
+      setStatus(targetStatus)
+      setIsEditing(false)
+      setCanEdit(false)
+      
+      const successMessage = targetStatus === 'ACT KNOWLEDGE'
+        ? t('ticket.resolve_success', 'Ticket successfully acknowledged.')
+        : t('ticket.close_success', 'Ticket successfully closed.')
+      toast.success(successMessage)
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || t('ticket.error.network_status', 'Network error while changing status.')
+      toast.error(t('common.error_detail', 'Error: {{detail}}', { detail }))
     }
   }
 
@@ -424,20 +399,15 @@ function IssueForm() {
 
   const executeDeleteAttachment = async (filename: string) => {
     try {
-      const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/attachments/${filename}`, {
-        method: 'DELETE',
+      await axios.delete(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/attachments/${filename}`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
-      });
+      })
 
-      if (response.ok) {
-        setExistingFiles(prev => prev.filter(f => f.attachment_name !== filename));
-        toast.success(t('ticket.success.file_deleted', 'File deleted successfully.'));
-      } else {
-        const err = await response.json();
-        toast.error(t('common.error_detail', 'Error: {{detail}}', { detail: err.detail }));
-      }
-    } catch (error) {
-      toast.error(t('ticket.error.network_delete', 'Network error while deleting file.'));
+      setExistingFiles(prev => prev.filter(f => f.attachment_name !== filename));
+      toast.success(t('ticket.success.file_deleted', 'File deleted successfully.'));
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || t('ticket.error.network_delete', 'Network error while deleting file.')
+      toast.error(t('common.error_detail', 'Error: {{detail}}', { detail }));
     }
   }
 
@@ -467,35 +437,28 @@ function IssueForm() {
     setIsPostingComment(true)
 
     try {
-      const response = await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/comments`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment_text: newComment })
-      })
+      const response = await axios.post(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/comments`, 
+        { comment_text: newComment },
+        { headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` } }
+      )
 
-      if (response.ok) {
-        const data = await response.json()
-        const newCommentId = data.id_comment
+      const data = response.data
+      const newCommentId = data.id_comment
 
-        if (commentFiles.length > 0 && newCommentId) {
-          const formData = new FormData()
-          commentFiles.forEach((file) => formData.append('file', file))
-          await fetch(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/comments/${newCommentId}/attachments`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` },
-            body: formData
-          })
-        }
-
-        setNewComment('') 
-        setCommentFiles([]) 
-        fetchComments()   
-      } else {
-        const err = await response.json()
-        toast.error(t('common.error_detail', 'Error: {{detail}}', { detail: err.detail }))
+      if (commentFiles.length > 0 && newCommentId) {
+        const formData = new FormData()
+        commentFiles.forEach((file) => formData.append('file', file))
+        await axios.post(`https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/comments/${newCommentId}/attachments`, formData, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
+        })
       }
-    } catch (error) {
-      toast.error(t('ticket.error.network_comment', 'Network error while posting comment.'))
+
+      setNewComment('') 
+      setCommentFiles([]) 
+      fetchComments()   
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || t('ticket.error.network_comment', 'Network error while posting comment.')
+      toast.error(t('common.error_detail', 'Error: {{detail}}', { detail }))
     } finally {
       setIsPostingComment(false)
     }
