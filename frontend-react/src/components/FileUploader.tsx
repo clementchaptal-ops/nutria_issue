@@ -7,7 +7,7 @@ interface FileUploaderProps {
   existingFiles?: any[]; 
 }
 
-// CONFIUGRATION DE LA LIMITE À 50 MO
+// CONFIGURATION DE LA LIMITE À 50 MO
 const MAX_FILE_SIZE = 50 * 1024 * 1024; 
 
 const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, existingFiles = [] }) => {
@@ -137,24 +137,25 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
         multiple 
         onChange={handleFileInputChange}
         style={{ display: 'block', margin: '0 auto', color: 'transparent', width: '110px' }}
-        title="Browse files"
+        title={t('form.browse_files', 'Browse files')}
       />
       
       <p style={{ fontSize: '13px', color: '#5e6c84', margin: '15px 0 0 0', fontStyle: 'italic' }}>
         💡 {t('form.paste_tip', 'Tip: You can also paste screenshots directly using Ctrl+V.')}
       </p>
       
-      {/* SECTION 1 : FICHIERS DÉJÀ EXISTANTS (LECTURE SEULE VUE SERVEUR) */}
       {existingFiles.length > 0 && (
         <div style={{ marginTop: '20px', borderTop: '1px solid #dfe1e6', paddingTop: '15px', textAlign: 'left' }}>
           <p style={{ fontSize: '14px', color: '#00875a', fontWeight: 'bold', margin: '0 0 10px 0' }}>
-            📁 {existingFiles.length} file(s) already saved:
+            {t('form.files_already_saved', '📁 {{count}} file(s) already saved:', { count: existingFiles.length })}
           </p>
           <ul style={{ fontSize: '13px', color: '#42526e', margin: 0, paddingLeft: '20px', listStyleType: 'square' }}>
             {existingFiles.map((file, index) => (
               <li key={`existing-${index}`} style={{ wordBreak: 'break-all', marginBottom: '5px' }}>
-                {file.attachment_name || file.name || 'Unknown file'} 
-                <span style={{ color: '#00875a', marginLeft: '10px', fontSize: '11px', fontWeight: 'bold' }}>(Saved)</span>
+                {file.attachment_name || file.name || t('form.unknown_file', 'Unknown file')} 
+                <span style={{ color: '#00875a', marginLeft: '10px', fontSize: '11px', fontWeight: 'bold' }}>
+                  {t('form.saved_badge', '(Saved)')}
+                </span>
               </li>
             ))}
           </ul>
@@ -164,7 +165,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
       {files.length > 0 && (
         <div style={{ marginTop: '20px', borderTop: '1px solid #dfe1e6', paddingTop: '15px', textAlign: 'left' }}>
           <p style={{ fontSize: '14px', color: '#0052cc', fontWeight: 'bold', margin: '0 0 10px 0' }}>
-            📎 {files.length} new file(s) ready to upload:
+            {t('form.files_ready_upload', '📎 {{count}} new file(s) ready to upload:', { count: files.length })}
           </p>
           <ul style={{ fontSize: '13px', color: '#42526e', margin: 0, paddingLeft: '20px', listStyleType: 'square' }}>
             {files.map((file, index) => (
@@ -173,7 +174,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
                 <span 
                   onClick={() => removeFile(index)} 
                   style={{ color: '#bf2600', marginLeft: '10px', cursor: 'pointer', fontWeight: 'bold' }}
-                  title="Remove this file"
+                  title={t('form.remove_file', 'Remove this file')}
                 >
                   ✕
                 </span>

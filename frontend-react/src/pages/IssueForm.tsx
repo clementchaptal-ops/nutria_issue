@@ -63,9 +63,9 @@ function IssueForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [title, setTitle] = useState('')
-  const [issueType, setIssueType] = useState('')      
-  const [criticity, setCriticity] = useState('')      
-  const [frequency, setFrequency] = useState('')      
+  const [issueType, setIssueType] = useState('')     
+  const [criticity, setCriticity] = useState('')     
+  const [frequency, setFrequency] = useState('')     
   const [blockingIssue, setBlockingIssue] = useState('F') 
   const [description, setDescription] = useState('')
   
@@ -88,7 +88,6 @@ function IssueForm() {
     current_project: '', current_batch: '', current_sample: '', current_analysis: '', current_analysis_variation: '', current_customer: '', citrix_session: ''
   })
 
-  // Retiré : workstation
   const [networkInfo, setNetworkInfo] = useState({
     ip_adress: '', ip_config: '', current_pc: '', ping: '',
   })
@@ -158,7 +157,6 @@ function IssueForm() {
             })
           }
         } catch (error) {
-          // Silent fallback
         } finally {
           setIsLoading(false)
         }
@@ -181,7 +179,7 @@ function IssueForm() {
             navigate('/dashboard', { replace: true })
             return
           }
-          throw new Error('Failed to fetch ticket')
+          throw new Error(t('ticket.error.fetch_failed', 'Failed to fetch ticket'))
         }
         
         const data = await response.json()
@@ -221,7 +219,6 @@ function IssueForm() {
           citrix_session: data.citrix_session || ''
         })
 
-        // Retiré : workstation
         setNetworkInfo({
           ip_adress: data.ip_adress || '',
           ip_config: data.ip_config || '',
@@ -264,7 +261,7 @@ function IssueForm() {
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('nutria_token')}` }
       })
-      if (!response.ok) throw new Error('Download impossible')
+      if (!response.ok) throw new Error(t('ticket.error.download_impossible', 'Download impossible'))
 
       const data = await response.json()
 
@@ -514,7 +511,7 @@ function IssueForm() {
             <span className={styles.statusLabel}>{t('ticket.current_status', 'Current Status:')}</span>
             <span className={styles.statusBadge}>{status}</span>
           </div>
-          {ticketId && <span className={styles.ticketIdText}>LIMS ID: #{ticketId}</span>}
+          {ticketId && <span className={styles.ticketIdText}>{t('ticket.lims_id', 'LIMS ID:')} #{ticketId}</span>}
         </div>
         
         {canEdit && (
@@ -568,10 +565,10 @@ function IssueForm() {
                   <label className={styles.label}>{t('ticket.issue_type', 'Issue Type')} <span className={styles.required}>*</span></label>
                   <select value={issueType} onChange={(e) => setIssueType(e.target.value)} className={styles.select} required>
                     <option value="">-- {t('common.select', 'Select')} --</option>
-                    <option value="SLOW">SLOW</option>
-                    <option value="CRASH">CRASH</option>
-                    <option value="ILLOGICAL">ILLOGICAL</option>
-                    <option value="OTHER">OTHER</option>
+                    <option value="SLOW">{t('issues.SLOW', 'SLOW')}</option>
+                    <option value="CRASH">{t('issues.CRASH', 'CRASH')}</option>
+                    <option value="ILLOGICAL">{t('issues.ILLOGICAL', 'ILLOGICAL')}</option>
+                    <option value="OTHER">{t('issues.OTHER', 'OTHER')}</option>
                   </select>
                 </div>
 
@@ -579,9 +576,9 @@ function IssueForm() {
                   <label className={styles.label}>{t('ticket.criticity', 'Criticity')} <span className={styles.required}>*</span></label>
                   <select value={criticity} onChange={(e) => setCriticity(e.target.value)} className={styles.select} required>
                     <option value="">-- {t('common.select', 'Select')} --</option>
-                    <option value="LOW">LOW</option>
-                    <option value="MEDIUM">MEDIUM</option>
-                    <option value="HIGH">HIGH</option>
+                    <option value="LOW">{t('ticket.criticity_low', 'LOW')}</option>
+                    <option value="MEDIUM">{t('ticket.criticity_medium', 'MEDIUM')}</option>
+                    <option value="HIGH">{t('ticket.criticity_high', 'HIGH')}</option>
                   </select>
                 </div>
               </div>
@@ -591,10 +588,10 @@ function IssueForm() {
                   <label className={styles.label}>{t('ticket.frequency', 'Frequency')} <span className={styles.required}>*</span></label>
                   <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className={styles.select} required>
                     <option value="">-- {t('common.select', 'Select')} --</option>
-                    <option value="ONE_TIME">ONE_TIME</option>
-                    <option value="LOW">LOW</option>
-                    <option value="MEDIUM">MEDIUM</option>
-                    <option value="HIGH">HIGH</option>
+                    <option value="ONE_TIME">{t('ticket.frequency_one_time', 'ONE_TIME')}</option>
+                    <option value="LOW">{t('ticket.frequency_low', 'LOW')}</option>
+                    <option value="MEDIUM">{t('ticket.frequency_medium', 'MEDIUM')}</option>
+                    <option value="HIGH">{t('ticket.frequency_high', 'HIGH')}</option>
                   </select>
                 </div>
 
@@ -655,7 +652,7 @@ function IssueForm() {
                            !path.includes('workingdir') && !path.includes('logs.zip');
                   })
                   .map((file, index) => {
-                    const displayName = file.attachment_name || 'Unknown_File';
+                    const displayName = file.attachment_name || t('ticket.unknown_file', 'Unknown_File');
                     const fileUrl = file.url_path || `https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api/issues/${ticketId}/attachments/${file.attachment_name}`;
                     const fileType = file.attachment_type;
                   
@@ -675,8 +672,8 @@ function IssueForm() {
                   
                         {fileType === 'VIDEO' && (
                           <div className={styles.fileItemContainer}>
-                            <div className={styles.videoPreviewBox} onClick={() => setLightboxMedia({ url: fileUrl, type: fileType })} title="Click to watch video">▶️</div>
-                            <span onClick={() => setLightboxMedia({ url: fileUrl, type: fileType })} className={styles.downloadLink} title={displayName}>📺 Watch: {displayName}</span>
+                            <div className={styles.videoPreviewBox} onClick={() => setLightboxMedia({ url: fileUrl, type: fileType })} title={t('ticket.click_to_watch', 'Click to watch video')}>▶️</div>
+                            <span onClick={() => setLightboxMedia({ url: fileUrl, type: fileType })} className={styles.downloadLink} title={displayName}>📺 {t('ticket.watch', 'Watch:')} {displayName}</span>
                           </div>
                         )}
                   
@@ -729,10 +726,10 @@ function IssueForm() {
                 <span className={styles.infoLabel}>{t('sidebar.user.fullname', 'Full Name:')}</span>
                 <span className={styles.infoValue}>{userInfo.full_name?.trim() ? userInfo.full_name : (userInfo.user_name || t('common.unknown', 'Unknown'))}</span>
               </div>
-              <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.role', 'Role:')}</span><span className={styles.infoValue}>{userInfo.current_role || 'N/A'}</span></div>
-              <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.lab', 'Lab:')}</span><span className={styles.infoValue}>{userInfo.lab || 'N/A'}</span></div>
-              <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.location', 'Location:')}</span><span className={styles.infoValue}>{userInfo.location || 'N/A'}</span></div>
-              <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.env', 'Environment:')}</span><span className={styles.infoValue}>{userInfo.env || 'N/A'}</span></div>
+              <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.role', 'Role:')}</span><span className={styles.infoValue}>{userInfo.current_role || t('common.na', 'N/A')}</span></div>
+              <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.lab', 'Lab:')}</span><span className={styles.infoValue}>{userInfo.lab || t('common.na', 'N/A')}</span></div>
+              <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.location', 'Location:')}</span><span className={styles.infoValue}>{userInfo.location || t('common.na', 'N/A')}</span></div>
+              <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.env', 'Environment:')}</span><span className={styles.infoValue}>{userInfo.env || t('common.na', 'N/A')}</span></div>
               <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.email', 'Email:')}</span><span className={styles.infoValue}>{userInfo.user_email}</span></div>
               <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.user.created_on', 'Created On:')}</span><span className={styles.infoValue}>{userInfo.created_on || t('common.na', 'N/A')}</span></div>
             </div>
@@ -773,21 +770,21 @@ function IssueForm() {
             <div className={`${styles.sidebarCard} ${styles.readOnlyCard}`}>
               <h3 className={styles.cardTitle}>🌐 {t('sidebar.network_title', 'Network & Infrastructure')}</h3>
               <div className={styles.cardContent}>
-                <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.network.citrix', 'Citrix Session:')}</span><span className={styles.infoValue}>{currentContext.citrix_session || 'N/A'}</span></div>
-                <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.network.ip', 'IP Address:')}</span><span className={styles.infoValue}>{networkInfo.ip_adress || 'N/A'}</span></div>
-                <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.network.pc', 'Current PC:')}</span><span className={styles.infoValue}>{networkInfo.current_pc || 'N/A'}</span></div>
+                <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.network.citrix', 'Citrix Session:')}</span><span className={styles.infoValue}>{currentContext.citrix_session || t('common.na', 'N/A')}</span></div>
+                <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.network.ip', 'IP Address:')}</span><span className={styles.infoValue}>{networkInfo.ip_adress || t('common.na', 'N/A')}</span></div>
+                <div className={styles.infoRow}><span className={styles.infoLabel}>{t('sidebar.network.pc', 'Current PC:')}</span><span className={styles.infoValue}>{networkInfo.current_pc || t('common.na', 'N/A')}</span></div>
                 
                 <div className={styles.infoBlock}>
                   <details className={styles.accordion}>
                     <summary className={styles.accordionSummary}>🖥️ {t('sidebar.network.show_ipconfig', 'Show IP Configuration logs')}</summary>
-                    <div className={styles.codeBlock}>{networkInfo.ip_config || 'N/A'}</div>
+                    <div className={styles.codeBlock}>{networkInfo.ip_config || t('common.na', 'N/A')}</div>
                   </details>
                 </div>
                 
                 <div className={styles.infoBlock}>
                   <details className={styles.accordion}>
                     <summary className={styles.accordionSummary}>📡 {t('sidebar.network.show_ping', 'Show Ping 8.8.8.8 results')}</summary>
-                    <div className={`${styles.codeBlock} ${styles.pingBlock}`}>{networkInfo.ping || 'N/A'}</div>
+                    <div className={`${styles.codeBlock} ${styles.pingBlock}`}>{networkInfo.ping || t('common.na', 'N/A')}</div>
                   </details>
                 </div>
               </div>

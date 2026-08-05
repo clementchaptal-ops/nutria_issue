@@ -71,7 +71,7 @@ function MainLayout() {
               className={styles.dashboardBtn}
               style={{ marginLeft: '10px', borderColor: '#ff991f', color: '#d97008' }}
             >
-              🛡️ Audit Logs
+              🛡️ {t('layout.audit_logs_btn', 'Audit Logs')}
             </button>
           )}
         </div>

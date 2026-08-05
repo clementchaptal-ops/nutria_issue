@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import styles from './IssueCard.module.css'
 
 interface IssueCardProps {
@@ -15,6 +16,8 @@ interface IssueCardProps {
 }
 
 const IssueCard: React.FC<IssueCardProps> = ({ issue }) => {
+  const { t } = useTranslation() 
+
   return (
     <div className={styles.card}>
       <div className={styles.mainInfo}>
@@ -24,7 +27,7 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue }) => {
         </div>
         <h3 className={styles.title}>{issue.title}</h3>
         <span className={styles.meta}>
-          Reported by <strong>{issue.full_name}</strong> ({issue.user_name}) • {issue.creation_date}
+          {t('ticket.reported_by', 'Reported by')} <strong>{issue.full_name}</strong> ({issue.user_name}) • {issue.creation_date}
         </span>
       </div>
       

@@ -1,6 +1,9 @@
 {
   "app_title": "NUTRIA - Finalize the report",
   "loading": "Secure connection with LabWare in progress...",
+  "admin": {
+    "access_denied": "Access denied: Module reserved for administrators."
+  },
   "error": {
     "no_id": "No ticket ID found in URL.",
     "not_found": "Unable to find this preticket",
@@ -17,7 +20,18 @@
     "description": "Description",
     "ssp_ticket": "SSP Ticket Number (Optional)",
     "ssp_help": "Just enter the number, the link will be generated automatically.",
-    "missing_fields": "Please fill all required fields."
+    "missing_fields": "Please fill all required fields.",
+    "attachments_label": "Attachments (Photos, Videos, Documents)",
+    "drag_drop_text": "Drag and drop your files here or click to browse",
+    "browse_files": "Browse files",
+    "paste_tip": "Tip: You can also paste screenshots directly using Ctrl+V.",
+    "files_already_saved": "📁 {{count}} file(s) already saved:",
+    "unknown_file": "Unknown file",
+    "saved_badge": "(Saved)",
+    "files_ready_upload": "📎 {{count}} new file(s) ready to upload:",
+    "remove_file": "Remove this file",
+    "size_alert": "⚠️ {{count}} file(s) ignored because they exceed the 50 MB limit.",
+    "duplicate_alert": "⚠️ {{count}} file(s) ignored (already attached or identical)."
   },
   "issues": {
     "SLOW": "Application slowness (SLOW)",
@@ -47,7 +61,7 @@
     "no": "No",
     "yes": "Yes",
     "loading": "Loading data...",
-    "cancel": "Cancel",
+    "cancel": "Cancel Changes",
     "save": "Save",
     "back": "Back",
     "delete": "Delete",
@@ -60,6 +74,7 @@
     "go_to_dashboard": "Go to Dashboard",
     "dashboard_btn": "Dashboard",
     "regroupements_btn": "Regroupements",
+    "audit_logs_btn": "Audit Logs",
     "logout_btn": "Logout"
   },
   "login": {
@@ -67,6 +82,9 @@
     "choose_profile": "Multiple LIMS profiles detected. Please choose one:",
     "back": "Back",
     "instructions": "Please log in with your Mérieux NutriSciences account to access the platform.",
+    "loading": "Loading...",
+    "signin_with": "Sign in with Google",
+    "success": "Welcome {{name}}!",
     "error": {
       "auth_denied": "Authentication denied",
       "server_fail": "Unable to connect to the Nutria server.",
@@ -78,7 +96,13 @@
     "title": "Tickets Dashboard",
     "visible": "visible(s)",
     "empty_state": "No matching tickets found",
-    "create_button": "Create a Pre-ticket",
+    "create_button": "Create an Issue",
+    "status": {
+      "preticket": "Pretickets",
+      "in_progress": "In Progress",
+      "act_knowledge": "Act Knowledge",
+      "closed": "Closed"
+    },
     "search": {
       "placeholder": "Search...",
       "all_columns": "All Columns",
@@ -88,6 +112,8 @@
       "issue_type": "Issue Type",
       "username": "User Name",
       "fullname": "Full Name",
+      "criticity": "Criticity",
+      "env": "Environment",
       "location": "Location",
       "date": "Date"
     },
@@ -99,11 +125,14 @@
     },
     "table": {
       "id": "ID",
+      "group": "Group",
       "title": "Title",
       "status": "Status",
       "type": "Type",
       "username": "Username",
       "fullname": "Full Name",
+      "criticity": "Criticity",
+      "env": "Environment",
       "location": "Location",
       "date": "Date"
     }
@@ -115,12 +144,15 @@
     "success_msg_update": "Ticket successfully updated!",
     "confirm_cancel": "Are you sure you want to cancel this ticket? This action cannot be undone.",
     "cancel_success": "Ticket successfully canceled.",
-    "confirm_resolve": "Are you sure you want to resolve this ticket?",
+    "confirm_resolve": "Are you sure you want to acknowledge this ticket?",
     "confirm_close": "Are you sure you want to close this ticket?",
-    "resolve_success": "Ticket successfully resolved.",
+    "resolve_success": "Ticket successfully acknowledged.",
     "close_success": "Ticket successfully closed.",
     "current_status": "Current Status:",
+    "lims_id": "LIMS ID:",
+    "reported_by": "Reported by",
     "resolve": "Resolve",
+    "act_knowledge": "Act Knowledge",
     "close": "Close",
     "edit": "Edit",
     "cancel": "Cancel Ticket",
@@ -130,27 +162,40 @@
     "ssp_ticket": "SSP Ticket Link (Optional)",
     "issue_type": "Issue Type",
     "criticity": "Criticity",
+    "criticity_low": "LOW",
+    "criticity_medium": "MEDIUM",
+    "criticity_high": "HIGH",
     "frequency": "Frequency",
+    "frequency_one_time": "ONE_TIME",
+    "frequency_low": "LOW",
+    "frequency_medium": "MEDIUM",
+    "frequency_high": "HIGH",
     "blocking_issue": "Blocking Issue?",
     "description": "Description",
-    "attachments": "Attachments",
+    "attachments": "Add New Attachments",
     "auto_collected": "Auto-collected Context Files:",
     "download_workdir": "Working Directory",
     "download_logs": "System Logs",
     "submit_create": "Create Ticket",
     "submit_update": "Submit & Update Ticket",
+    "existing_files": "Ticket Attachments",
+    "unknown_file": "Unknown_File",
+    "click_to_watch": "Click to watch video",
+    "watch": "Watch:",
     "download_video": "Click here to Download the Video",
     "discussion": "Discussion",
     "no_comments": "No comment for the moment",
     "type_comment": "Type your comment here...",
-    "button_send": "Send",
-    "existing_files": "Ticket Attachments",
+    "button_send": "✉️ Send",
+    "lightbox_preview": "Enlarged preview",
     "confirm_delete_file": "Are you sure you want to delete this file?",
     "success": {
       "file_deleted": "File deleted successfully."
     },
     "error": {
       "fetch": "Error loading ticket data.",
+      "fetch_failed": "Failed to fetch ticket",
+      "download_impossible": "Download impossible",
       "upload_attachments": "Text saved, but files could not be uploaded.",
       "submit_failed": "An error occurred during submission.",
       "network_cancel": "Network error while canceling ticket.",
@@ -186,6 +231,7 @@
       "role": "Role:",
       "lab": "Lab:",
       "location": "Location:",
+      "env": "Environment:",
       "email": "Email:",
       "created_on": "Created On:"
     },
@@ -218,6 +264,10 @@
       "details": "Details",
       "ip": "IP Address"
     },
-    "empty": "No logs found."
+    "empty": "No logs found.",
+    "error": {
+      "fetch_failed": "Error while fetching audit logs.",
+      "invalid_format": "Invalid response format from server."
+    }
   }
 }
