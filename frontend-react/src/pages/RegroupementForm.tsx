@@ -7,6 +7,7 @@ import { fetchAllIssues } from '../api/issues'
 import FileUploader from '../components/FileUploader'
 import styles from './IssueForm.module.css' 
 
+/** Form component for creating and managing issue regroupements with attachments. */
 function RegroupementForm() {
   const { t } = useTranslation()
   const navigate = useNavigate()

@@ -9,11 +9,13 @@ import StatCard from '../components/StatCard'
 import SearchBar from '../components/SearchBar'
 import GenericTable, { TableColumn } from '../components/GenericTable'
 
+/** Configuration properties for sorting tabular issue data. */
 type SortConfig = {
   key: string;
   direction: 'asc' | 'desc';
 }
 
+/** Computes background colors, text colors, and labels for group badge styling. */
 const getGroupBadgeStyle = (groupId: number | null | undefined) => {
   if (!groupId) return { background: 'transparent', color: '#a5adba', text: '-' };
   const colors = ['#0052cc', '#36b37e', '#ff991f', '#ff5630', '#6554c0', '#00b8d9', '#ff7452', '#2684ff'];
@@ -21,6 +23,7 @@ const getGroupBadgeStyle = (groupId: number | null | undefined) => {
   return { background: bgColor, color: 'white', text: `G-${groupId}` };
 }
 
+/** Main dashboard component displaying issue statistics, search controls, and a detailed table layout. */
 function Dashboard() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -36,7 +39,7 @@ function Dashboard() {
   const statusParam = searchParams.get('status')
   const activeStatuses = statusParam !== null 
     ? (statusParam ? statusParam.split(',') : []) 
-    : ['IN PROGRESS'] // Default view filtered on IN PROGRESS
+    : ['IN PROGRESS'] 
 
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'id_issue', direction: 'desc' })
 
@@ -63,7 +66,6 @@ function Dashboard() {
   useEffect(() => {
     fetchAllIssues()
       .then((data) => {
-        // fetchAllIssues renvoie directement le tableau des tickets depuis apiClient
         const issueList = Array.isArray(data) ? data : (data.data || []);
         setIssues(issueList);
         setLoading(false);

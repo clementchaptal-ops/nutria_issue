@@ -2,6 +2,7 @@ import React from 'react'
 import { useTranslation } from 'react-i18next'
 import styles from './IssueCard.module.css'
 
+/** Properties for the IssueCard component. */
 interface IssueCardProps {
   issue: {
     id_issue: number;
@@ -15,6 +16,7 @@ interface IssueCardProps {
   }
 }
 
+/** A component that displays issue details in a structured card format. */
 const IssueCard: React.FC<IssueCardProps> = ({ issue }) => {
   const { t } = useTranslation() 
 

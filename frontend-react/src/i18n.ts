@@ -5,15 +5,13 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 
 i18n
   .use(HttpApi)
-  .use(LanguageDetector) // Tell i18n to use the language detector
+  .use(LanguageDetector)
   .use(initReactI18next)
   .init({
-    fallbackLng: 'en', // Universal fallback language
+    fallbackLng: 'en',
     detection: {
-      // Order of checks: first the URL (if forced via ?lng=fr), 
-      // then local storage, then browser settings (Chrome/Edge/etc.)
       order: ['querystring', 'localStorage', 'navigator'],
-      caches: ['localStorage'], // Caches the detected language for future visits
+      caches: ['localStorage'],
       lookupQuerystring: 'lng'
     },
     backend: {
@@ -24,4 +22,5 @@ i18n
     }
   });
 
+/** The configured i18next instance for application internationalization. */
 export default i18n;

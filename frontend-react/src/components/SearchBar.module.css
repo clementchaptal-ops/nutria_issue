@@ -1,3 +1,4 @@
+/* Main container for the search bar elements. */
 .searchBar {
     display: flex;
     align-items: center;
@@ -5,6 +6,7 @@
     width: 100%;
   }
   
+  /* Dropdown selection menu styling. */
   .select {
     height: 40px;
     padding: 0 12px;
@@ -23,6 +25,7 @@
     border-color: #0052cc;
   }
   
+  /* Text input search field styling. */
   .inputSearch {
     height: 40px;
     flex: 1;

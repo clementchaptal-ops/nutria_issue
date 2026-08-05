@@ -1,7 +1,10 @@
 import React from 'react'
 import styles from './SearchBar.module.css'
 
-type ColumnOption = { value: string; label: string }
+type ColumnOption = {
+  value: string;
+  label: string;
+}
 
 type SearchBarProps = {
   columns: ColumnOption[]
@@ -12,6 +15,7 @@ type SearchBarProps = {
   placeholder: string
 }
 
+/** A search bar component containing a column selection dropdown and a text query input. */
 const SearchBar: React.FC<SearchBarProps> = ({ columns, searchColumn, onColumnChange, searchQuery, onSearchChange, placeholder }) => {
   return (
     <div className={styles.searchBar}>

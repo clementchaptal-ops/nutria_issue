@@ -1,9 +1,9 @@
-/* --- STRUCTURE GLOBALE (COPIÉE DE MAINLAYOUT) --- */
+/* Main page layout structure */
 .layout {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-    background-color: #f1f5f9; /* Fond gris très clair uniforme */
+    background-color: #f1f5f9;
   }
   
   .header {
@@ -26,7 +26,7 @@
   .logoText {
     font-size: 22px;
     font-weight: 800;
-    color: #0284c7; /* Bleu Nutria */
+    color: #0284c7;
     letter-spacing: 0.5px;
   }
   
@@ -38,7 +38,7 @@
     padding: 20px;
   }
   
-  /* --- LA CARTE DE LOGIN ET DE SÉLECTION --- */
+  /* Login and profile selection card styles */
   .loginCard {
     background: #ffffff;
     padding: 32px;
@@ -79,7 +79,7 @@
     width: 100%;
   }
   
-  /* --- SÉLECTION DES PROFILS LIMS --- */
+  /* Profile selection controls and animations */
   .profileSelectionContainer {
     display: flex;
     flex-direction: column;

@@ -2,33 +2,32 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
 
+/** Props for the FileUploader component. */
 interface FileUploaderProps {
   files?: File[]; 
   onFilesChange: (files: File[]) => void;
   existingFiles?: any[]; 
 }
 
-// CONFIGURATION DE LA LIMITE À 50 MO
+/** The maximum allowable size for individual uploaded files. */
 const MAX_FILE_SIZE = 50 * 1024 * 1024; 
 
+/** Component for uploading files via selection, drag-and-drop, or clipboard pasting. */
 const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, existingFiles = [] }) => {
   const { t } = useTranslation()
   const [isDragging, setIsDragging] = useState<boolean>(false)
 
-  // SÉCURITÉ : Vérification de la taille + Blocage des doublons (Ctrl+V)
   const addFilesWithCheck = useCallback((newFiles: File[]) => {
     let updatedFiles = [...files];
     let duplicateCount = 0;
-    let tooLargeCount = 0; // Compteur pour les fichiers qui dépassent 50 Mo
+    let tooLargeCount = 0; 
 
     newFiles.forEach((newFile) => {
-      // 1. Contrôle de la taille maximale
       if (newFile.size > MAX_FILE_SIZE) {
         tooLargeCount++;
-        return; // On ignore ce fichier et on passe au suivant
+        return; 
       }
 
-      // 2. Contrôle des doublons
       const isDuplicate = updatedFiles.some(f => f.name === newFile.name || f.size === newFile.size);
 
       if (isDuplicate) {
@@ -38,7 +37,6 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
       }
     });
 
-    // Affichage des alertes i18n si des fichiers sont rejetés (remplacement de alert par toast.error)
     if (tooLargeCount > 0) {
       toast.error(t('form.size_alert', `⚠️ ${tooLargeCount} file(s) ignored because they exceed the 50 MB limit.`));
     }
@@ -49,7 +47,6 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
     onFilesChange(updatedFiles);
   }, [files, onFilesChange, t]);
 
-  // Gestion du Ctrl+V (Copier-Coller)
   const handlePaste = useCallback((event: ClipboardEvent) => {
     const items = event.clipboardData?.items;
     if (!items) return;
@@ -77,7 +74,6 @@ const FileUploader: React.FC<FileUploaderProps> = ({ files = [], onFilesChange, 
     };
   }, [handlePaste]);
 
-  // Drag & Drop
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);

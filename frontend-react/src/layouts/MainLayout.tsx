@@ -2,6 +2,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import styles from './MainLayout.module.css'
 
+/** Provides the global application shell layout containing navigation and routing. */
 function MainLayout() {
   const { t } = useTranslation()
   const navigate = useNavigate()

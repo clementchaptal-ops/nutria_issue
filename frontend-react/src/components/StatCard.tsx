@@ -1,5 +1,6 @@
 import React from 'react'
 
+/** Properties for the StatCard component. */
 type StatCardProps = {
   label: string
   count: number
@@ -8,6 +9,7 @@ type StatCardProps = {
   onClick: () => void
 }
 
+/** A card component that displays a metric with status-based styling. */
 const StatCard: React.FC<StatCardProps> = ({ label, count, color, isActive, onClick }) => {
   return (
     <div 

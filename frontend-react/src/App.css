@@ -1,3 +1,4 @@
+/* Root container layout and alignment */
 #root {
   max-width: 1280px;
   margin: 0 auto;
@@ -5,6 +6,7 @@
   text-align: center;
 }
 
+/* Logo styling, hover transitions, and animations */
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -33,10 +35,12 @@
   }
 }
 
+/* Card container padding */
 .card {
   padding: 2em;
 }
 
+/* Helper class for informational text */
 .read-the-docs {
   color: #888;
 }

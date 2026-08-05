@@ -2,6 +2,7 @@ import { Navigate, Outlet } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import i18next from 'i18next'
 
+/** Route guard restricting access to users with IT_TEAM or LOCAL_ADMIN roles. */
 const AdminRoute = () => {
   const userStr = localStorage.getItem('nutria_user')
   const user = userStr ? JSON.parse(userStr) : null

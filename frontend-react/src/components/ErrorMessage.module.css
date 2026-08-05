@@ -1,3 +1,4 @@
+/* Style for the error alert container. */
 .alert {
     background-color: var(--error-bg);
     color: var(--error-color);

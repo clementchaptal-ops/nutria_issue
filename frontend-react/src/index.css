@@ -1,20 +1,20 @@
-/* 1. Design Tokens (Variables Globales) */
+/* Global design tokens and color variables. */
 :root {
     --primary-color: #0052cc;      
     --primary-hover: #0065ff;
-    --success-color: #006644;      /* Le vert succès */
+    --success-color: #006644;      
     --success-bg: #e3fcef;
     --success-border: #abf5d1;
-    --error-color: #bf2600;        /* Le rouge erreur */
+    --error-color: #bf2600;        
     --error-bg: #ffebe6;
-    --text-main: #172b4d;          /* Gris très foncé pour le texte */
-    --text-muted: #5e6c84;         /* Gris moyen pour les sous-titres */
-    --bg-app: #f4f5f7;             /* Fond de l'application */
-    --bg-container: #ffffff;       /* Fond des blocs blancs */
-    --border-color: #dfe1e6;       /* Bordures standard */
+    --text-main: #172b4d;          
+    --text-muted: #5e6c84;         
+    --bg-app: #f4f5f7;             
+    --bg-container: #ffffff;       
+    --border-color: #dfe1e6;       
   }
   
-  /* 2. Reset & Base Styles */
+  /* Global reset and base application styles. */
   * {
     box-sizing: border-box;
     margin: 0;
@@ -29,7 +29,7 @@
     -moz-osx-font-smoothing: grayscale;
   }
   
-  /* Classes utilitaires globales simples */
+  /* Utility classes for accessibility. */
   .sr-only {
     position: absolute;
     width: 1px;

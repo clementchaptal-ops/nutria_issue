@@ -4,12 +4,11 @@ import i18next from 'i18next';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://europe-west1-nutria-issue.cloudfunctions.net/nutria_api";
 
-// Création de l'instance configurée
+/** Pre-configured Axios client instance for API requests with JWT insertion and session expiration handling. */
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
 });
 
-// 1. Intercepteur de REQUÊTE : Attache le token automatiquement à CHAQUE appel
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('nutria_token');
   if (token) {
@@ -18,7 +17,6 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// 2. Intercepteur de RÉPONSE : Gère l'expiration de session globale
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {

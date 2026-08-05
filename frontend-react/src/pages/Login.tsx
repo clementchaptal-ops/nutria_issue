@@ -5,12 +5,14 @@ import toast from 'react-hot-toast'
 import styles from './Login.module.css'
 import apiClient from '../api/client'
 
+/** Represents the LIMS user profile structure. */
 interface LimsProfile {
   user_name: string
   full_name: string
   location: string
 }
 
+/** Handles user authentication via Google OAuth and multiple LIMS profile selection. */
 function Login() {
   const { t } = useTranslation()
   const navigate = useNavigate()

@@ -1,10 +1,12 @@
 import React from 'react'
-import styles from './ErrorMessage.module.css' // <-- On importe le CSS sous forme d'objet !
+import styles from './ErrorMessage.module.css'
 
+/** Properties for the ErrorMessage component. */
 interface ErrorMessageProps {
   message: string | null
 }
 
+/** Renders an alert message banner if an error message is provided. */
 const ErrorMessage: React.FC<ErrorMessageProps> = ({ message }) => {
   if (!message) return null
 

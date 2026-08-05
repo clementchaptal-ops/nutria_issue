@@ -1,5 +1,6 @@
 import toast from 'react-hot-toast'
 
+/** Properties required for the confirmation toast. */
 interface ShowConfirmToastProps {
   message: string
   confirmText: string
@@ -7,6 +8,7 @@ interface ShowConfirmToastProps {
   onConfirm: () => void
 }
 
+/** Displays a toast notification requiring user confirmation before proceeding. */
 export const showConfirmToast = ({
   message,
   confirmText,

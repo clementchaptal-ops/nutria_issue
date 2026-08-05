@@ -1,3 +1,4 @@
+/* Main layout container and header styles */
 .container {
   padding: 40px;
   max-width: 1400px;
@@ -25,23 +26,22 @@
   border-radius: 15px;
   font-size: 14px;
   font-weight: bold;
-}/* ==========================================
-   BARRE D'ACTION ET FILTRES
-   ========================================== */
+}
+
+/* Action bar controls and query filtering styles */
 .actionBar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   background-color: #ffffff;
-  padding: 12px 16px; /* Légèrement réduit pour matcher avec la hauteur de 40px */
+  padding: 12px 16px;
   border-radius: 8px;
   border: 1px solid #e3e6e8;
   margin-bottom: 24px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
-  gap: 16px; /* Ajout vital pour l'espacement entre la recherche et le bouton */
+  gap: 16px;
 }
 
-/* Nouveau wrapper pour étirer la barre de recherche */
 .searchWrapper {
   flex: 1;
   display: flex;
@@ -51,8 +51,8 @@
   background-color: #0052cc;
   color: #ffffff;
   border: none;
-  height: 40px; /* Fixé à 40px comme la SearchBar */
-  min-width: 200px; /* Empêche le bouton de s'écraser */
+  height: 40px;
+  min-width: 200px;
   padding: 0 20px;
   border-radius: 6px;
   font-weight: bold;
@@ -62,7 +62,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  white-space: nowrap; /* INTERDIT au texte de passer sur 2 lignes */
+  white-space: nowrap;
   transition: background-color 0.2s ease, transform 0.1s ease;
 }
 
@@ -73,9 +73,8 @@
 .createBtn:active {
   transform: scale(0.98);
 }
-/* ==========================================
-   TABLE STYLES
-   ========================================== */
+
+/* Table layout and data rows styling */
 .tableWrapper {
   overflow-x: auto;
   background: var(--bg-container);
@@ -126,7 +125,7 @@
   border-bottom: none;
 }
 
-/* Specific column styles */
+/* Column specific spacing and alignment overrides */
 .tdId {
   font-weight: bold;
   color: var(--text-muted);
@@ -151,9 +150,7 @@
   font-size: 13px;
 }
 
-/* ==========================================
-   BADGES (TYPE, STATUS & CRITICITY)
-   ========================================== */
+/* Status, priority, and type categorization badges */
 .badge {
   padding: 4px 10px;
   border-radius: 12px;
@@ -167,16 +164,13 @@
   color: var(--text-muted); 
 }
 
-/* Types */
 .type_CRASH { background-color: #ffebe6; color: #bf2600; }
 .type_SLOW { background-color: #fff0b3; color: #8f6b00; }
 .type_ILLOGICAL { background-color: #eae6ff; color: #403294; }
 
-/* Status */
 .status_PRETICKET { background-color: #e6f0ff; color: var(--primary-color); }
 .status_RESOLVED { background-color: var(--success-bg); color: var(--success-color); }
 
-/* Criticity */
 .criticity_DEFAULT {
   background-color: #ebecf0;
   color: #42526e;
@@ -199,6 +193,7 @@
   color: #006644;
 }
 
+/* Fallback view for empty dashboard data */
 .emptyState {
   text-align: center;
   padding: 50px;

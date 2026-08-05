@@ -11,6 +11,9 @@ import RegroupementForm from './pages/RegroupementForm'
 import RegroupementDetail from './pages/RegroupementDetail'
 import { Toaster } from 'react-hot-toast' 
 
+/**
+ * Root component that manages the application routing layout, authentication guards, and global toast notifications.
+ */
 function App() {
   return (
     <BrowserRouter>

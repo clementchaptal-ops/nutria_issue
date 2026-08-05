@@ -1,3 +1,14 @@
+/** Decodes the stored JWT token to retrieve the user payload. */
+const getDecodedToken = () => {
+  const token = localStorage.getItem('nutria_token');
+  if (!token) return null;
+  try {
+    return JSON.parse(atob(token.split('.')[1]));
+  } catch (e) {
+    return null;
+  }
+};
+
 import React, { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -10,18 +21,9 @@ import {
   fetchIssueById, fetchUserMe, createIssue, validateIssue, 
   cancelTicket, closeTicket, fetchIssueComments, addIssueComment, 
   uploadIssueAttachments, uploadCommentAttachments, deleteIssueAttachment, downloadIssueFile 
-} from '../api/issues' // <-- Imports centralisés de l'API
+} from '../api/issues'
 
-const getDecodedToken = () => {
-  const token = localStorage.getItem('nutria_token');
-  if (!token) return null;
-  try {
-    return JSON.parse(atob(token.split('.')[1]));
-  } catch (e) {
-    return null;
-  }
-};
-
+/** A form component for creating, viewing, updating, and managing issue tickets. */
 function IssueForm() {
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
@@ -73,9 +75,6 @@ function IssueForm() {
     ip_adress: '', ip_config: '', current_pc: '', ping: '',
   })
 
-  // ==========================================
-  // FONCTIONS DE CHARGEMENT DES DONNÉES
-  // ==========================================
   const loadComments = useCallback(async () => {
     if (!ticketId) return
     try {
@@ -123,7 +122,6 @@ function IssueForm() {
           env: profile.env || profile.environment || backupUser.env
         })
       } catch (error) {
-        // Silent catch
       } finally {
         setIsLoading(false)
       }
@@ -217,10 +215,6 @@ function IssueForm() {
     if (ticketId && !isNewTicket) loadComments()
   }, [loadTicketData, loadComments, ticketId, isNewTicket])
 
-
-  // ==========================================
-  // ACTIONS ET SOUMISSIONS
-  // ==========================================
   const handleFileDownload = async (type: 'working_dir' | 'logs', defaultFilename: string) => {
     if (!ticketId) return
     try {
@@ -288,7 +282,6 @@ function IssueForm() {
       if (isNewTicket) {
         navigate('/dashboard')
       } else {
-        // NOUVEAU : Remplace le window.location.reload()
         loadTicketData()
         loadComments()
       }
@@ -379,7 +372,6 @@ function IssueForm() {
     if (isNewTicket) navigate('/dashboard');
     else {
       setIsEditing(false);
-      // NOUVEAU : Remplace le window.location.reload()
       loadTicketData();
     }
   };
@@ -416,7 +408,6 @@ function IssueForm() {
   return (
     <div className={styles.pageContainer}>
       
-      {/* STATUS BANNER */}
       <div className={`${styles.statusBanner} ${styles[status.toLowerCase().replace(' ', '_')]}`} style={{ display: 'flex', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div className={styles.statusInfo}>
@@ -459,7 +450,6 @@ function IssueForm() {
 
       <div className={styles.gridContainer}>
         
-        {/* === LEFT COLUMN: FORM & ATTACHMENTS === */}
         <div className={styles.leftColumn}>
           <form onSubmit={handleSubmit}>
             <fieldset disabled={!isEditing} style={{ border: 'none', padding: 0, margin: 0 }}>
@@ -545,7 +535,6 @@ function IssueForm() {
             </fieldset>
           </form>
 
-          {/* TICKET ATTACHMENTS GALLERY */}
           {existingFiles && existingFiles.some(f => {
             const name = (f.attachment_name || '').toLowerCase();
             const path = (f.url_path || '').toLowerCase();
@@ -565,7 +554,6 @@ function IssueForm() {
                   })
                   .map((file, index) => {
                     const displayName = file.attachment_name || t('ticket.unknown_file', 'Unknown_File');
-                    // Plus d'URL en dur ici, on utilise l'URL renvoyée par le backend
                     const fileUrl = file.url_path;
                     const fileType = file.attachment_type;
                   
@@ -607,7 +595,6 @@ function IssueForm() {
             </div>
           )}
           
-          {/* AUTO FILES */}
           {!isNewTicket && !isCreatedFromWeb && (
             <div className={styles.autoFilesSection} style={{ marginTop: '30px' }}>
               <h4 className={styles.autoFilesTitle}>{t('ticket.auto_collected', 'Auto-collected Context Files:')}</h4>
@@ -629,7 +616,6 @@ function IssueForm() {
           )}
         </div>
         
-        {/* === RIGHT COLUMN: READ ONLY === */}
         <div className={styles.rightColumn}>
           <div className={`${styles.sidebarCard} ${styles.readOnlyCard}`}>
             <h3 className={styles.cardTitle}>👤 {t('sidebar.user_title', 'User Information')}</h3>
@@ -648,7 +634,6 @@ function IssueForm() {
             </div>
           </div>
 
-          {/* LIMS Context */}
           <div className={`${styles.sidebarCard} ${styles.editableCard}`}>
             <h3 className={styles.cardTitle}>⚙️ {t('sidebar.context_title', 'LIMS Context')}</h3>
             <div className={styles.cardContent}>
@@ -706,7 +691,6 @@ function IssueForm() {
         </div>
       </div> 
 
-      {/* COMMENTS SECTION */}
       {!isNewTicket && !isEditing && (
         <div className={styles.commentsSection} style={{ width: '100%', marginTop: '30px' }}>
           <h3 className={styles.commentsTitle}>💬 {t('ticket.discussion', 'Discussion')}</h3>
@@ -782,7 +766,6 @@ function IssueForm() {
         </div>
       )}
 
-      {/* OVERLAY LIGHTBOX */}
       {lightboxMedia && (
         <div 
           className={styles.lightboxOverlay}

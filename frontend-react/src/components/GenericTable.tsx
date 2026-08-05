@@ -1,6 +1,7 @@
 import React from 'react'
 import styles from '../pages/Dashboard.module.css'
 
+/** Defines the configuration and rendering options for a table column. */
 export type TableColumn<T> = {
   key: Extract<keyof T, string> | string
   label: string
@@ -20,6 +21,7 @@ type GenericTableProps<T> = {
   rowKey: (item: T) => string | number
 }
 
+/** A generic, type-safe table component that renders tabular data with sorting and row selection. */
 function GenericTable<T>({ columns, data, sortConfig, onSort, onRowClick, rowKey }: GenericTableProps<T>) {
   const getSortIcon = (key: string) => {
     if (sortConfig.key !== key) return ' ↕'

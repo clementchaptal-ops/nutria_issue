@@ -9,11 +9,13 @@ import StatCard from '../components/StatCard'
 import SearchBar from '../components/SearchBar'
 import GenericTable, { TableColumn } from '../components/GenericTable'
 
+/** Represents the sorting configuration for the regroupements tables. */
 type SortConfig = {
   key: string;
   direction: 'asc' | 'desc';
 }
 
+/** Dashboard component for managing classic and AI-suggested regroupements. */
 function RegroupementList() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -139,6 +141,7 @@ function RegroupementList() {
   }
 
   const toggleClassicStatus = (status: string) => setClassicStatuses(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]);
+  
   const toggleAiStatus = (status: string) => setAiStatuses(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]);
 
   const searchColumns = [

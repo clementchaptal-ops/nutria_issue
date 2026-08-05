@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import ErrorMessage from '../components/ErrorMessage'
 import apiClient from '../api/client'
 
+/** Component for displaying system audit logs. */
 function AuditLogs() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -14,7 +15,6 @@ function AuditLogs() {
   useEffect(() => {
     const fetchLogs = async () => {
       try {
-        // apiClient s'occupe de l'URL de base et d'attacher le token !
         const response = await apiClient.get('/issues/audit/logs')
 
         const data = response.data
@@ -26,7 +26,6 @@ function AuditLogs() {
           setLogs([]) 
         }
       } catch (err: any) {
-        // La redirection 401 est gérée par apiClient, on gère juste le 403 ici
         if (err.response && err.response.status === 403) {
           navigate('/dashboard') 
           return
@@ -98,4 +97,5 @@ function AuditLogs() {
   )
 }
 
+/** Default export for the AuditLogs component. */
 export default AuditLogs
