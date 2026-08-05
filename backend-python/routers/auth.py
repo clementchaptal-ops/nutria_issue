@@ -16,13 +16,18 @@ from .schemas import GoogleTokenRequest
 
 # --- CONFIGURATION ---
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "549394697229-tvgof9to9fcu4um4260vnigbtt57o9fo.apps.googleusercontent.com") 
-JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "your_super_secret_key_change_this_in_production")
+
+# CORRECTION AIKIDO : Suppression de la valeur en clair
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 120
 USE_MOCK_DATA = os.environ.get("USE_MOCK_DATA", "True") == "True"
 
 # --- HELPER FUNCTIONS ---
 def create_access_token(data: dict, expires_delta: timedelta):
+    if not JWT_SECRET_KEY:
+        raise ValueError("Server configuration error: JWT_SECRET_KEY is missing in GCP variables.")
+        
     to_encode = data.copy()
     expire = datetime.utcnow() + expires_delta
     to_encode.update({"exp": expire})
@@ -112,7 +117,7 @@ def google_auth(request_json):
         db_fullname = selected_row[1]
         db_location = selected_row[2]
 
-        # 6. DETERMINE ROLE VIA GOOGLE DIRECTORY API (Natif GCP)
+        # 6. DETERMINE ROLE VIA GOOGLE DIRECTORY (OR APPS SCRIPT TEMPORARILY)
         role = "USER"  
         
         # Structure de groups_data : {"nutria_core_it@mxns.com": ["mail1@...", ...], "nutria-local_admin@mxns.com": [...]}
@@ -130,15 +135,19 @@ def google_auth(request_json):
 
         # 7. Generate the JWT Access Token
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={
-                "sub": db_username, 
-                "email": user_email,
-                "role": role,            
-                "location": db_location 
-            }, 
-            expires_delta=access_token_expires
-        )
+        
+        try:
+            access_token = create_access_token(
+                data={
+                    "sub": db_username, 
+                    "email": user_email,
+                    "role": role,            
+                    "location": db_location 
+                }, 
+                expires_delta=access_token_expires
+            )
+        except ValueError as ve:
+            return {"error": str(ve)}, 500
 
         return {
             "access_token": access_token,

@@ -1,68 +1,154 @@
-import time
-import google.auth
-from googleapiclient.discovery import build
+import os
+import jwt
+from datetime import datetime, timedelta
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+from pydantic import ValidationError
 
-# Configuration des groupes
-TARGET_GROUPS = {
-    "IT_TEAM": "nutria_core_it@mxns.com",
-    "LOCAL_ADMIN": "nutria-local_admin@mxns.com"
-}
+# Database configuration import
+from config.database import get_db_connection 
 
-# Cache en mémoire (1 heure)
-cache = {
-    "data": None,
-    "last_updated": 0
-}
-CACHE_DURATION = 3600
+# Role management script import
+from config.admin_role import get_google_groups
 
-def fetch_group_members_from_google():
+# --- LOCAL FILE IMPORTS ---
+from routers.schemas import GoogleTokenRequest 
+
+# --- CONFIGURATION ---
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "549394697229-tvgof9to9fcu4um4260vnigbtt57o9fo.apps.googleusercontent.com") 
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "your_super_secret_key_change_this_in_production")
+JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 120
+USE_MOCK_DATA = os.environ.get("USE_MOCK_DATA", "True") == "True"
+
+# --- HELPER FUNCTIONS ---
+def create_access_token(data: dict, expires_delta: timedelta):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + expires_delta
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    return encoded_jwt
+
+# --- ROUTES ---
+def google_auth(request_json):
     """
-    Interroge directement l'API Directory de Google Workspace 
-    via les identifiants natifs du Service Account GCP.
+    Handles the Google Single Sign-On flow, validates the token,
+    checks the PostgreSQL LIMS database for the user profile,
+    determines the role via Google Apps Script, and issues a JWT.
     """
-    group_results = {}
-    
     try:
-        # Récupère automatiquement les identifiants GCP du Cloud Run / Cloud Function
-        credentials, _ = google.auth.default(
-            scopes=['https://www.googleapis.com/auth/admin.directory.group.readonly']
+        auth_request = GoogleTokenRequest(**request_json)
+    except ValidationError as e:
+        return {"error": "Invalid data format", "details": e.errors()}, 400
+
+    try:
+        # 1. Verify the Google Token
+        try:
+            idinfo = id_token.verify_oauth2_token(
+                auth_request.credential, 
+                google_requests.Request(), 
+                GOOGLE_CLIENT_ID
+            )
+        except ValueError:
+            return {"error": "Invalid Google token."}, 401
+
+        # 2. Extract email
+        user_email = idinfo.get("email")
+        if not user_email:
+            return {"error": "Email not provided by Google."}, 400
+
+        # 3. Query the Database
+        if USE_MOCK_DATA:
+            fake_username = user_email.split('@')[0].upper()
+            user_rows = [
+                (fake_username, "Demo User", "Demo Laboratory")
+            ]
+            
+        else:
+            connection = get_db_connection()
+            if not connection:
+                return {"error": "Database connection error."}, 500
+                
+            cursor = connection.cursor()
+
+            # PostgreSQL syntax: %s placeholder instead of :1
+            query = """
+                SELECT user_name, full_name, location 
+                FROM lims_users 
+                WHERE LOWER(EMAIL_ADDR) = LOWER(%s)
+            """
+            cursor.execute(query, (user_email,))
+            user_rows = cursor.fetchall()  
+
+            cursor.close()
+            connection.close()
+            
+        # 4. Check if user exists
+        if not user_rows:
+            return {"error": f"User not found in LIMS database with email: {user_email}"}, 403
+
+        # --- MULTIPLE PROFILES MANAGEMENT LOGIC ---
+        if len(user_rows) > 1 and not auth_request.selected_profile:
+            profiles_list = [
+                {"user_name": row[0], "full_name": row[1], "location": row[2]} 
+                for row in user_rows
+            ]
+            return {
+                "require_selection": True,
+                "profiles": profiles_list
+            }, 200
+
+        selected_row = user_rows[0]  
+        
+        if auth_request.selected_profile:
+            matched_row = next((row for row in user_rows if row[0] == auth_request.selected_profile), None)
+            if matched_row:
+                selected_row = matched_row
+            else:
+                return {"error": "Invalid selected profile."}, 400
+
+        # 5. Extract database values
+        db_username = selected_row[0]  
+        db_fullname = selected_row[1]
+        db_location = selected_row[2]
+
+        # 6. DETERMINE ROLE VIA GOOGLE DIRECTORY API (Natif GCP)
+        role = "USER"  
+        
+        # Structure de groups_data : {"nutria_core_it@mxns.com": ["mail1@...", ...], "nutria-local_admin@mxns.com": [...]}
+        groups_data = get_google_groups()
+        
+        it_team_emails = groups_data.get("nutria_core_it@mxns.com", [])
+        local_admin_emails = groups_data.get("nutria-local_admin@mxns.com", [])
+
+        cleaned_user_email = user_email.strip().lower()
+
+        if cleaned_user_email in it_team_emails:
+            role = "IT_TEAM"
+        elif cleaned_user_email in local_admin_emails:
+            role = "LOCAL_ADMIN"
+
+        # 7. Generate the JWT Access Token
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={
+                "sub": db_username, 
+                "email": user_email,
+                "role": role,            
+                "location": db_location 
+            }, 
+            expires_delta=access_token_expires
         )
-        service = build('admin', 'directory_v1', credentials=credentials)
 
-        for role_name, group_email in TARGET_GROUPS.items():
-            try:
-                # CORRECTION : Utiliser groupKey au lieu de groupUniqueId
-                response = service.members().list(groupKey=group_email).execute()
-                members = response.get('members', [])
-                group_results[group_email] = [m['email'].strip().lower() for m in members if 'email' in m]
-            except Exception as group_err:
-                print(f"[GOOGLE DIRECTORY ERROR] Impossible de lire {group_email}: {group_err}")
-                group_results[group_email] = []
-
-        return group_results
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user_name": db_username,
+            "full_name": db_fullname,
+            "role": role,
+            "location": db_location
+        }, 200
 
     except Exception as e:
-        print(f"[FATAL DIRECTORY ERROR]: {e}")
-        return None
-
-def get_google_groups():
-    """Gère le cache Python pour éviter de requêter Google à chaque milliseconde."""
-    current_time = time.time()
-    
-    # 1. Utilisation du cache s'il est valide
-    if cache["data"] is not None and (current_time - cache["last_updated"] < CACHE_DURATION):
-        print("-> Fetching group roles from Python CACHE")
-        return cache["data"]
-    
-    # 2. Rafraîchissement depuis Google Directory API
-    print("-> Refreshing group roles from Google Directory API...")
-    fresh_data = fetch_group_members_from_google()
-    
-    if fresh_data is not None:
-        cache["data"] = fresh_data
-        cache["last_updated"] = current_time
-        print("-> Group cache successfully updated")
-        return cache["data"]
-    
-    # Fallback sur l'ancien cache en cas de panne
-    return cache["data"] or {}
+        print(f"[AUTH ERROR - google_auth]: {str(e)}")
+        return {"error": "Internal server error during authentication."}, 500
