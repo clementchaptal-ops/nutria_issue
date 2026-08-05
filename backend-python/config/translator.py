@@ -1,27 +1,40 @@
-# Utility script for translation generation (do not deploy).
 import json
 import os
 from deep_translator import GoogleTranslator
 
-# 1. Automatic ABSOLUTE path calculation
 script_dir = os.path.dirname(os.path.abspath(__file__))
 base_path = os.path.normpath(os.path.join(script_dir, '..', '..', 'frontend-react', 'public', 'translation'))
 
-# English is now the source, so we add 'fr' to the target list
 languages = ['es', 'pl', 'pt']
 
 def complete_dictionary(en_dict, existing_dict, translator):
+    """
+    Recursively updates a target language dictionary using an English source dictionary.
+
+    Iterates through key-value pairs of the English reference. If a key maps to a nested
+    dictionary, the function traverses recursively. For string values, it preserves
+    existing translations and uses GoogleTranslator to translate missing or empty entries.
+
+    Args:
+        en_dict (dict): English source dictionary serving as the translation reference.
+        existing_dict (dict): Currently saved target translation dictionary.
+        translator (GoogleTranslator): Initialized translation client for the target language.
+
+    Returns:
+        dict: Fully updated translation dictionary structured identically to the source.
+    """
     final_dict = {}
     
     for key, value in en_dict.items():
         existing_value = existing_dict.get(key) if existing_dict else None
         
         if isinstance(value, dict):
+            # Recursively sync schemas of nested objects to maintain structure
             existing_sub_dict = existing_value if isinstance(existing_value, dict) else {}
             final_dict[key] = complete_dictionary(value, existing_sub_dict, translator)
             
         elif isinstance(value, str):
-            # If the translation already exists and is not empty, keep it
+            # Retain non-empty existing translations; request API translation only for new keys
             if existing_value and str(existing_value).strip() != "":
                 final_dict[key] = existing_value
             else:
@@ -34,7 +47,6 @@ def complete_dictionary(en_dict, existing_dict, translator):
 
 print(f"Searching for English source file in: {base_path}")
 
-# 2. Read the English source file (New Source of Truth)
 en_path = os.path.join(base_path, 'en', 'translation.json')
 try:
     with open(en_path, 'r', encoding='utf-8') as f:
@@ -44,7 +56,6 @@ except FileNotFoundError:
     print("Please make sure your reference JSON is placed in public/translation/en/translation.json")
     exit()
 
-# 3. Loop through target languages to update files
 for lang in languages:
     print(f"Updating language: {lang.upper()}...")
     
@@ -58,12 +69,11 @@ for lang in languages:
         except Exception:
             print(f"   Could not read existing {lang}.json. Full overwrite triggered.")
 
-    # We now translate FROM English (source='en') TO the target language
+    # Initialize translation client dynamically for target language mapping
     translator = GoogleTranslator(source='en', target=lang)
     
     final_text = complete_dictionary(en_text, existing_text, translator)
         
-    # 4. Save the merged file
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
     with open(dest_path, 'w', encoding='utf-8') as f:
         json.dump(final_text, f, ensure_ascii=False, indent=2)

@@ -10,18 +10,18 @@ from pydantic import ValidationError
 from config.storage import make_signed_url, BUCKET_NAME
 from services.state_manager import trigger_state_json_update
 
-# Local file imports
 from .schemas import IssueCreate, IssueUpdate, StatusUpdate
 from .audit import log_user_action
 
 
-
-# =====================================================================
-# 1. STATIC ROUTES
-# =====================================================================
-
 def get_all_issues(current_user):
-    """Fetches all tickets from the database, filtering them based on the user's role and site location code prefix."""
+    """
+    Retrieve all issue records from the database.
+
+    Filters the issues according to the user's role and geographic site location code prefix.
+    Members of the 'IT_TEAM' receive all records, while regional users are restricted to
+    issues matching their local site configuration prefix.
+    """
     user_role = current_user.get("role")
     user_location = current_user.get("location")
 
@@ -33,8 +33,7 @@ def get_all_issues(current_user):
     tickets = []
     
     try:
-        # On utilise ARRAY_AGG pour récupérer TOUS les id_regroupment sous forme de tableau (liste)
-        # ARRAY_REMOVE permet de filtrer les NULL si le ticket n'est dans aucun groupe.
+        # Aggregate grouping IDs into an array while filtering out null associations
         base_select = """
             SELECT i.id_issue, i.title, i.issue_type, i.status, i.user_name,
                    u.full_name, u.location, TO_CHAR(i.created_on, 'YYYY-MM-DD HH24:MI') as c_date,
@@ -53,12 +52,12 @@ def get_all_issues(current_user):
         else:
             safe_location = str(user_location).strip().upper() if user_location else ""
             
+            # Extract root site location prefix before optional sub-site hyphen separators
             if len(safe_location) >= 7 and safe_location[6:7] == "-":
                 site_root = safe_location[:6]
             else:
                 site_root = safe_location
 
-            # Clause WHERE avant GROUP BY
             qry = base_select + " WHERE TRIM(UPPER(u.location)) LIKE TRIM(UPPER(%s)) || '%%' " + group_and_order
             cursor.execute(qry, (site_root,))
             
@@ -75,7 +74,6 @@ def get_all_issues(current_user):
                 "creation_date": row[7] if row[7] else "",
                 "criticity": row[8] if row[8] else "N/A",
                 "environment": row[9] if row[9] else "UNKNOWN",
-                # On renvoie la liste complète des regroupements
                 "regroupements": row[10] if row[10] else []
             })
         return tickets, 200
@@ -88,7 +86,9 @@ def get_all_issues(current_user):
 
 
 def get_my_profile(current_user):
-    """Fetches true LIMS user profile details for the currently logged-in account."""
+    """
+    Retrieve LIMS user profile details for the currently authenticated account.
+    """
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -121,7 +121,9 @@ def get_my_profile(current_user):
 
 
 def create_issue(request_json, current_user, client_ip):
-    """Creates a new manual issue through the web platform and routes it straight to 'IN PROGRESS'."""
+    """
+    Create a new manual issue entry and initiate its status directly as 'IN PROGRESS'.
+    """
     try:
         issue_payload = IssueCreate(**request_json)
     except ValidationError as e:
@@ -134,7 +136,6 @@ def create_issue(request_json, current_user, client_ip):
         
     try:
         cursor = connection.cursor()
-        # 🚨 Retour à 'IN PROGRESS'
         insert_qry = """
             INSERT INTO c_issue (title, issue_type, criticity, frequency, description, status, user_name, created_on, changed_on) 
             VALUES (%s, %s, %s, %s, %s, 'IN PROGRESS', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
@@ -145,7 +146,6 @@ def create_issue(request_json, current_user, client_ip):
         next_id = cursor.fetchone()[0]
         connection.commit()
 
-        # 🚀 UPDATE DU JSON GLOBAL SUR GCS
         trigger_state_json_update()
 
         log_user_action(user_name=username, action_type="CREATE_ISSUE", target_id=str(next_id), details=f"Manual web creation. Title: '{issue_payload.title}'", ip_address=client_ip)
@@ -159,12 +159,14 @@ def create_issue(request_json, current_user, client_ip):
         cursor.close()
         connection.close()
 
-# =====================================================================
-# 2. DYNAMIC ROUTES
-# =====================================================================
 
 def get_issue(issue_id, current_user):
-    """Fetches detailed technical data and contextual information, including its attachments."""
+    """
+    Fetch comprehensive technical details and context metadata for a specific issue.
+    
+    Includes parsing and signing GCS urls for non-deleted, non-comment attachments.
+    Ensures structural data boundaries are maintained according to user role permissions.
+    """
     user_role = current_user.get("role")
     user_location = current_user.get("location")
     connection = get_db_connection()
@@ -174,7 +176,6 @@ def get_issue(issue_id, current_user):
     try:
         cursor = connection.cursor()
         
-        # Champ sspticket supprimé de la requête
         qry = """
             SELECT i.id_issue, i.title, i.issue_type, i.description, i.user_name, i.ip_adress,
                    i.ip_config, i.ping, i.status, i.citrix_session, i.current_pc, i.frequency,
@@ -214,7 +215,6 @@ def get_issue(issue_id, current_user):
         
         attachments_list = [dict(zip(attach_cols, r)) for r in attach_rows]
         
-        # Apply signed URLs
         for att in attachments_list:
             att["url_path"] = make_signed_url(att["url_path"])
             
@@ -231,7 +231,9 @@ def get_issue(issue_id, current_user):
 
 
 def get_issue_comments(issue_id, current_user):
-    """Fetches comments and their respective attachments for a specific issue."""
+    """
+    Retrieve historical comments and their associated attachments for a specific issue.
+    """
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -280,7 +282,7 @@ def get_issue_comments(issue_id, current_user):
                     comments_dict[att_c_id]["attachments"].append({
                         "attachment_name": att_row[1],
                         "attachment_type": att_row[2],
-                        "url_path": make_signed_url(att_row[3]) # Signed URL applied here
+                        "url_path": make_signed_url(att_row[3])
                     })
                     
         return comments_list, 200
@@ -293,7 +295,9 @@ def get_issue_comments(issue_id, current_user):
 
 
 def add_issue_comment(issue_id, payload_data, current_user, client_ip):
-    """Adds a text comment to a specific issue."""
+    """
+    Append a new text comment entry to a specific issue log.
+    """
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -331,7 +335,9 @@ def add_issue_comment(issue_id, payload_data, current_user, client_ip):
 
 
 def get_oracle_attachment_type(content_type: str, filename: str) -> str:
-    """Evaluates the MIME type to return the legacy Oracle attachment type."""
+    """
+    Evaluate a MIME context type or file suffix to assign a legacy DB metadata string.
+    """
     content_type = content_type.lower()
     if content_type.startswith('image/'): return 'IMAGE'
     elif content_type.startswith('video/'): return 'VIDEO'
@@ -340,7 +346,12 @@ def get_oracle_attachment_type(content_type: str, filename: str) -> str:
 
 
 def upload_comment_attachments(issue_id, comment_id, files_data, current_user):
-    """Uploads comment attachments to Google Cloud Storage (Cloud Run standard)."""
+    """
+    Store comment attachment files directly to Cloud Storage and map references in DB.
+    
+    Optionally schedules an automated asynchronous AI extractor parsing routine
+    to digest context data updates from the newly provided assets.
+    """
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -359,7 +370,6 @@ def upload_comment_attachments(issue_id, comment_id, files_data, current_user):
             safe_file_name = f"com_{unique_prefix}_{filename}"
             blob_path = f"tickets/ticket_{issue_id}/comments/{safe_file_name}"
             
-            # Upload to GCS
             blob = bucket.blob(blob_path)
             blob.upload_from_string(file_bytes)
             public_url = f"https://storage.googleapis.com/{BUCKET_NAME}/{blob_path}"
@@ -374,13 +384,11 @@ def upload_comment_attachments(issue_id, comment_id, files_data, current_user):
             
         connection.commit()
 
-        # --- 🤖 AI INTEGRATION: UPDATE ISSUE FINGERPRINT ---
         try:
             from services.ai_extractor import analyze_issue_attachments_and_save
             analyze_issue_attachments_and_save(issue_id)
         except Exception as ai_error:
             print(f"[WARNING] AI Analysis failed for issue {issue_id} (via comment): {ai_error}")
-        # ---------------------------------------------------
 
         return {"message": "success.comment_attachments_uploaded"}, 200
     except Exception as e:
@@ -393,7 +401,12 @@ def upload_comment_attachments(issue_id, comment_id, files_data, current_user):
 
 
 def validate_issue(issue_id, request_json, current_user, client_ip):
-    """Validates data alterations and updates an issue payload to 'IN PROGRESS' status."""
+    """
+    Modify structural data parameters and enforce transitions to 'IN PROGRESS' state.
+    
+    Applies security verification checks on the user requesting modifications to
+    verify their alignment with geographic location boundaries or record ownership.
+    """
     try:
         issue_payload = IssueUpdate(**request_json)
     except ValidationError as e:
@@ -427,7 +440,6 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
         elif user_role == "LOCAL_ADMIN" and safe_issue_loc != safe_user_loc:
             return {"error": "error.forbidden_access"}, 403
 
-        # 🚨 Retour à 'IN PROGRESS'
         update_qry = """
             UPDATE c_issue 
             SET title = %s, issue_type = %s, criticity = %s, frequency = %s, 
@@ -450,7 +462,6 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
         if cursor.rowcount == 0:
             return {"error": "error.unable_to_modify_issue"}, 400
 
-        # 🚀 UPDATE DU JSON GLOBAL SUR GCS
         trigger_state_json_update()
 
         log_user_action(user_name=username, action_type="UPDATE_ISSUE", target_id=str(issue_id), details=f"Issue updated/validated. New title: '{issue_payload.title}'", ip_address=client_ip)
@@ -466,7 +477,9 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
 
 
 def cancel_issue(issue_id, current_user, client_ip):
-    """Flags a target active ticket with the 'CANCELED' status."""
+    """
+    Transition the active state of a chosen issue to 'CANCELED' status.
+    """
     user_email = current_user.get("email")
     user_role = current_user.get("role")
     user_location = current_user.get("location")
@@ -498,7 +511,6 @@ def cancel_issue(issue_id, current_user, client_ip):
         cursor.execute("UPDATE c_issue SET status = 'CANCELED', changed_on = CURRENT_TIMESTAMP WHERE id_issue = %s", (issue_id,))
         connection.commit()
 
-        # 🚀 UPDATE DU JSON GLOBAL SUR GCS
         trigger_state_json_update()
 
         log_user_action(user_name=username, action_type="CANCEL_TICKET", target_id=str(issue_id), details="Ticket canceled by user.", ip_address=client_ip)
@@ -514,8 +526,9 @@ def cancel_issue(issue_id, current_user, client_ip):
 
 def download_file_path(ticket_id, file_type, current_user, client_ip):
     """
-    On GCP, files are in Cloud Storage, not on the local disk.
-    We MUST retrieve the exact URL (with the UUID hash) from the database!
+    Retrieve the dynamic Cloud Storage download pathway for target contextual zip files.
+    
+    Generates a secure temporary signed URL for requested log or workspace artifacts.
     """
     if file_type == "working_dir":
         search_pattern = "%WorkingDir.zip"
@@ -535,7 +548,7 @@ def download_file_path(ticket_id, file_type, current_user, client_ip):
     try:
         cursor = connection.cursor()
         
-        # Récupération de l'URL exacte générée lors de l'upload (avec le hash)
+        # Query GCS stored reference URL utilizing matching signature pattern
         qry = """
             SELECT url_path, attachment_name 
             FROM c_issue_attachment 
@@ -553,7 +566,6 @@ def download_file_path(ticket_id, file_type, current_user, client_ip):
         public_url = row[0]
         file_name = row[1]
         
-        # Sign this URL to allow secure downloading
         signed_url = make_signed_url(public_url)
         
         log_user_action(user_name=current_user.get("sub", "UNKNOWN"), action_type=action_type, target_id=str(ticket_id), details=details, ip_address=client_ip)
@@ -569,7 +581,9 @@ def download_file_path(ticket_id, file_type, current_user, client_ip):
 
 
 def close_ticket(issue_id, request_json, current_user, client_ip):
-    """Transitions the resolution status lifecycle parameters to 'RESOLVED' or 'CLOSED'."""
+    """
+    Transition ticket state parameter to 'CLOSED' or 'ACT KNOWLEDGE' (resolved confirmation).
+    """
     try:
         payload = StatusUpdate(**request_json)
     except ValidationError as e:
@@ -600,7 +614,6 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
         cursor.execute("UPDATE c_issue SET status = %s, changed_on = CURRENT_TIMESTAMP WHERE id_issue = %s", (payload.new_status, issue_id))
         connection.commit()
 
-        # 🚀 UPDATE DU JSON GLOBAL SUR GCS
         trigger_state_json_update()
 
         action_type = "RESOLVE_TICKET" if payload.new_status == "ACT KNOWLEDGE" else "CLOSE_TICKET"
@@ -618,10 +631,10 @@ def close_ticket(issue_id, request_json, current_user, client_ip):
 
 def create_preticket(request_json, current_user, client_ip):
     """
-    Receives automated capture data from LabWare LIMS scripts.
-    1. Extracts real LIMS username from payload/snapshot.
-    2. Synchronizes/Ensures user exists in lims_users.
-    3. Inserts a technical PRETICKET into c_issue.
+    Register an automated issue payload capture originating directly from LIMS system clients.
+
+    This workflow parses user parameters, synchronizes associated profile models, and creates
+    the base non-validated 'PRETICKET' structure.
     """
     connection = get_db_connection()
     if not connection:
@@ -631,29 +644,25 @@ def create_preticket(request_json, current_user, client_ip):
     try:
         cursor = connection.cursor()
         
-        # --- 1. EXTRACTION DU VRAI USERNAME LIMS ---
         user_snapshot = request_json.get("user_snapshot") or {}
         
-        # Priorité : user_name du snapshot > user_name du JSON principal > Fallback
+        # Prioritize username lookup: snapshot mapping overrides base attributes
         lims_username = (
             user_snapshot.get("user_name") or 
             request_json.get("user_name") or 
             "UNKNOWN"
         )
 
-        # --- 2. SYNCHRONISATION / CREATION DANS LIMS_USERS ---
         fullname = user_snapshot.get("full_name", "")
         email = user_snapshot.get("email_addr", "")
         user_role = user_snapshot.get("user_role", "")
         lab = user_snapshot.get("lab", "")
         location = user_snapshot.get("location", "")
 
-        # Vérification si l'utilisateur existe dans lims_users
         cursor.execute("SELECT user_name FROM lims_users WHERE TRIM(UPPER(user_name)) = TRIM(UPPER(%s))", (lims_username,))
         existing_user = cursor.fetchone()
 
         if existing_user:
-            # Mise à jour si snapshot présent
             if user_snapshot:
                 update_user_qry = """
                     UPDATE lims_users 
@@ -662,7 +671,6 @@ def create_preticket(request_json, current_user, client_ip):
                 """
                 cursor.execute(update_user_qry, (fullname, email, user_role, lab, location, lims_username))
         else:
-            # Création automatique pour garantir la Clé Étrangère (fk_c_issue_user)
             insert_user_qry = """
                 INSERT INTO lims_users (user_name, full_name, email_addr, user_role, lab, location)
                 VALUES (%s, %s, %s, %s, %s, %s)
@@ -671,7 +679,6 @@ def create_preticket(request_json, current_user, client_ip):
         
         connection.commit()
 
-        # --- 3. CREATION DU PRETICKET ---
         title = request_json.get("title","") 
         client_time = request_json.get("client_time", "Unknown Time")
         description = request_json.get("description", "")
@@ -709,7 +716,6 @@ def create_preticket(request_json, current_user, client_ip):
         next_id = row[0] if row else 0
         connection.commit()
 
-        # 🚀 UPDATE DU JSON GLOBAL SUR GCS
         trigger_state_json_update()
         
         return {"id_issue": next_id, "message": "success.preticket_created"}, 201
@@ -727,7 +733,9 @@ def create_preticket(request_json, current_user, client_ip):
             
 
 def update_issue_environment(issue_id, request_json):
-    """Updates only the contextual environment data of a preticket/ticket."""
+    """
+    Update the environment attributes associated with a specific issue registration.
+    """
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -741,7 +749,7 @@ def update_issue_environment(issue_id, request_json):
         variation = request_json.get("current_analysis_variation", "")
         customer = request_json.get("current_customer", "")
         
-        # Sécurisation du champ Sample (PostgreSQL attend un numérique ou NULL)
+        # Cast optional sample identifier safely to integer or NULL
         sample_str = request_json.get("current_sample", "").strip()
         sample = int(sample_str) if sample_str else None
         
@@ -754,7 +762,6 @@ def update_issue_environment(issue_id, request_json):
         cursor.execute(update_qry, (project, batch, sample, analysis, variation, customer, issue_id))
         connection.commit()
         
-        # 🚀 UPDATE DU JSON GLOBAL SUR GCS
         trigger_state_json_update()
         
         return {"message": "success.environment_updated"}, 200
@@ -769,14 +776,13 @@ def update_issue_environment(issue_id, request_json):
 
 def trigger_ai_analysis(issue_id, current_user, client_ip):
     """
-    Triggers the AI analysis for a specific ticket.
-    Generates JSON and PDF reports and returns the download links.
+    Coordinate and dispatch analytical processing calls for resolving structural errors.
+    
+    Generates combined JSON context and PDF report outputs, returning access profiles.
     """
     from .reports import generate_ai_analysis
-    # Call the logic isolated in reports.py
     result, status_code = generate_ai_analysis(issue_id, current_user, client_ip)
     
-    # Log the action if successful
     username = current_user.get("sub", "UNKNOWN")
     if status_code == 200:
         log_user_action(
@@ -792,8 +798,7 @@ def trigger_ai_analysis(issue_id, current_user, client_ip):
 
 def sync_lims_user(request_json):
     """
-    Reçoit les informations d'un utilisateur depuis LabWare LIMS.
-    Crée l'utilisateur s'il n'existe pas, ou met à jour ses infos s'il existe déjà.
+    Upsert incoming User records received directly from the active LIMS.
     """
     connection = get_db_connection()
     if not connection:
@@ -802,7 +807,6 @@ def sync_lims_user(request_json):
     try:
         cursor = connection.cursor()
         
-        # Récupération des données envoyées par le JSON LabWare
         user_name = request_json.get("user_name")
         
         if not user_name:
@@ -814,8 +818,7 @@ def sync_lims_user(request_json):
         lab = request_json.get("lab", "")
         location = request_json.get("location", "")
         
-        # Requête UPSERT (Insert or Update) spécifique à PostgreSQL
-        # Nécessite que la colonne user_name soit une clé primaire (PRIMARY KEY) ou UNIQUE
+        # PostgreSQL ON CONFLICT statement to update existing users or insert new ones
         upsert_qry = """
             INSERT INTO lims_users (user_name, full_name, email_addr, user_role, lab, location)
             VALUES (%s, %s, %s, %s, %s, %s)
@@ -843,11 +846,14 @@ def sync_lims_user(request_json):
 
 def system_cleanup():
     """
-    Tâche de maintenance globale :
-    1. Supprime les PRETICKETS (> 1h) ET leurs fichiers sur Cloud Storage.
-    2. Supprime les logs d'audit (> 2 ans).
-    3. Supprime les tickets CLOSED (> 6 mois) ET leurs fichiers sur Cloud Storage.
-    4. Supprime les REGROUPEMENTS CLOSED dont la dernière issue a > 6 mois (ou vides > 6 mois) ET leurs fichiers.
+    Perform structural background purging of outdated data items and storage paths.
+    
+    Processes:
+      1. Purges PRE-TICKETS older than 1 hour and their related GCS buckets.
+      2. Clears system audit tracking logs older than 2 years.
+      3. Clears closed regrouping folders and associated records older than 6 months.
+      4. Removes rejected AI regrouping predictions older than 1 month.
+      5. Removes unlinked/orphaned closed issues older than 6 months.
     """
     connection = get_db_connection()
     if not connection:
@@ -858,7 +864,6 @@ def system_cleanup():
         client = storage.Client()
         bucket = client.bucket(BUCKET_NAME)
 
-        # --- Fonctions internes pour nettoyer les dossiers GCS ---
         def delete_gcs_issue_folder(issue_id):
             blobs = bucket.list_blobs(prefix=f"tickets/ticket_{issue_id}/")
             for blob in blobs:
@@ -877,9 +882,7 @@ def system_cleanup():
                 if folder_blob.exists():
                     folder_blob.delete()
 
-        # =========================================================
-        # 1. NETTOYAGE DES PRETICKETS (> 1 heure)
-        # =========================================================
+        # Step 1: Purge expired preticket entries (> 1 hour)
         cursor.execute("SELECT id_issue FROM c_issue WHERE status = 'PRETICKET' AND created_on < CURRENT_TIMESTAMP - INTERVAL '1 hour'")
         expired_pretickets = [row[0] for row in cursor.fetchall()]
         deleted_pretickets_count = len(expired_pretickets)
@@ -893,21 +896,16 @@ def system_cleanup():
             cursor.execute(f"DELETE FROM c_issue_comments WHERE id_issue IN ({p_format})", p_tuple)
             cursor.execute(f"DELETE FROM c_issue WHERE id_issue IN ({p_format})", p_tuple)
 
-        # =========================================================
-        # 2. NETTOYAGE DES LOGS D'AUDIT (> 2 ans)
-        # =========================================================
+        # Step 2: Clear outdated historical audit trail records (> 2 years)
         cursor.execute("DELETE FROM c_issue_audit_logs WHERE created_at < CURRENT_TIMESTAMP - INTERVAL '2 years'")
         deleted_logs = cursor.rowcount
 
-        # =========================================================
-        # 3. NETTOYAGE DES REGROUPEMENTS (Règle stricte des 6 mois)
-        # =========================================================
+        # Step 3: Handle closed system grouping folders (> 6 months)
         qry_regroupements = """
             SELECT r.id_regroupment
             FROM c_issue_regroupment r
             WHERE r.status = 'CLOSED'
               AND (
-                  -- CAS A : Le regroupement contient des issues
                   (
                       NOT EXISTS (
                           SELECT 1 FROM c_link_issue_regroupment l
@@ -922,7 +920,6 @@ def system_cleanup():
                       ) < CURRENT_TIMESTAMP - INTERVAL '6 months'
                   )
                   OR
-                  -- CAS B : Le regroupement est vide et a plus de 6 mois
                   (
                       NOT EXISTS (SELECT 1 FROM c_link_issue_regroupment l3 WHERE l3.id_regroupment = r.id_regroupment)
                       AND r.created_on < CURRENT_TIMESTAMP - INTERVAL '6 months'
@@ -938,13 +935,9 @@ def system_cleanup():
                 delete_gcs_regroupement_folder(r_id)
             r_format = ','.join(['%s'] * deleted_regroupements_count)
             r_tuple = tuple(closed_regroupements)
-            # Pas besoin de supprimer à la main link et attachment car CASCADE est configuré dans ta BDD,
-            # mais on le fait proprement si PostgreSQL n'est strict :
             cursor.execute(f"DELETE FROM c_issue_regroupment WHERE id_regroupment IN ({r_format})", r_tuple)
         
-        # =========================================================
-        # 3.bis NETTOYAGE DES SUGGESTIONS IA REJETÉES (> 1 mois)
-        # =========================================================
+        # Step 3b: Remove legacy rejected AI recommendations (> 1 month)
         cursor.execute("""
             SELECT id_regroupment FROM c_issue_regroupment 
             WHERE status = 'REJECTED' 
@@ -960,11 +953,7 @@ def system_cleanup():
             r_tuple = tuple(rejected_regroupements)
             cursor.execute(f"DELETE FROM c_issue_regroupment WHERE id_regroupment IN ({r_format})", r_tuple)
 
-        # =========================================================
-        # 4. NETTOYAGE DES TICKETS FERMÉS ORPHELINS (> 6 mois)
-        # =========================================================
-        # On supprime les tickets fermés depuis 6 mois qui ne sont PAS liés à un regroupement
-        # (S'ils sont liés à un regroupement, ils ont déjà été supprimés par l'étape CASCADE précédente).
+        # Step 4: Remove unlinked, closed individual tickets (> 6 months)
         cursor.execute("""
             SELECT id_issue FROM c_issue 
             WHERE status = 'CLOSED' 

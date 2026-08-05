@@ -2,14 +2,22 @@ from config.database import get_db_connection
 
 
 def log_user_action(user_name: str, action_type: str, target_id: str = None, details: str = None, ip_address: str = None):
-    """Records a user action into the audit trail table (Synchronous on GCP)."""
+    """
+    Synchronously records a user action into the audit trail database table.
+
+    Args:
+        user_name (str): The username of the operator.
+        action_type (str): The category of transaction/action.
+        target_id (str, optional): The identifier of the modified entity.
+        details (str, optional): Contextual JSON or text details of the action.
+        ip_address (str, optional): The originating client IP address.
+    """
     connection = get_db_connection()
     if not connection:
         return
         
     try:
         cursor = connection.cursor()
-        # PostgreSQL syntax: %s instead of :1
         query = """
             INSERT INTO c_issue_audit_logs (user_name, action_type, target_id, details, ip_address)
             VALUES (%s, %s, %s, %s, %s)
@@ -19,7 +27,7 @@ def log_user_action(user_name: str, action_type: str, target_id: str = None, det
     except Exception as e:
         if connection:
             connection.rollback()
-        # On logge l'erreur en console GCP pour ne pas planter silencieusement
+        # Log to standard output to guarantee visibility in GCP environments
         print(f"[AUDIT ERROR - log_user_action]: {str(e)}")
     finally:
         if 'cursor' in locals() and cursor:
@@ -28,6 +36,17 @@ def log_user_action(user_name: str, action_type: str, target_id: str = None, det
 
 
 def get_audit_logs(current_user):
+    """
+    Retrieves all audit trail records, sorted in descending chronological order.
+
+    Access is restricted to specific administrative roles.
+
+    Args:
+        current_user (dict): User context extracted from the active session or token.
+
+    Returns:
+        tuple: Structured logs and HTTP 200, or error payload and corresponding HTTP code.
+    """
     user_role = current_user.get("role")
 
     if user_role not in ["IT_TEAM", "LOCAL_ADMIN"]:
@@ -51,6 +70,7 @@ def get_audit_logs(current_user):
         logs = []
         for row in rows:
             details_val = row[4]
+            # Transform database sequence elements to key-value maps with default fallbacks
             logs.append({
                 "id_log": row[0],
                 "user_name": row[1] if row[1] else "UNKNOWN",
@@ -73,8 +93,13 @@ def get_audit_logs(current_user):
 
 def add_audit_log(payload):
     """
-    Called via API POST request (e.g., from LabWare LIMS).
-    Receives a JSON payload and inserts it into the audit trail.
+    Exposes an entry point to register logs generated from external systems.
+
+    Args:
+        payload (dict): Parsed JSON body containing execution parameters.
+
+    Returns:
+        tuple: Operation confirmation status and HTTP code.
     """
     user_name = payload.get("user_name", "UNKNOWN")
     action_type = payload.get("action_type", "UNKNOWN")

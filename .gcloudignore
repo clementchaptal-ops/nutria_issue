@@ -4,5 +4,6 @@
 frontend-react/
 .vscode/
 
-# 📁 ON IGNORE LE STOCKAGE LOCAL DES PIÈCES JOINTES
 backend-python/stored_attachments/
+backend-pyhon/__pycache__/
+backend-python/config/translator.py/

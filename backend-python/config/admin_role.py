@@ -3,30 +3,30 @@ import os
 import json
 import urllib.request
 
-# Configuration des groupes
 TARGET_GROUPS = {
     "IT_TEAM": "nutria_core_it@mxns.com",
     "LOCAL_ADMIN": "nutria-local_admin@mxns.com"
 }
 
-# Cache en mémoire (1 heure)
 cache = {
     "data": None,
     "last_updated": 0
 }
 CACHE_DURATION = 3600
 
-# URL de ton déploiement Apps Script
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwh4FglO3vXZJKB-_WI42m8xsc5uCVH6VluFsGg0C8eBr5zVRorAlk-devE69Cf4125mw/exec"
 
 def fetch_group_members_from_google():
     """
-    Récupère les membres des groupes.
-    Mode temporaire : fait appel au Web App Google Apps Script via urllib.
+    Fetch Google Group membership details via the configured external Web App.
+
+    Queries the Google Apps Script endpoint using a standard HTTP request, 
+    processes the JSON response, and normalizes membership emails to lowercase.
+
+    Returns:
+        dict: Mapping of group email addresses to lists of normalized member emails,
+              or None if the fetch operation fails.
     """
-    # -------------------------------------------------------------------------
-    # OPTION A : MODE TEMPORAIRE (via Google Apps Script)
-    # -------------------------------------------------------------------------
     try:
         print("--> [TEMPORAIRE] Lecture des groupes via Google Apps Script...")
         
@@ -36,7 +36,7 @@ def fetch_group_members_from_google():
                 body = response.read().decode('utf-8')
                 json_response = json.loads(body)
                 
-                # Récupère le dictionnaire {"nutria_core_it@mxns.com": [...], ...}
+                # Extract and normalize membership collections
                 data = json_response.get("data", {})
                 
                 cleaned_data = {}
@@ -52,48 +52,25 @@ def fetch_group_members_from_google():
         print(f"[APPS SCRIPT ERROR] Impossible de contacter Apps Script: {e}")
         return None
 
-    # -------------------------------------------------------------------------
-    # OPTION B : MODE DÉFINITIF (via Service Account Google Directory API)
-    # TODO: Décommenter le bloc ci-dessous et commenter le bloc OPTION A
-    #       une fois la validation faite par David.
-    # -------------------------------------------------------------------------
-    """
-    import google.auth
-    from googleapiclient.discovery import build
-
-    group_results = {}
-    try:
-        credentials, _ = google.auth.default(
-            scopes=['https://www.googleapis.com/auth/admin.directory.group.readonly']
-        )
-        service = build('admin', 'directory_v1', credentials=credentials)
-
-        for role_name, group_email in TARGET_GROUPS.items():
-            try:
-                response = service.members().list(groupKey=group_email).execute()
-                members = response.get('members', [])
-                group_results[group_email] = [m['email'].strip().lower() for m in members if 'email' in m]
-            except Exception as group_err:
-                print(f"[GOOGLE DIRECTORY ERROR] Impossible de lire {group_email}: {group_err}")
-                group_results[group_email] = []
-
-        return group_results
-
-    except Exception as e:
-        print(f"[FATAL DIRECTORY ERROR]: {e}")
-        return None
-    """
-
 def get_google_groups():
-    """Gère le cache Python pour éviter de solliciter le réseau à chaque requête."""
+    """
+    Retrieve Google Group rosters, implementing a TTL-based memory caching strategy.
+
+    Maintains group rosters in-memory for the duration of CACHE_DURATION.
+    Triggers an external refresh when the cache expires, and falls back to
+    stale cached data if the external request fails.
+
+    Returns:
+        dict: Mapping of group email addresses to member email arrays.
+    """
     current_time = time.time()
     
-    # 1. Utilisation du cache s'il est encore valide
+    # Retrieve rosters from memory if TTL has not expired
     if cache["data"] is not None and (current_time - cache["last_updated"] < CACHE_DURATION):
         print("-> Fetching group roles from Python CACHE")
         return cache["data"]
     
-    # 2. Rafraîchissement des données
+    # Retrieve fresh group membership rosters
     print("-> Refreshing group roles...")
     fresh_data = fetch_group_members_from_google()
     
@@ -103,5 +80,5 @@ def get_google_groups():
         print("-> Group cache successfully updated")
         return cache["data"]
     
-    # Fallback sur le dernier cache en cas de problème réseau
+    # Fallback to expired cache when external query fails
     return cache["data"] or {}

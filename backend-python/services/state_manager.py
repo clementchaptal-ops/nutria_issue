@@ -7,7 +7,10 @@ from config.storage import BUCKET_NAME
 STATE_FILE_PATH = "system/active_issues_state.json"
 
 def _generate_and_upload_state_json():
-    """Génère le JSON des tickets actifs depuis la BDD et l'écrase sur GCS."""
+    """
+    Fetch active issues from the database, format them as JSON, 
+    and upload the resulting file to Google Cloud Storage.
+    """
     connection = get_db_connection()
     if not connection:
         return
@@ -15,6 +18,7 @@ def _generate_and_upload_state_json():
     cursor = None
     try:
         cursor = connection.cursor()
+        # Query retrieves active issues joined with user details from LIMS
         qry = """
             SELECT i.id_issue, i.title, i.issue_type, i.description, i.status,
                    i.current_project, i.current_batch, i.current_sample, i.current_analysis,
@@ -45,6 +49,8 @@ def _generate_and_upload_state_json():
             })
 
         json_data = json.dumps(global_issues, ensure_ascii=False, indent=2, default=str)
+        
+        # Upload the updated JSON payload to GCS
         client = storage.Client()
         bucket = client.bucket(BUCKET_NAME)
         blob = bucket.blob(STATE_FILE_PATH)
@@ -58,7 +64,10 @@ def _generate_and_upload_state_json():
         if connection: connection.close()
 
 def trigger_state_json_update():
-    """Lance la mise à jour du JSON en arrière-plan."""
+    """
+    Trigger the state JSON generation and upload in a background thread 
+    to avoid blocking the main execution flow.
+    """
     thread = threading.Thread(target=_generate_and_upload_state_json)
     thread.daemon = True
     thread.start()

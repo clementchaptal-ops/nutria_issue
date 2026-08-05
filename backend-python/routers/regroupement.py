@@ -9,11 +9,17 @@ from .audit import log_user_action
 from config.storage import make_signed_url, BUCKET_NAME
 from services.state_manager import trigger_state_json_update
 
-# =====================================================================
-# REGROUPEMENTS MODULE
-# =====================================================================
 
 def get_all_regroupements(current_user):
+    """
+    Retrieve all ticket regroupements for administrative or IT team users.
+
+    Args:
+        current_user (dict): The authenticated user context with role and identification.
+
+    Returns:
+        tuple: A list of regroupement records and an HTTP status code, or an error payload.
+    """
     if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
         return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
 
@@ -25,6 +31,7 @@ def get_all_regroupements(current_user):
     regroupements = []
     
     try:
+        # Retrieve regroupements and count of associated issues joined with users table
         qry = """
             SELECT r.id_regroupment, r.title, r.ssp_ticket, r.description,
                    u.full_name, r.created_by,
@@ -60,6 +67,16 @@ def get_all_regroupements(current_user):
 
 
 def get_regroupement(regroupement_id, current_user):
+    """
+    Retrieve details of a specific regroupement including its linked issues and attachments.
+
+    Args:
+        regroupement_id (int): The unique identifier of the regroupement.
+        current_user (dict): The authenticated user context.
+
+    Returns:
+        tuple: Detailed regroupement payload and HTTP status code.
+    """
     if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
         return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
 
@@ -70,7 +87,7 @@ def get_regroupement(regroupement_id, current_user):
     try:
         cursor = connection.cursor()
         
-        # 1. Groupe details
+        # Query primary regroupement metadata
         qry_group = """
             SELECT r.id_regroupment, r.title, r.description, r.ssp_ticket,
                    u.full_name, TO_CHAR(r.created_on, 'YYYY-MM-DD HH24:MI') as created_on, r.status
@@ -96,7 +113,7 @@ def get_regroupement(regroupement_id, current_user):
             "attachments": []
         }
         
-        # 2. Tickets liés
+        # Fetch list of associated tickets
         qry_issues = """
             SELECT i.id_issue, i.title, i.status, i.issue_type, 
                    u.full_name, TO_CHAR(i.created_on, 'YYYY-MM-DD HH24:MI') as created_on
@@ -117,7 +134,7 @@ def get_regroupement(regroupement_id, current_user):
                 "created_on": i_row[5]
             })
 
-        # 3. Pièces jointes du regroupement
+        # Fetch non-comment attachment references and generate signed access URLs
         qry_attachments = """
             SELECT id_attachment, attachment_name, attachment_type, url_path
             FROM c_issue_attachment
@@ -142,6 +159,17 @@ def get_regroupement(regroupement_id, current_user):
 
 
 def create_regroupement(request_json, current_user, client_ip):
+    """
+    Create a new ticket regroupement and link existing issues.
+
+    Args:
+        request_json (dict): Input parameters verified against RegroupementCreate schema.
+        current_user (dict): Requesting user details.
+        client_ip (str): Remote client IP address for auditing.
+
+    Returns:
+        tuple: Creation status dictionary and HTTP status code.
+    """
     if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
         return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
 
@@ -175,7 +203,6 @@ def create_regroupement(request_json, current_user, client_ip):
 
         connection.commit()
 
-        # 🚀 UPDATE DU JSON GLOBAL
         trigger_state_json_update()
 
         log_user_action(
@@ -193,6 +220,17 @@ def create_regroupement(request_json, current_user, client_ip):
 
 
 def close_regroupement(regroupement_id, current_user, client_ip):
+    """
+    Close an active regroupement and log the transition.
+
+    Args:
+        regroupement_id (int): ID of the regroupement to be closed.
+        current_user (dict): Requesting user context.
+        client_ip (str): IP address of the client triggering the operation.
+
+    Returns:
+        tuple: Success message and HTTP status code.
+    """
     if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
         return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
 
@@ -208,7 +246,6 @@ def close_regroupement(regroupement_id, current_user, client_ip):
         """, (username, regroupement_id))
         connection.commit()
         
-        # 🚀 UPDATE DU JSON GLOBAL
         trigger_state_json_update()
 
         log_user_action(
@@ -224,6 +261,16 @@ def close_regroupement(regroupement_id, current_user, client_ip):
 
 
 def get_regroupement_comments(regroupement_id, current_user):
+    """
+    Fetch all historical comments associated with a specific regroupement.
+
+    Args:
+        regroupement_id (int): Unique identifier of the regroupement.
+        current_user (dict): User executing the request.
+
+    Returns:
+        tuple: List of comments with optional attachment references and HTTP status.
+    """
     if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
         return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
 
@@ -261,6 +308,18 @@ def get_regroupement_comments(regroupement_id, current_user):
 
 
 def add_regroupement_comment(regroupement_id, request_json, current_user, client_ip):
+    """
+    Append a new comment log to the specified regroupement.
+
+    Args:
+        regroupement_id (int): Target regroupement identifier.
+        request_json (dict): Payload containing `comment_text`.
+        current_user (dict): Active session user.
+        client_ip (str): Remote connection IP address.
+
+    Returns:
+        tuple: Resulting ID details and HTTP status code.
+    """
     if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
         return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
 
@@ -287,6 +346,17 @@ def add_regroupement_comment(regroupement_id, request_json, current_user, client
 
 
 def upload_regroupement_attachments(regroupement_id, files_data, current_user):
+    """
+    Upload files to GCP Storage and register them as regroupement attachments.
+
+    Args:
+        regroupement_id (int): Target regroupement identifier.
+        files_data (list): List of file metadata dicts containing 'filename' and raw 'bytes'.
+        current_user (dict): Authenticated user request context.
+
+    Returns:
+        tuple: Success or error message with status code.
+    """
     if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
         return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
 
@@ -324,6 +394,18 @@ def upload_regroupement_attachments(regroupement_id, files_data, current_user):
 
 
 def upload_regroupement_comment_attachments(regroupement_id, comment_id, files_data, current_user):
+    """
+    Store files on GCP and associate them specifically with an individual comment inside a regroupement.
+
+    Args:
+        regroupement_id (int): Target regroupement identifier.
+        comment_id (int): Target comment identifier.
+        files_data (list): File metadata dicts list containing names and data payloads.
+        current_user (dict): User making the request.
+
+    Returns:
+        tuple: Success message and HTTP status code.
+    """
     if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
         return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
 
@@ -361,6 +443,18 @@ def upload_regroupement_comment_attachments(regroupement_id, comment_id, files_d
 
 
 def delete_regroupement_attachment(regroupement_id, filename, current_user, client_ip):
+    """
+    Remove an attachment reference linked to a regroupement.
+
+    Args:
+        regroupement_id (int): Parent regroupement identifier.
+        filename (str): Base file name of the attachment to remove.
+        current_user (dict): Performing user details.
+        client_ip (str): Origin client IP address.
+
+    Returns:
+        tuple: Success dictionary and HTTP status.
+    """
     if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
         return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
 
@@ -379,6 +473,18 @@ def delete_regroupement_attachment(regroupement_id, filename, current_user, clie
 
 
 def update_regroupement(regroupement_id, request_json, current_user, client_ip):
+    """
+    Modify basic text elements and metadata of an existing regroupement.
+
+    Args:
+        regroupement_id (int): Target regroupement identifier.
+        request_json (dict): Input body holding updated title, description, and ssp_ticket.
+        current_user (dict): Identified user instance.
+        client_ip (str): Request originator address.
+
+    Returns:
+        tuple: Outcome payload and HTTP status code.
+    """
     if current_user.get("role", "USER") not in ["IT_TEAM", "LOCAL_ADMIN"]:
         return {"error": "error.forbidden_access", "details": "Restricted area."}, 403
 
@@ -411,7 +517,17 @@ def update_regroupement(regroupement_id, request_json, current_user, client_ip):
         connection.close()
 
 def validate_ai_suggestion(reg_id, current_user, client_ip):
-    """Transforms an AI-suggested (or previously rejected) regroupement into an official OPEN regroupement."""
+    """
+    Promote an AI-suggested or rejected regroupement into an active, official open regroupement.
+
+    Args:
+        reg_id (int): Target regroupement database identity.
+        current_user (dict): Operational authorization profile.
+        client_ip (str): Client endpoint IP.
+
+    Returns:
+        tuple: Dictionary representing transaction response and the HTTP response status.
+    """
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -421,7 +537,7 @@ def validate_ai_suggestion(reg_id, current_user, client_ip):
     try:
         cursor = connection.cursor()
 
-        # 1. Promote regroupement to 'OPEN'. On accepte SUGGESTED ou REJECTED.
+        # Update parent regroupement status to OPEN from transient status states
         update_reg_qry = """
             UPDATE c_issue_regroupment 
             SET status = 'OPEN', changed_by = %s, changed_on = CURRENT_TIMESTAMP
@@ -432,7 +548,7 @@ def validate_ai_suggestion(reg_id, current_user, client_ip):
         if cursor.rowcount == 0:
             return {"error": "error.suggestion_not_found"}, 404
 
-        # 2. Validate all AI-linked tickets
+        # Finalize the status validation step for all suggested internal links
         update_links_qry = """
             UPDATE c_link_issue_regroupment 
             SET link_status = 'VALIDATED' 
@@ -442,7 +558,6 @@ def validate_ai_suggestion(reg_id, current_user, client_ip):
 
         connection.commit()
 
-        # 🚀 UPDATE DU JSON GLOBAL
         trigger_state_json_update()
 
         log_user_action(user_name=username, action_type="VALIDATE_AI_REGROUPEMENT", target_id=str(reg_id), details="Validated AI suggested regroupement.", ip_address=client_ip)
@@ -461,7 +576,17 @@ def validate_ai_suggestion(reg_id, current_user, client_ip):
 
 
 def reject_ai_suggestion(reg_id, current_user, client_ip):
-    """Marks an AI-suggested regroupement as REJECTED instead of deleting it."""
+    """
+    Soft-reject a previously generated AI suggestion by shifting its status to REJECTED.
+
+    Args:
+        reg_id (int): Regroupement row identifier.
+        current_user (dict): Credentials carrying authorization and identity context.
+        client_ip (str): Context tracking remote IP.
+
+    Returns:
+        tuple: Confirmation payload and context HTTP status code.
+    """
     connection = get_db_connection()
     if not connection:
         return {"error": "error.database_connection"}, 500
@@ -471,7 +596,7 @@ def reject_ai_suggestion(reg_id, current_user, client_ip):
     try:
         cursor = connection.cursor()
 
-        # Remplacement du DELETE par un UPDATE vers le statut REJECTED
+        # Perform soft status update instead of a physical deletion step
         update_qry = """
             UPDATE c_issue_regroupment 
             SET status = 'REJECTED', changed_by = %s, changed_on = CURRENT_TIMESTAMP 
@@ -484,7 +609,6 @@ def reject_ai_suggestion(reg_id, current_user, client_ip):
 
         connection.commit()
 
-        # 🚀 UPDATE DU JSON GLOBAL
         trigger_state_json_update()
 
         log_user_action(user_name=username, action_type="REJECT_AI_REGROUPEMENT", target_id=str(reg_id), details="Rejected AI suggested regroupement.", ip_address=client_ip)

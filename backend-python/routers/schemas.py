@@ -2,6 +2,9 @@ from pydantic import BaseModel
 from typing import Optional
 
 class IssueCreate(BaseModel):
+    """
+    Schema for validating data when creating a new issue tracker entry.
+    """
     title: str
     issue_type: str
     criticity: str        
@@ -17,6 +20,9 @@ class IssueCreate(BaseModel):
     environment: Optional[str] = None
 
 class IssueUpdate(BaseModel):
+    """
+    Schema for validating data when updating an existing issue tracker entry.
+    """
     title: str
     issue_type: str
     criticity: str        
@@ -32,20 +38,32 @@ class IssueUpdate(BaseModel):
     environment: Optional[str] = None
 
 class StatusUpdate(BaseModel):
+    """
+    Schema for validating updates to the workflow status of an issue.
+    """
     new_status: str
 
 class GoogleTokenRequest(BaseModel):
+    """
+    Schema representing a request to authenticate or verify a Google OAuth credential.
+    """
     credential: str
     token: Optional[str] = None
     selected_profile: Optional[str] = None
 
 class RegroupementCreate(BaseModel):
+    """
+    Schema for validating data when creating a new grouping of related issues.
+    """
     title: str
     description: str
     ssp_ticket: Optional[str] = None
     issue_ids: Optional[list[int]] = [] 
 
 class RegroupementUpdate(BaseModel):
+    """
+    Schema for validating data when updating an existing grouping of related issues.
+    """
     title: str
     description: str
     ssp_ticket: Optional[str] = None

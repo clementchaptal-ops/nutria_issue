@@ -2,16 +2,27 @@ import os
 import functions_framework
 from flask import jsonify
 
-# --- SECURITY & AUTH FUNCTIONS IMPORT ---
 from routers.security import verify_token
 from routers.auth import google_auth
 from routers.issues import get_all_issues
 
 @functions_framework.http
 def nutria_api(request):
-    """Single entry point for Cloud Function / Flask."""
-    
-    # 1. CORS MANAGEMENT
+    """
+    HTTP Cloud Function serving as the unified API routing controller.
+
+    This function handles CORS negotiation, verifies system-to-system and 
+    user tokens, applies scope boundaries for machine clients, routes 
+    dynamic URL parameters to specific sub-routers, and implements robust 
+    global exception handling.
+
+    Args:
+        request (flask.Request): The incoming Flask request payload.
+
+    Returns:
+        tuple: (flask.Response, int, dict) containing JSON data, HTTP status code, 
+               and response headers.
+    """
     if request.method == 'OPTIONS':
         headers = {
             'Access-Control-Allow-Origin': '*',
@@ -28,27 +39,19 @@ def nutria_api(request):
     path = request.path.strip('/')
     
     try:
-        # Home Route / Health Check
         if path in ("", "/"):
             return jsonify({"message": "success.api_operational"}), 200, headers
             
-        # ---------------------------------------------------------
-        # AUTHENTICATION
-        # ---------------------------------------------------------
         elif path.startswith("auth"):
             request_json = request.get_json(silent=True) or {}
             data, http_code = google_auth(request_json)
             return jsonify(data), http_code, headers
             
-        # ---------------------------------------------------------
-        # ISSUES MODULE
-        # ---------------------------------------------------------
         elif path.startswith("issues"):
-            
             auth_header = request.headers.get("Authorization")
             expected_labware_token = os.environ.get("LABWARE_API_TOKEN")
 
-            # 1. Verification if request comes from LabWare (System to System)
+            # Fall back to external OAuth if LabWare direct authorization check fails
             if expected_labware_token and auth_header == f"Bearer {expected_labware_token}":
                 real_lims_user = request.headers.get("X-LIMS-User") or request.headers.get("X-User-Name") or "LABWARE_LIMS"
                 
@@ -60,19 +63,15 @@ def nutria_api(request):
                 }
                 error_msg = None
             else:
-                # 2. Otherwise, verify Google token for web user
                 current_user, error_msg = verify_token(auth_header)
 
-            # 3. Security: Block access if no valid token
             if error_msg:
                 return jsonify({"error": "error.unauthorized_access", "details": error_msg}), 401, headers
             
             client_ip = request.remote_addr or "Unknown"
             parts = path.split("/")
 
-            # =========================================================================
-            # Security 
-            # =========================================================================
+            # Enforce access restrictions on automation endpoints for machine-to-machine integration
             if current_user.get("sub") == "LABWARE_LIMS":
                 is_preticket = (path == "issues/preticket" and request.method == "POST")
                 is_attachment = (len(parts) == 3 and parts[1].isdigit() and parts[2] == "attachments" and request.method == "POST")
@@ -83,7 +82,6 @@ def nutria_api(request):
                 if not (is_preticket or is_attachment or is_environment or is_cleanup or is_audit_log):
                     print(f"[SECURITY ALERT] Attempt to use LIMS token for unauthorized route: {request.method} {path} from IP {client_ip}")
                     return jsonify({"error": "error.forbidden", "details": "error.lims_token_restricted"}), 403, headers
-            # =========================================================================
             
             if path == "issues" and request.method == "GET":
                 data, http_code = get_all_issues(current_user)
@@ -147,12 +145,14 @@ def nutria_api(request):
             elif len(parts) == 5 and parts[1].isdigit() and parts[2] == "comments" and parts[3].isdigit() and parts[4] == "attachments" and request.method == "POST":
                 from routers.issues import upload_comment_attachments
                 issue_id, comment_id = int(parts[1]), int(parts[3])
+                # Flatten file properties from multipart forms into a structured, byte-serialized array
                 files_data = [{"filename": f.filename, "content_type": f.content_type, "bytes": f.read()} for k in request.files for f in request.files.getlist(k)]
                 data, http_code = upload_comment_attachments(issue_id, comment_id, files_data, current_user)
                 return jsonify(data), http_code, headers
 
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "attachments" and request.method == "POST":
                 from routers.attachments import upload_attachments
+                # Flatten file properties from multipart forms into a structured, byte-serialized array
                 files_data = [{"filename": f.filename, "content_type": f.content_type, "bytes": f.read()} for k in request.files for f in request.files.getlist(k)]
                 data, http_code = upload_attachments(int(parts[1]), files_data, current_user, client_ip)
                 return jsonify(data), http_code, headers
@@ -201,11 +201,7 @@ def nutria_api(request):
             else:
                 return jsonify({"error": "error.route_not_found"}), 404, headers
 
-        # ---------------------------------------------------------
-        # REGROUPEMENTS MODULE
-        # ---------------------------------------------------------
         elif path.startswith("regroupements"):
-            
             auth_header = request.headers.get("Authorization")
             current_user, error_msg = verify_token(auth_header)
 
@@ -256,12 +252,14 @@ def nutria_api(request):
             elif len(parts) == 5 and parts[1].isdigit() and parts[2] == "comments" and parts[3].isdigit() and parts[4] == "attachments" and request.method == "POST":
                 from routers.regroupement import upload_regroupement_comment_attachments
                 reg_id, comment_id = int(parts[1]), int(parts[3])
+                # Flatten file properties from multipart forms into a structured, byte-serialized array
                 files_data = [{"filename": f.filename, "content_type": f.content_type, "bytes": f.read()} for k in request.files for f in request.files.getlist(k)]
                 data, http_code = upload_regroupement_comment_attachments(reg_id, comment_id, files_data, current_user)
                 return jsonify(data), http_code, headers
 
             elif len(parts) == 3 and parts[1].isdigit() and parts[2] == "attachments" and request.method == "POST":
                 from routers.regroupement import upload_regroupement_attachments
+                # Flatten file properties from multipart forms into a structured, byte-serialized array
                 files_data = [{"filename": f.filename, "content_type": f.content_type, "bytes": f.read()} for k in request.files for f in request.files.getlist(k)]
                 data, http_code = upload_regroupement_attachments(int(parts[1]), files_data, current_user)
                 return jsonify(data), http_code, headers

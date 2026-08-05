@@ -5,24 +5,31 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from pydantic import ValidationError
 
-# Database configuration import
 from config.database import get_db_connection 
-
-# Role management script import
 from config.admin_role import get_google_groups
-
-# --- LOCAL FILE IMPORTS ---
 from routers.schemas import GoogleTokenRequest 
 
-# --- CONFIGURATION ---
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "549394697229-tvgof9to9fcu4um4260vnigbtt57o9fo.apps.googleusercontent.com") 
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 120
 USE_MOCK_DATA = os.environ.get("USE_MOCK_DATA", "True") == "True"
 
-# --- HELPER FUNCTIONS ---
+
 def create_access_token(data: dict, expires_delta: timedelta):
+    """
+    Generates a signed HS256 JWT access token with the specified payload and expiration.
+
+    Args:
+        data (dict): Data to be encoded as the JWT payload.
+        expires_delta (timedelta): Time offset defining when the token will expire.
+
+    Returns:
+        str: Encoded cryptographic JWT.
+
+    Raises:
+        ValueError: If JWT_SECRET_KEY is missing from environment configurations.
+    """
     if not JWT_SECRET_KEY:
         raise ValueError("Server configuration error: JWT_SECRET_KEY is missing in GCP variables.")
         
@@ -32,12 +39,20 @@ def create_access_token(data: dict, expires_delta: timedelta):
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     return encoded_jwt
 
-# --- ROUTES ---
+
 def google_auth(request_json):
     """
-    Handles the Google Single Sign-On flow, validates the token,
-    checks the PostgreSQL LIMS database for the user profile,
-    determines the role via Google Apps Script, and issues a JWT.
+    Authenticates a user via Google Single Sign-On (SSO), resolves profiles against
+    the LIMS database, assigns permission levels, and returns an access token.
+
+    If multiple database profiles match the authenticated email, provides a flag
+    requiring the user to select their desired identity.
+
+    Args:
+        request_json (dict): Payload containing the Google token and optional profile.
+
+    Returns:
+        tuple[dict, int]: Dict payload with details or token and the HTTP status code.
     """
     try:
         auth_request = GoogleTokenRequest(**request_json)
@@ -45,8 +60,8 @@ def google_auth(request_json):
         return {"error": "Invalid data format", "details": e.errors()}, 400
 
     try:
-        # 1. Verify the Google Token
         try:
+            # Validate token integrity directly against Google's OAuth2 authorization servers.
             idinfo = id_token.verify_oauth2_token(
                 auth_request.credential, 
                 google_requests.Request(), 
@@ -55,12 +70,10 @@ def google_auth(request_json):
         except ValueError:
             return {"error": "Invalid Google token."}, 401
 
-        # 2. Extract email
         user_email = idinfo.get("email")
         if not user_email:
             return {"error": "Email not provided by Google."}, 400
 
-        # 3. Query the Database
         if USE_MOCK_DATA:
             fake_username = user_email.split('@')[0].upper()
             user_rows = [
@@ -74,6 +87,7 @@ def google_auth(request_json):
                 
             cursor = connection.cursor()
 
+            # Retrieve active profiles mapped to the authenticated email address.
             query = """
                 SELECT user_name, full_name, location 
                 FROM lims_users 
@@ -85,11 +99,10 @@ def google_auth(request_json):
             cursor.close()
             connection.close()
             
-        # 4. Check if user exists
         if not user_rows:
             return {"error": f"User not found in LIMS database with email: {user_email}"}, 403
 
-        # --- MULTIPLE PROFILES MANAGEMENT LOGIC ---
+        # Return list of potential profiles if selection ambiguity exists.
         if len(user_rows) > 1 and not auth_request.selected_profile:
             profiles_list = [
                 {"user_name": row[0], "full_name": row[1], "location": row[2]} 
@@ -109,14 +122,13 @@ def google_auth(request_json):
             else:
                 return {"error": "Invalid selected profile."}, 400
 
-        # 5. Extract database values
         db_username = selected_row[0]  
         db_fullname = selected_row[1]
         db_location = selected_row[2]
 
-        # 6. DETERMINE ROLE VIA GOOGLE APPS SCRIPT
         role = "USER"  
         
+        # Interrogate Google Apps Script groups to dynamically compute administrative hierarchy.
         groups_data = get_google_groups()
         
         it_team_emails = groups_data.get("nutria_core_it@mxns.com", [])
@@ -129,7 +141,6 @@ def google_auth(request_json):
         elif cleaned_user_email in local_admin_emails:
             role = "LOCAL_ADMIN"
 
-        # 7. Generate the JWT Access Token
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         
         try:

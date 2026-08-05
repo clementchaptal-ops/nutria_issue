@@ -7,27 +7,30 @@ from google.genai import types
 from google.cloud import storage
 
 from config.database import get_db_connection
-
-# 🚀 IMPORT DU GESTIONNAIRE D'ÉTAT JSON GLOBAL
 from services.state_manager import trigger_state_json_update
 
-# --- CONFIGURATION GCP & VERTEX AI ---
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 PROJECT_ID = os.environ.get("GCP_PROJECT", os.environ.get("GOOGLE_CLOUD_PROJECT", "nutria-issue"))
 
 LOCATION_GEMINI = "us-central1"
 DATASTORE_ID = os.environ.get("DATASTORE_ID", "nutria-knowledge-base_1784796187534")
 
-# Le modèle validé sur ton projet
 MODEL_NAME = "gemini-2.5-flash"
 
-# Initialisation du client officiel (Authentification Cloud Run gérée nativement)
 client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION_GEMINI)
 storage_client = storage.Client()
 
 
 def _clean_blob_name(public_url_or_path: str) -> str:
-    """Extrait le chemin d'accès relatif du fichier dans le bucket GCS."""
+    """
+    Extracts the relative GCS object path (blob name) from a full GCS public URL or relative path.
+
+    Args:
+        public_url_or_path (str): The public HTTP URL or existing relative GCS path.
+
+    Returns:
+        str: The cleaned relative path inside the storage bucket.
+    """
     prefix = f"https://storage.googleapis.com/{BUCKET_NAME}/"
     if public_url_or_path.startswith(prefix):
         return public_url_or_path.replace(prefix, "")
@@ -35,7 +38,15 @@ def _clean_blob_name(public_url_or_path: str) -> str:
 
 
 def extract_text_from_zip(raw_blob_name: str) -> str:
-    """Télécharge un ZIP depuis GCS et extrait les logs/txt."""
+    """
+    Downloads a ZIP archive from Google Cloud Storage and extracts contents of text and log files.
+
+    Args:
+        raw_blob_name (str): The raw blob name of the ZIP file in GCS.
+
+    Returns:
+        str: Combined text extracted from matching files, truncated if individual files exceed limit.
+    """
     try:
         blob_path = _clean_blob_name(raw_blob_name)
         bucket = storage_client.bucket(BUCKET_NAME)
@@ -48,6 +59,7 @@ def extract_text_from_zip(raw_blob_name: str) -> str:
                 if filename.lower().endswith(('.log', '.txt')):
                     with z.open(filename) as f:
                         text = f.read().decode('utf-8', errors='ignore')
+                        # Truncate large files to prevent exceeding LLM context limits
                         if len(text) > 50000:
                             text = "[... TRONQUÉ ...] \n" + text[-50000:]
                         extracted_text += f"\n--- Fichier {filename} ---\n{text}\n"
@@ -59,7 +71,17 @@ def extract_text_from_zip(raw_blob_name: str) -> str:
 
 
 def analyze_issue_attachments_and_save(issue_id: int):
-    """Analyse les pièces jointes d'une issue avec Gemini + Grounding Datastore."""
+    """
+    Analyzes all valid attachments for a given issue using Gemini with Vertex AI Search grounding.
+
+    Retrieves issue attachments (images, videos, ZIP logs, documents) from the database,
+    downloads and formats them, queries the Gemini model with a LIMS expert system prompt,
+    cleans up any inline search citations, updates the database with the generated summary,
+    and triggers a state update.
+
+    Args:
+        issue_id (int): The unique identifier of the issue to analyze.
+    """
     connection = get_db_connection()
     if not connection:
         print("[AI EXTRACTOR ERROR]: Connexion BDD impossible")
@@ -69,10 +91,12 @@ def analyze_issue_attachments_and_save(issue_id: int):
     try:
         cursor = connection.cursor()
 
+        # Retrieve issue title for prompt context
         cursor.execute("SELECT title FROM c_issue WHERE id_issue = %s", (issue_id,))
         issue_row = cursor.fetchone()
         issue_title = issue_row[0] if issue_row else f"Issue #{issue_id}"
 
+        # Fetch active root-level attachments
         qry = """
             SELECT attachment_name, attachment_type, url_path 
             FROM c_issue_attachment 
@@ -88,6 +112,7 @@ def analyze_issue_attachments_and_save(issue_id: int):
 
         parts_for_gemini = []
 
+        # Process each attachment dynamically based on its designated type
         for att_name, att_type, public_url in attachments:
             blob_name = _clean_blob_name(public_url)
             gcs_uri = f"gs://{BUCKET_NAME}/{blob_name}"
@@ -134,7 +159,7 @@ def analyze_issue_attachments_and_save(issue_id: int):
         """
         parts_for_gemini.append(types.Part.from_text(text=prompt))
 
-        # Config de l'outil Grounding Datastore
+        # Setup Vertex AI Search grounding tools using the specified datastore resource path
         tools = []
         try:
             datastore_resource_path = f"projects/{PROJECT_ID}/locations/global/collections/default_collection/dataStores/{DATASTORE_ID}"
@@ -149,7 +174,7 @@ def analyze_issue_attachments_and_save(issue_id: int):
         except Exception as e:
             print(f"[WARNING]: Impossibilité d'attacher le datastore : {e}")
 
-        # Génération de la réponse via Vertex AI
+        # Execute multimodal content generation request via official client SDK
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=parts_for_gemini,
@@ -161,17 +186,16 @@ def analyze_issue_attachments_and_save(issue_id: int):
         
         raw_ai_summary = response.text.strip()
 
-        # --- NETTOYAGE POST-TRAITEMENT DES CITATIONS (REGEX) ---
+        # Sanitize and strip out grounding search citations from the raw model response
         cleaned_summary = re.sub(r'\[(?:cite:\s*)?\d+(?:,\s*\d+)*\]', '', raw_ai_summary)
         cleaned_summary = re.sub(r'\[\d+\]', '', cleaned_summary)
         cleaned_summary = " ".join(cleaned_summary.split()) 
 
-        # Enregistrement en base de données
+        # Persist generated summary, commit database changes, and trigger global state notification
         update_qry = "UPDATE c_issue SET ai_attachments_summary = %s WHERE id_issue = %s"
         cursor.execute(update_qry, (cleaned_summary, issue_id))
         connection.commit()
         
-        # 🚀 UPDATE DU JSON GLOBAL (Maintenant que le résumé IA est en BDD)
         trigger_state_json_update()
         
         print(f"[AI EXTRACTOR SUCCESS]: Résumé généré pour l'issue #{issue_id}")

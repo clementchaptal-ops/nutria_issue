@@ -9,6 +9,21 @@ from services.state_manager import trigger_state_json_update
 USE_MOCK_DATA = os.environ.get("USE_MOCK_DATA", "True") == "True"
 
 def upload_attachments(issue_id, files_data, current_user, client_ip):
+    """
+    Uploads multiple file attachments associated with a specific issue to Google Cloud Storage.
+
+    Saves attachment metadata to the database and, if mock mode is disabled, 
+    spawns an asynchronous background thread to analyze the documents using an AI extractor.
+
+    Args:
+        issue_id (int/str): The ID of the issue the attachments belong to.
+        files_data (list): A list of dictionaries, each containing 'filename', 'content_type', and 'bytes'.
+        current_user (dict): Context of the authenticated user.
+        client_ip (str): The IP address of the client performing the action.
+
+    Returns:
+        tuple: A dictionary response payload and an HTTP status code integer.
+    """
     uploaded_files_info = []
     file_names_list = []
     username = current_user.get("sub", "UNKNOWN")
@@ -21,6 +36,7 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
 
             file_names_list.append(filename)
 
+            # Upload the file to GCS bucket and retrieve URI/URL details
             gcs_info = upload_to_gcs(file_bytes, filename, issue_id)
             attach_type = get_oracle_attachment_type(content_type, filename)
 
@@ -46,6 +62,7 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
             cursor = connection.cursor()
 
             try:
+                # Insert metadata record for each successfully uploaded file
                 for file_data in uploaded_files_info:
                     qry = "INSERT INTO c_issue_attachment (id_issue, attachment_name, attachment_type, url_path) VALUES (%s, %s, %s, %s)"
                     cursor.execute(qry, (issue_id, file_data["original_name"], file_data["type"], file_data["url_path"]))
@@ -53,6 +70,7 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
                 connection.commit()
                 log_user_action(user_name=username, action_type="UPLOAD_ATTACHMENTS", target_id=str(issue_id), details=audit_details, ip_address=client_ip)
 
+                # Process document analysis asynchronously via background thread
                 def run_ai_in_background(target_issue_id):
                     try:
                         from services.ai_extractor import analyze_issue_attachments_and_save
@@ -79,10 +97,32 @@ def upload_attachments(issue_id, files_data, current_user, client_ip):
         return {"error": "error.storage_upload", "details": "error.internal_upload_process"}, 500
 
 def get_attachment_file(issue_id, filename):
+    """
+    Constructs and returns the public GCS URL path for a specific file associated with an issue.
+
+    Args:
+        issue_id (int/str): The ID of the target issue.
+        filename (str): The filename of the attachment.
+
+    Returns:
+        tuple: A dictionary containing the target URL path and an HTTP status code.
+    """
     public_url = f"[https://storage.googleapis.com/](https://storage.googleapis.com/){BUCKET_NAME}/tickets/ticket_{issue_id}/{filename}"
     return {"public_url": public_url}, 200
 
 def delete_attachment(issue_id, filename, current_user, client_ip):
+    """
+    Performs a soft delete on an attachment by updating its removed state in the database.
+
+    Args:
+        issue_id (int/str): The ID of the issue.
+        filename (str): The filename of the attachment to mark as deleted.
+        current_user (dict): Context of the authenticated user performing the deletion.
+        client_ip (str): The IP address of the client machine.
+
+    Returns:
+        tuple: A dictionary response payload and an HTTP status code.
+    """
     username = current_user.get("sub", "UNKNOWN")
 
     if USE_MOCK_DATA:
@@ -94,6 +134,7 @@ def delete_attachment(issue_id, filename, current_user, client_ip):
 
         try:
             cursor = connection.cursor()
+            # Perform a logical soft-delete rather than physically deleting the record
             soft_delete_qry = "UPDATE c_issue_attachment SET removed = 'T' WHERE id_issue = %s AND url_path LIKE %s"
             cursor.execute(soft_delete_qry, (issue_id, f"%{filename}%"))
             connection.commit()

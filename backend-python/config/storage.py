@@ -8,10 +8,22 @@ from google.cloud import storage
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 
 def make_signed_url(public_url: str) -> str:
-    """Generates a temporary signed URL (15 min) compatible with Cloud Run and GCP IAM Credentials."""
+    """
+    Generate a secure, temporary (15 minutes) signed URL for a public GCS object.
+
+    Uses GCP IAM service account credentials to sign the request. This approach
+    is compatible with Cloud Run and ambient IAM configurations.
+
+    Args:
+        public_url (str): The fully qualified public GCS URL.
+
+    Returns:
+        str: The signed access URL, or the original URL if parsing or signing fails.
+    """
     if not public_url or "storage.googleapis.com" not in public_url:
         return public_url
 
+    # Parse bucket and blob names from the standard public storage endpoint
     parts = public_url.replace("https://storage.googleapis.com/", "").split("/", 1)
     if len(parts) != 2:
         return public_url
@@ -19,6 +31,7 @@ def make_signed_url(public_url: str) -> str:
     bucket_name, blob_name = parts[0], parts[1]
 
     try:
+        # Refresh ambient credentials to obtain the required service account email and token
         credentials, _ = google.auth.default()
         auth_request = requests.Request()
         credentials.refresh(auth_request)
@@ -39,7 +52,16 @@ def make_signed_url(public_url: str) -> str:
         return public_url
 
 def get_oracle_attachment_type(content_type: str, filename: str) -> str:
-    """Evaluates the MIME type to return the legacy Oracle attachment type."""
+    """
+    Map a file's MIME type or extension to a legacy Oracle attachment type.
+
+    Args:
+        content_type (str): The MIME/Media type of the uploaded file.
+        filename (str): The source file name used as a fallback for ZIP detection.
+
+    Returns:
+        str: Corresponding Oracle category classification ('IMAGE', 'VIDEO', 'ZIP', or 'DOCUMENT').
+    """
     content_type = content_type.lower()
     if content_type.startswith('image/'):
         return 'IMAGE'
@@ -51,6 +73,20 @@ def get_oracle_attachment_type(content_type: str, filename: str) -> str:
         return 'DOCUMENT'
 
 def upload_to_gcs(file_bytes: bytes, filename: str, issue_id) -> dict:
+    """
+    Upload raw file bytes directly to a structured path in Google Cloud Storage.
+
+    Constructs a unique filepath within an issue-specific directory using a short UUID
+    prefix to prevent naming collisions.
+
+    Args:
+        file_bytes (bytes): Binary payload of the file.
+        filename (str): Original client-side filename.
+        issue_id: Identifier of the parent issue entity.
+
+    Returns:
+        dict: Mapping of 'blob_path', 'gs_uri', and 'public_url'.
+    """
     try:
         client = storage.Client()
         bucket = client.bucket(BUCKET_NAME)

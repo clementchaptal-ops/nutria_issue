@@ -4,23 +4,26 @@ from google import genai
 from google.genai import types
 from config.database import get_db_connection
 
-# --- CONFIGURATION GCP & VERTEX AI ---
 BUCKET_NAME = os.environ.get("BUCKET_NAME", "nutria-issue-attachments")
 PROJECT_ID = os.environ.get("GCP_PROJECT", os.environ.get("GOOGLE_CLOUD_PROJECT", "nutria-issue"))
 
 LOCATION = os.environ.get("GCP_LOCATION", "us-central1")
 MODEL_NAME = "gemini-2.5-flash"
-STATE_FILE_PATH = "system/active_issues_state.json"  # <-- NOUVEAU CHEMIN DU FICHIER
+STATE_FILE_PATH = "system/active_issues_state.json"
 
-# Initialisation du client GenAI unifié (Authentification Cloud Run automatique)
 client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
 
 
 def generate_suggested_regroupements(creator_id: str):
     """
-    1. Récupère le JSON global des issues actives DIRECTEMENT depuis Google Cloud Storage.
-    2. Gemini l'analyse, détecte les anomalies communes et crée les regroupements suggérés.
-    3. Enregistre les suggestions dans la base de données PostgreSQL.
+    Fetch active issues from GCS, analyze correlations using Gemini, and store
+    suggested clusters in the PostgreSQL database.
+
+    Args:
+        creator_id (str): The identifier of the creator initiating the clustering process.
+
+    Returns:
+        tuple: A dictionary response with status message/data and an HTTP status code.
     """
     connection = get_db_connection()
     if not connection:
@@ -30,10 +33,9 @@ def generate_suggested_regroupements(creator_id: str):
     try:
         cursor = connection.cursor()
 
-        # --- 1. LECTURE DIRECTE DU FICHIER JSON SUR CLOUD STORAGE (ZÉRO CHARGE BDD) ---
+        # Build GCS URI pointing to the active issues JSON state file
         gcs_uri = f"gs://{BUCKET_NAME}/{STATE_FILE_PATH}"
 
-        # --- 2. Prompt pour Gemini ---
         prompt = f"""
         You are an AIOps incident correlation engine for a LIMS / Citrix platform.
         Analyze the attached JSON file containing the complete export of currently open support tickets.
@@ -66,7 +68,7 @@ def generate_suggested_regroupements(creator_id: str):
         }}
         """
 
-        # --- 3. Appel de génération via Vertex AI en passant directement l'URI GCS ---
+        # Prepare GenAI payload with GCS file reference and analysis instructions
         parts_for_gemini = [
             types.Part.from_uri(file_uri=gcs_uri, mime_type="text/plain"), 
             types.Part.from_text(text=prompt)
@@ -81,28 +83,27 @@ def generate_suggested_regroupements(creator_id: str):
             )
         )
 
+        # Clean markdown wrappers from LLM response before parsing JSON
         raw_text = response.text.strip().replace("```json", "").replace("```", "").strip()
         data = json.loads(raw_text)
 
         created_groups_count = 0
 
-        # --- 4. Insertion des suggestions en base de données ---
         for group in data.get("suggested_groups", []):
             issue_ids = group.get("issue_ids", [])
             if len(issue_ids) < 2:
                 continue
 
-            # Création du regroupement avec status = 'SUGGESTED'
+            # Insert suggested cluster into the regroupment table
             insert_reg_qry = """
                 INSERT INTO c_issue_regroupment (title, description, ai_reasoning, status, created_by, created_on, changed_on)
                 VALUES (%s, %s, %s, 'SUGGESTED', %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 RETURNING id_regroupment
             """
-            # On passe le creator_id comme 4ème paramètre
             cursor.execute(insert_reg_qry, (group.get("title"), group.get("reasoning"), group.get("reasoning"), creator_id))
             reg_id = cursor.fetchone()[0]
 
-            # Liaisons avec link_status = 'AI_SUGGESTION'
+            # Associate related issues to the newly created regroupment group
             for i_id in issue_ids:
                 insert_link_qry = """
                     INSERT INTO c_link_issue_regroupment (id_regroupment, id_issue, link_status)
