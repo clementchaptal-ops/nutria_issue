@@ -96,8 +96,10 @@ NUTRIA relies heavily on a modern, serverless Google Cloud stack:
 ---
 
 ## Local Development Setup
-All the variable are stored in the nutria-api in the variable section
+*All the variable are stored in the nutria-api in the variable section
 ### 1. Backend Initialization
+
+
 Create a `.env` file in `backend-python/`:
 ```ini
 DB_USER=postgres
@@ -109,4 +111,22 @@ GCP_PROJECT=nutria-issue
 BUCKET_NAME=nutria-issue-attachments
 JWT_SECRET_KEY=""
 GOOGLE_CLIENT_ID=""
-LABWARE_API_TOKEN=""
+LABWARE_API_TOKEN="" 
+
+cd backend-python
+python -m venv venv
+source venv/bin/activate 
+pip install -r requirements.txt
+functions-framework --target=nutria_api --debug
+
+### 2. Frontend Initialization
+VITE_API_URL=http://localhost:8080
+
+
+cd frontend-react
+npm install
+npm run dev
+
+Deployment
+The backend is deployed via Google Cloud Build. Run this command at the root of the project:
+gcloud builds submit --config cloudbuild.yaml
