@@ -205,7 +205,7 @@ function IssueForm() {
 
       // Evaluate role capabilities and locate ownership matches for modification actions
       const currentUser = getDecodedToken()
-      if (currentUser && currentStatus !== 'CANCELED' && currentStatus !== 'CLOSED' && currentStatus !== 'ACT KNOWLEDGE') {
+      if (currentUser && currentStatus !== 'CANCELED' && currentStatus !== 'CLOSED') {
         const userRole = currentUser.role
         const userLoc = currentUser.location
         const userEmail = currentUser.email?.toLowerCase()
@@ -263,12 +263,16 @@ function IssueForm() {
       } else {
         toast.error(t('ticket.download_error', 'File link not found.'))
       }
-    } catch (error) {
-      toast.error(t('ticket.download_error', 'Failed to download file.'))
+    } catch (error: any) {
+      if (error.response && error.response.status === 404) {
+        toast.error(t('ticket.error.file_too_large', 'Error: The logs/working directory file is too large to be uploaded by LabWare.'));
+      } else {
+        toast.error(t('ticket.download_error', 'Failed to download file.'));
+      }
     }
   }
 
-  const isFormValid = title.trim() !== '' && issueType !== '' && criticity !== '' && frequency !== '' && description.trim() !== ''
+  const isFormValid = title.trim() !== '' && issueType !== '' && frequency !== '' && description.trim() !== ''
 
   /**
    * Event handler that submits completed fields to update an existing issue or register a new ticket.
@@ -280,7 +284,7 @@ function IssueForm() {
     setIsSubmitting(true)
 
     const payloadData = {
-      title, issue_type: issueType, criticity, frequency, blocking_issue: blockingIssue, description,
+      title, issue_type: issueType, criticity: 'MEDIUM', frequency, blocking_issue: blockingIssue, description,
       current_project: currentContext.current_project, current_batch: currentContext.current_batch,
       current_sample: currentContext.current_sample ? Number(currentContext.current_sample) : null,
       current_analysis: currentContext.current_analysis, current_analysis_variation: currentContext.current_analysis_variation,
@@ -482,11 +486,13 @@ function IssueForm() {
         
         {canEdit && (
           <div style={{ display: 'flex', gap: '10px' }}>
-            {!isEditing && status !== 'CLOSED' && status !== 'ACT KNOWLEDGE' && status !== 'CANCELED' && (
+            {!isEditing && status !== 'CLOSED' && status !== 'CANCELED' && (
               <>
-                <button type="button" onClick={() => handleCloseTicket('ACT KNOWLEDGE')} style={{ padding: '6px 16px', borderRadius: '4px', border: '1px solid #36b37e', background: '#e3fcef', color: '#006644', cursor: 'pointer', fontWeight: 'bold' }}>
-                  ✅ {t('ticket.act_knowledge', 'Act Knowledge')}
-                </button>
+                {status !== 'ACT KNOWLEDGE' && (
+                  <button type="button" onClick={() => handleCloseTicket('ACT KNOWLEDGE')} style={{ padding: '6px 16px', borderRadius: '4px', border: '1px solid #36b37e', background: '#e3fcef', color: '#006644', cursor: 'pointer', fontWeight: 'bold' }}>
+                    ✅ {t('ticket.act_knowledge', 'Act Knowledge')}
+                  </button>
+                )}
                 <button type="button" onClick={() => handleCloseTicket('CLOSED')} style={{ padding: '6px 16px', borderRadius: '4px', border: '1px solid #42526e', background: '#ebecf0', color: '#42526e', cursor: 'pointer', fontWeight: 'bold' }}>
                   🔒 {t('ticket.close', 'Close')}
                 </button>
@@ -536,16 +542,6 @@ function IssueForm() {
                     <option value="CRASH">{t('issues.CRASH', 'CRASH')}</option>
                     <option value="ILLOGICAL">{t('issues.ILLOGICAL', 'ILLOGICAL')}</option>
                     <option value="OTHER">{t('issues.OTHER', 'OTHER')}</option>
-                  </select>
-                </div>
-
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>{t('ticket.criticity', 'Criticity')} <span className={styles.required}>*</span></label>
-                  <select value={criticity} onChange={(e) => setCriticity(e.target.value)} className={styles.select} required>
-                    <option value="">-- {t('common.select', 'Select')} --</option>
-                    <option value="LOW">{t('ticket.criticity_low', 'LOW')}</option>
-                    <option value="MEDIUM">{t('ticket.criticity_medium', 'MEDIUM')}</option>
-                    <option value="HIGH">{t('ticket.criticity_high', 'HIGH')}</option>
                   </select>
                 </div>
               </div>

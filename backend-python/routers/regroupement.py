@@ -37,7 +37,8 @@ def get_all_regroupements(current_user):
                    u.full_name, r.created_by,
                    TO_CHAR(r.created_on, 'YYYY-MM-DD HH24:MI') as created_on,
                    (SELECT COUNT(*) FROM c_link_issue_regroupment l WHERE l.id_regroupment = r.id_regroupment) as ticket_count,
-                   r.status
+                   r.status,
+                   (SELECT i.issue_type FROM c_link_issue_regroupment l JOIN c_issue i ON l.id_issue = i.id_issue WHERE l.id_regroupment = r.id_regroupment LIMIT 1) as issue_type
             FROM c_issue_regroupment r
             LEFT JOIN lims_users u ON TRIM(UPPER(r.created_by)) = TRIM(UPPER(u.user_name))
             ORDER BY r.id_regroupment DESC
@@ -54,7 +55,8 @@ def get_all_regroupements(current_user):
                 "created_by": row[4] if row[4] else (row[5] if row[5] else "Unknown"),
                 "created_on": row[6],
                 "ticket_count": row[7],
-                "status": row[8] if row[8] else "OPEN"
+                "status": row[8] if row[8] else "OPEN",
+                "issue_type": row[9] if row[9] else "UNKNOWN"
             })
             
         return regroupements, 200

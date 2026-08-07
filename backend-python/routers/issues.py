@@ -52,11 +52,8 @@ def get_all_issues(current_user):
         else:
             safe_location = str(user_location).strip().upper() if user_location else ""
             
-            # Extract root site location prefix before optional sub-site hyphen separators
-            if len(safe_location) >= 7 and safe_location[6:7] == "-":
-                site_root = safe_location[:6]
-            else:
-                site_root = safe_location
+            # Extract the first 2 letters for country filtering (e.g., "PL" from "PL-WAW")
+            site_root = safe_location[:2] if len(safe_location) >= 2 else safe_location
 
             qry = base_select + " WHERE TRIM(UPPER(u.location)) LIKE TRIM(UPPER(%s)) || '%%' " + group_and_order
             cursor.execute(qry, (site_root,))

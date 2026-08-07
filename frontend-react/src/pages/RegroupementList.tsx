@@ -17,6 +17,15 @@ type SortConfig = {
   direction: 'asc' | 'desc';
 }
 
+const getTypeBadgeStyle = (type: string) => {
+  switch(type) {
+    case 'CRASH': return { bg: '#ffebe6', color: '#bf2600' }
+    case 'SLOW': return { bg: '#fff0b3', color: '#8f6b00' }
+    case 'ILLOGICAL': return { bg: '#eae6ff', color: '#403294' }
+    default: return { bg: '#f4f5f7', color: '#42526e' }
+  }
+}
+
 /**
  * Dashboard component for managing classic and AI-suggested regroupements.
  * Provides views for searching, sorting, and filtering manually created groups 
@@ -195,6 +204,10 @@ function RegroupementList() {
   // Shared table columns configurations across both visual lists
   const commonColumns: TableColumn<any>[] = [
     { key: 'id_regroupment', label: t('regroupements.table.id', 'ID'), render: (item) => <span style={{ fontWeight: 'bold', color: '#0052cc' }}>#{item.id_regroupment}</span> },
+    { key: 'issue_type', label: t('dashboard.search.issue_type', 'Type'), render: (item) => {
+      const s = getTypeBadgeStyle(item.issue_type || 'MIXED');
+      return <span style={{ background: s.bg, color: s.color, padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>{item.issue_type || 'MIXED'}</span>
+    }},
     { key: 'title', label: t('dashboard.search.title', 'Title'), render: (item) => <strong>{item.title}</strong> },
     { key: 'created_by', label: t('regroupements.table.creator', 'Created By') },
     { key: 'ticket_count', label: t('regroupements.table.issues', 'Issues') }
