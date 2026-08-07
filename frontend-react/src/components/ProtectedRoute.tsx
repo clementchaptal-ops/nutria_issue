@@ -19,6 +19,9 @@ const ProtectedRoute = () => {
     // Reconstruct the full path including any active query parameters
     const fullUrl = `${location.pathname}${location.search}`
     
+    // FIX: Save target URL to persistent storage for Google SSO return
+    localStorage.setItem('nutria_redirect_target', fullUrl)
+    
     // Redirect unauthorized users to login, replacing the history entry
     return <Navigate to="/login" replace state={{ from: fullUrl }} />
   }

@@ -39,7 +39,11 @@ apiClient.interceptors.response.use(
       );
       
       // Redirect the application context to the login page if not already there
+
       if (window.location.pathname !== '/login') {
+        const targetUrl = window.location.pathname + window.location.search;
+        localStorage.setItem('nutria_redirect_target', targetUrl);
+        
         window.location.href = '/login';
       }
     }

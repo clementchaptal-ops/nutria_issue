@@ -31,7 +31,10 @@ function Login() {
   const [loading, setLoading] = useState<boolean>(false)
 
   const GOOGLE_CLIENT_ID = "549394697229-tvgof9to9fcu4um4260vnigbtt57o9fo.apps.googleusercontent.com"
-  const from = location.state?.from || '/dashboard'
+  
+  
+  const storedTarget = localStorage.getItem('nutria_redirect_target')
+  const from = location.state?.from || storedTarget || '/dashboard'
 
   // Extract query parameters to handle potential profile preselection
   let searchString = from.includes('?') ? from.substring(from.indexOf('?')) : ''
