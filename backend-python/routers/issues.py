@@ -434,7 +434,7 @@ def validate_issue(issue_id, request_json, current_user, client_ip):
 
         if user_role == "USER" and safe_issue_email != safe_user_email:
             return {"error": "error.forbidden_access"}, 403
-        elif user_role == "LOCAL_ADMIN" and safe_issue_loc != safe_user_loc:
+        elif user_role == "LOCAL_ADMIN" and safe_issue_loc[:2] != safe_user_loc[:2]:
             return {"error": "error.forbidden_access"}, 403
 
         update_qry = """
@@ -502,7 +502,7 @@ def cancel_issue(issue_id, current_user, client_ip):
 
         if user_role == "USER" and safe_ticket_email != safe_user_email:
             return {"error": "error.cancel_forbidden_ownership"}, 403
-        elif user_role == "LOCAL_ADMIN" and safe_ticket_loc != safe_user_loc:
+        elif user_role == "LOCAL_ADMIN" and safe_ticket_loc[:2] != safe_user_loc[:2]:
             return {"error": "error.cancel_forbidden_jurisdiction"}, 403
 
         cursor.execute("UPDATE c_issue SET status = 'CANCELED', changed_on = CURRENT_TIMESTAMP WHERE id_issue = %s", (issue_id,))
