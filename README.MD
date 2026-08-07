@@ -1,8 +1,7 @@
-# NUTRIA - LIMS AIOps & Issue Tracking Platform
+# NUTRIA Issue 
 
-NUTRIA is an advanced Technical Support and Artificial Intelligence for IT Operations (AIOps) platform designed specifically to diagnose, correlate, and resolve incidents related to the LabWare LIMS and Citrix environments.
-
-This repository is a monorepo containing the complete source code, divided into a reactive React frontend and a Serverless Python API powered by Generative AI.
+NUTRIA Issue is a Technical Support and Artificial Intelligence for Nutria IT team platform  specifically to diagnose, correlate, and resolve incidents related to the LIMS Nutria
+This repository containing the source code, divided into a reactive React frontend and a Serverless Python API powered by Generative AI.
 
 ---
 
@@ -127,6 +126,6 @@ cd frontend-react
 npm install
 npm run dev
 
-Deployment
+## Deployment
 The backend is deployed via Google Cloud Build. Run this command at the root of the project:
 gcloud builds submit --config cloudbuild.yaml
